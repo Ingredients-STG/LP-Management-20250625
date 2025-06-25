@@ -1,5 +1,5 @@
-// API Configuration - Updated with deployed API Gateway URL
-const API_BASE_URL = 'https://sigcqzr25l.execute-api.eu-west-2.amazonaws.com/dev';
+// API Configuration - Updated with new API Gateway URL
+const API_BASE_URL = 'https://uliwzluwwi.execute-api.eu-west-2.amazonaws.com/dev';
 
 class AssetManagementApp {
     constructor() {
@@ -91,6 +91,7 @@ class AssetManagementApp {
     async loadDashboardData() {
         try {
             this.showLoading();
+            
             const response = await fetch(`${API_BASE_URL}/items/dashboard`);
             
             if (!response.ok) {
@@ -178,6 +179,7 @@ class AssetManagementApp {
     async loadAssets() {
         try {
             this.showLoading();
+            
             const response = await fetch(`${API_BASE_URL}/items/assets`);
             
             if (!response.ok) {

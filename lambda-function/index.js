@@ -34,8 +34,17 @@ exports.handler = async (event) => {
 
         // Extract resource from path
         const pathParts = path.split('/').filter(part => part !== '');
-        const resource = pathParts[1]; // /items/{resource}
-        const id = pathParts[2]; // optional ID
+        console.log('Path parts:', pathParts);
+        
+        // Handle different path structures: /items/{resource} or /dev/items/{resource}
+        let resourceIndex = pathParts.indexOf('items') + 1;
+        if (resourceIndex === 0) {
+            // Fallback: assume items is at index 1
+            resourceIndex = 2;
+        }
+        
+        const resource = pathParts[resourceIndex]; // resource after 'items'
+        const id = pathParts[resourceIndex + 1]; // optional ID
 
         console.log(`Resource: ${resource}, ID: ${id}, Method: ${httpMethod}`);
 
