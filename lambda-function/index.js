@@ -200,6 +200,9 @@ async function updateAsset(id, updates) {
         'warrantyExpiry', 'notes'
     ];
     
+    // Reserved keywords that need ExpressionAttributeNames
+    const reservedKeywords = ['status'];
+    
     const params = {
         TableName: ASSETS_TABLE,
         Key: { id },
@@ -207,13 +210,21 @@ async function updateAsset(id, updates) {
         ExpressionAttributeValues: {
             ':timestamp': timestamp
         },
+        ExpressionAttributeNames: {},
         ReturnValues: 'ALL_NEW'
     };
 
     // Build update expression dynamically for allowed fields only
     Object.keys(updates).forEach(key => {
         if (allowedFields.includes(key)) {
-            params.UpdateExpression += `, ${key} = :${key}`;
+            if (reservedKeywords.includes(key)) {
+                // Use attribute name placeholder for reserved keywords
+                const placeholder = `#${key}`;
+                params.UpdateExpression += `, ${placeholder} = :${key}`;
+                params.ExpressionAttributeNames[placeholder] = key;
+            } else {
+                params.UpdateExpression += `, ${key} = :${key}`;
+            }
             params.ExpressionAttributeValues[`:${key}`] = updates[key] || '';
         }
     });
