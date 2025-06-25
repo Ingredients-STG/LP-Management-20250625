@@ -1,110 +1,72 @@
-// API Configuration - Updated with new API Gateway URL
+// API Configuration
 const API_BASE_URL = 'https://uliwzluwwi.execute-api.eu-west-2.amazonaws.com/dev';
 
-class AssetManagementApp {
+class WaterTapAssetManager {
     constructor() {
-        this.currentTab = 'assets';
         this.assets = [];
-        this.maintenance = [];
-        this.locations = [];
         this.dashboardData = {};
+        this.currentEditingAsset = null;
         
         this.init();
     }
 
     init() {
-        console.log('Initializing AssetManagementApp...');
+        console.log('Initializing Water Tap Asset Manager...');
         this.setupEventListeners();
-        console.log('Event listeners set up, loading data...');
         this.loadDashboardData();
         this.loadAssets();
-        console.log('Initial data loading started');
+        console.log('Initialization complete');
     }
 
     setupEventListeners() {
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
-            });
-        });
-
-        // Modal controls
+        // Add Asset Button
         document.getElementById('addAssetBtn').addEventListener('click', () => {
-            this.showModal('addAssetModal');
+            this.showAssetModal();
         });
 
-        document.getElementById('cancelAddAsset').addEventListener('click', () => {
-            this.hideModal('addAssetModal');
+        // Modal Controls
+        document.getElementById('cancelAsset').addEventListener('click', () => {
+            this.hideAssetModal();
         });
 
-        document.getElementById('addAssetForm').addEventListener('submit', (e) => {
+        document.getElementById('assetForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            this.handleAddAsset(e);
+            this.handleSaveAsset(e);
         });
 
-        // Refresh button
+        // Refresh Button
         document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.refreshAllData();
+            this.refreshData();
+        });
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            this.filterAssets(e.target.value);
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchInput').value;
+            this.filterAssets(searchTerm);
         });
 
         // Close modal on background click
-        document.getElementById('addAssetModal').addEventListener('click', (e) => {
-            if (e.target.id === 'addAssetModal') {
-                this.hideModal('addAssetModal');
+        document.getElementById('assetModal').addEventListener('click', (e) => {
+            if (e.target.id === 'assetModal') {
+                this.hideAssetModal();
             }
         });
     }
 
-    switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
-            btn.classList.add('border-transparent', 'text-gray-500');
-        });
-
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active', 'border-blue-500', 'text-blue-600');
-        document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
-
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.add('hidden');
-        });
-
-        document.getElementById(`${tabName}-tab`).classList.remove('hidden');
-        this.currentTab = tabName;
-
-        // Load data for the active tab
-        switch (tabName) {
-            case 'assets':
-                this.loadAssets();
-                break;
-            case 'maintenance':
-                this.loadMaintenance();
-                break;
-            case 'locations':
-                this.loadLocations();
-                break;
-            case 'analytics':
-                this.loadAnalytics();
-                break;
-        }
-    }
-
     async loadDashboardData() {
         try {
-            console.log('Starting loadDashboardData...');
-            const statsContainer = document.getElementById('dashboardStats');
-            console.log('Dashboard stats container found:', !!statsContainer);
-            
+            console.log('Loading dashboard data...');
             this.showLoading();
             
-            console.log('Loading dashboard data from:', `${API_BASE_URL}/items/dashboard`);
             const response = await fetch(`${API_BASE_URL}/items/dashboard`);
             console.log('Dashboard response status:', response.status);
             
             if (!response.ok) {
-                throw new Error(`Failed to load dashboard data: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to load dashboard data: ${response.status}`);
             }
 
             this.dashboardData = await response.json();
@@ -112,7 +74,6 @@ class AssetManagementApp {
             this.renderDashboardStats();
         } catch (error) {
             console.error('Error loading dashboard data:', error);
-            console.log('Falling back to mock data');
             this.showMockDashboardData();
         } finally {
             this.hideLoading();
@@ -189,74 +150,96 @@ class AssetManagementApp {
 
     async loadAssets() {
         try {
-            console.log('Starting loadAssets...');
-            const assetsTableBody = document.getElementById('assetsTableBody');
-            console.log('Assets table body found:', !!assetsTableBody);
-            
+            console.log('Loading assets...');
             this.showLoading();
             
-            console.log('Loading assets from:', `${API_BASE_URL}/items/assets`);
             const response = await fetch(`${API_BASE_URL}/items/assets`);
             console.log('Assets response status:', response.status);
             
             if (!response.ok) {
-                throw new Error(`Failed to load assets: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to load assets: ${response.status}`);
             }
 
             const data = await response.json();
             console.log('Assets data loaded:', data);
             this.assets = data.assets || [];
             this.renderAssets();
+            this.updateAssetCount();
         } catch (error) {
             console.error('Error loading assets:', error);
-            console.log('Falling back to mock data');
             this.showMockAssets();
         } finally {
             this.hideLoading();
         }
     }
 
-    renderAssets() {
+    renderAssets(assetsToRender = null) {
         const tbody = document.getElementById('assetsTableBody');
+        const assets = assetsToRender || this.assets;
         
-        if (this.assets.length === 0) {
+        if (assets.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                        No assets found. Click "Add Asset" to get started.
+                    <td colspan="14" class="px-4 py-8 text-center text-gray-500">
+                        <i class="fas fa-tint text-gray-300 text-4xl mb-4"></i>
+                        <p>No assets found. Click "Add Asset" to get started.</p>
                     </td>
                 </tr>
             `;
             return;
         }
 
-        tbody.innerHTML = this.assets.map(asset => `
+        tbody.innerHTML = assets.map(asset => `
             <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${asset.assetBarcode}
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                    ${asset.assetBarcode || '-'}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${asset.assetType}
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.assetType || '-'}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${asset.floor ? `Floor ${asset.floor}` : ''} ${asset.room ? `- ${asset.room}` : ''}
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.primaryIdentifier || '-'}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-4 py-3 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${this.getStatusColor(asset.status)}">
-                        ${asset.status}
+                        ${asset.status || 'ACTIVE'}
                     </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.building || '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.floor || '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.room || '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     ${asset.filterNeeded ? 
                         `<span class="text-orange-600"><i class="fas fa-exclamation-triangle mr-1"></i>Required</span>` : 
                         '<span class="text-green-600"><i class="fas fa-check mr-1"></i>Not Required</span>'
                     }
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button class="text-indigo-600 hover:text-indigo-900 mr-3" onclick="app.editAsset('${asset.id}')">
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.filterType || '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.lastMaintenanceDate ? this.formatDate(asset.lastMaintenanceDate) : '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.nextMaintenanceDate ? this.formatDate(asset.nextMaintenanceDate) : '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.installationDate ? this.formatDate(asset.installationDate) : '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.warrantyExpiry ? this.formatDate(asset.warrantyExpiry) : '-'}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    <button class="text-indigo-600 hover:text-indigo-900 mr-3" onclick="app.editAsset('${asset.id}')" title="Edit Asset">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="text-red-600 hover:text-red-900" onclick="app.deleteAsset('${asset.id}')">
+                    <button class="text-red-600 hover:text-red-900" onclick="app.deleteAsset('${asset.id}')" title="Delete Asset">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
@@ -272,295 +255,174 @@ class AssetManagementApp {
                 return 'bg-orange-100 text-orange-800';
             case 'INACTIVE':
                 return 'bg-red-100 text-red-800';
-            default:
+            case 'DECOMMISSIONED':
                 return 'bg-gray-100 text-gray-800';
+            default:
+                return 'bg-green-100 text-green-800';
         }
     }
 
-    async handleAddAsset(event) {
+    formatDate(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    }
+
+    updateAssetCount() {
+        const count = this.assets.length;
+        document.getElementById('assetCount').textContent = `${count} asset${count !== 1 ? 's' : ''}`;
+    }
+
+    filterAssets(searchTerm) {
+        if (!searchTerm.trim()) {
+            this.renderAssets();
+            return;
+        }
+
+        const filtered = this.assets.filter(asset => {
+            const searchLower = searchTerm.toLowerCase();
+            return (
+                (asset.assetBarcode && asset.assetBarcode.toLowerCase().includes(searchLower)) ||
+                (asset.assetType && asset.assetType.toLowerCase().includes(searchLower)) ||
+                (asset.primaryIdentifier && asset.primaryIdentifier.toLowerCase().includes(searchLower)) ||
+                (asset.building && asset.building.toLowerCase().includes(searchLower)) ||
+                (asset.floor && asset.floor.toLowerCase().includes(searchLower)) ||
+                (asset.room && asset.room.toLowerCase().includes(searchLower)) ||
+                (asset.status && asset.status.toLowerCase().includes(searchLower))
+            );
+        });
+
+        this.renderAssets(filtered);
+    }
+
+    showAssetModal(asset = null) {
+        this.currentEditingAsset = asset;
+        const modal = document.getElementById('assetModal');
+        const title = document.getElementById('modalTitle');
+        const form = document.getElementById('assetForm');
+        
+        if (asset) {
+            title.textContent = 'Edit Asset';
+            this.populateForm(asset);
+        } else {
+            title.textContent = 'Add New Asset';
+            form.reset();
+        }
+        
+        modal.classList.remove('hidden');
+    }
+
+    hideAssetModal() {
+        document.getElementById('assetModal').classList.add('hidden');
+        document.getElementById('assetForm').reset();
+        this.currentEditingAsset = null;
+    }
+
+    populateForm(asset) {
+        const form = document.getElementById('assetForm');
+        const formData = new FormData();
+        
+        // Populate form fields with asset data
+        Object.keys(asset).forEach(key => {
+            const input = form.querySelector(`[name="${key}"]`);
+            if (input) {
+                if (input.type === 'checkbox') {
+                    input.checked = asset[key];
+                } else {
+                    input.value = asset[key] || '';
+                }
+            }
+        });
+    }
+
+    async handleSaveAsset(event) {
         const formData = new FormData(event.target);
         const assetData = {
             assetBarcode: formData.get('assetBarcode'),
             assetType: formData.get('assetType'),
             primaryIdentifier: formData.get('primaryIdentifier'),
+            status: formData.get('status') || 'ACTIVE',
+            building: formData.get('building'),
             floor: formData.get('floor'),
             room: formData.get('room'),
             filterNeeded: formData.get('filterNeeded') === 'on',
-            status: 'ACTIVE'
+            filterType: formData.get('filterType'),
+            lastMaintenanceDate: formData.get('lastMaintenanceDate'),
+            nextMaintenanceDate: formData.get('nextMaintenanceDate'),
+            installationDate: formData.get('installationDate'),
+            warrantyExpiry: formData.get('warrantyExpiry'),
+            notes: formData.get('notes')
         };
 
         try {
             this.showLoading();
-            console.log('Creating asset:', assetData);
-            const response = await fetch(`${API_BASE_URL}/items/assets`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(assetData)
-            });
+            console.log('Saving asset:', assetData);
 
-            console.log('Create asset response status:', response.status);
-
-            if (!response.ok) {
-                throw new Error(`Failed to create asset: ${response.status} ${response.statusText}`);
+            let response;
+            if (this.currentEditingAsset) {
+                // Update existing asset
+                response = await fetch(`${API_BASE_URL}/items/assets/${this.currentEditingAsset.id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(assetData)
+                });
+            } else {
+                // Create new asset
+                response = await fetch(`${API_BASE_URL}/items/assets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(assetData)
+                });
             }
 
-            const newAsset = await response.json();
-            console.log('New asset created:', newAsset);
-            this.assets.push(newAsset);
+            console.log('Save response status:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`Failed to save asset: ${response.status}`);
+            }
+
+            const savedAsset = await response.json();
+            console.log('Asset saved:', savedAsset);
+
+            if (this.currentEditingAsset) {
+                // Update existing asset in the array
+                const index = this.assets.findIndex(a => a.id === this.currentEditingAsset.id);
+                if (index !== -1) {
+                    this.assets[index] = savedAsset;
+                }
+            } else {
+                // Add new asset to the array
+                this.assets.push(savedAsset);
+            }
+
             this.renderAssets();
-            this.hideModal('addAssetModal');
-            event.target.reset();
-            this.showNotification('Asset added successfully!', 'success');
+            this.updateAssetCount();
+            this.hideAssetModal();
+            this.loadDashboardData(); // Refresh dashboard stats
+            this.showNotification(
+                this.currentEditingAsset ? 'Asset updated successfully!' : 'Asset added successfully!', 
+                'success'
+            );
             
-            // Reload dashboard to update stats
-            this.loadDashboardData();
         } catch (error) {
-            console.error('Error adding asset:', error);
-            this.showNotification('Failed to add asset. Please try again.', 'error');
+            console.error('Error saving asset:', error);
+            this.showNotification('Failed to save asset. Please try again.', 'error');
         } finally {
             this.hideLoading();
         }
     }
 
-    async loadMaintenance() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/items/maintenance`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to load maintenance records');
-            }
-
-            const data = await response.json();
-            this.maintenance = data.maintenanceRecords || [];
-            this.renderMaintenance();
-        } catch (error) {
-            console.error('Error loading maintenance:', error);
-            this.showMockMaintenance();
-        }
-    }
-
-    renderMaintenance() {
-        const container = document.getElementById('maintenanceList');
-        
-        if (this.maintenance.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-tools text-gray-400 text-4xl mb-4"></i>
-                    <p class="text-gray-500">No maintenance records found.</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.maintenance.map(record => `
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h4 class="font-medium text-gray-900">${record.maintenanceType}</h4>
-                        <p class="text-sm text-gray-500">Asset ID: ${record.assetId}</p>
-                        <p class="text-sm text-gray-500">Scheduled: ${record.scheduledDate}</p>
-                    </div>
-                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${this.getMaintenanceStatusColor(record.status)}">
-                        ${record.status}
-                    </span>
-                </div>
-                ${record.notes ? `<p class="mt-2 text-sm text-gray-600">${record.notes}</p>` : ''}
-            </div>
-        `).join('');
-    }
-
-    getMaintenanceStatusColor(status) {
-        switch (status) {
-            case 'COMPLETED':
-                return 'bg-green-100 text-green-800';
-            case 'IN_PROGRESS':
-                return 'bg-blue-100 text-blue-800';
-            case 'SCHEDULED':
-                return 'bg-yellow-100 text-yellow-800';
-            case 'CANCELLED':
-                return 'bg-red-100 text-red-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
-        }
-    }
-
-    async loadLocations() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/items/locations`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to load locations');
-            }
-
-            const data = await response.json();
-            this.locations = data.locations || [];
-            this.renderLocations();
-        } catch (error) {
-            console.error('Error loading locations:', error);
-            this.showMockLocations();
-        }
-    }
-
-    renderLocations() {
-        const container = document.getElementById('locationsList');
-        
-        if (this.locations.length === 0) {
-            container.innerHTML = `
-                <div class="col-span-full text-center py-8">
-                    <i class="fas fa-map-marker-alt text-gray-400 text-4xl mb-4"></i>
-                    <p class="text-gray-500">No locations found.</p>
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = this.locations.map(location => `
-            <div class="bg-white rounded-lg shadow p-4 card-hover transition-all">
-                <div class="flex items-center mb-2">
-                    <i class="fas fa-building text-blue-600 mr-2"></i>
-                    <h4 class="font-medium text-gray-900">${location.building}</h4>
-                </div>
-                <p class="text-sm text-gray-500">Floor: ${location.floor}</p>
-                <p class="text-sm text-gray-500">Room: ${location.room}</p>
-                ${location.description ? `<p class="text-sm text-gray-600 mt-2">${location.description}</p>` : ''}
-            </div>
-        `).join('');
-    }
-
-    async loadAnalytics() {
-        this.loadDashboardData();
-    }
-
-    // Mock data for testing without backend
-    showMockDashboardData() {
-        this.dashboardData = {
-            totalAssets: 25,
-            activeAssets: 20,
-            maintenanceAssets: 3,
-            inactiveAssets: 2,
-            filtersNeeded: 8,
-            assetsByFloor: {
-                'Ground': 10,
-                'First': 8,
-                'Second': 7
-            },
-            assetsByType: {
-                'Water Tap': 15,
-                'Drinking Fountain': 6,
-                'Water Cooler': 4
-            }
-        };
-        this.renderDashboardStats();
-    }
-
-    showMockAssets() {
-        this.assets = [
-            {
-                id: '1',
-                assetBarcode: 'WT001',
-                assetType: 'Water Tap',
-                primaryIdentifier: 'Main Hall Tap',
-                floor: 'Ground',
-                room: 'Main Hall',
-                status: 'ACTIVE',
-                filterNeeded: true
-            },
-            {
-                id: '2',
-                assetBarcode: 'DF002',
-                assetType: 'Drinking Fountain',
-                primaryIdentifier: 'Cafeteria Fountain',
-                floor: 'First',
-                room: 'Cafeteria',
-                status: 'ACTIVE',
-                filterNeeded: false
-            }
-        ];
-        this.renderAssets();
-    }
-
-    showMockMaintenance() {
-        this.maintenance = [
-            {
-                id: '1',
-                assetId: '1',
-                maintenanceType: 'FILTER_REPLACEMENT',
-                scheduledDate: '2024-01-15',
-                status: 'SCHEDULED',
-                notes: 'Replace water filter'
-            }
-        ];
-        this.renderMaintenance();
-    }
-
-    showMockLocations() {
-        this.locations = [
-            {
-                id: '1',
-                building: 'Main Building',
-                floor: 'Ground',
-                room: 'Main Hall',
-                description: 'Main entrance hall'
-            }
-        ];
-        this.renderLocations();
-    }
-
-    showModal(modalId) {
-        document.getElementById(modalId).classList.remove('hidden');
-    }
-
-    hideModal(modalId) {
-        document.getElementById(modalId).classList.add('hidden');
-    }
-
-    showLoading() {
-        document.getElementById('loadingSpinner').classList.remove('hidden');
-    }
-
-    hideLoading() {
-        document.getElementById('loadingSpinner').classList.add('hidden');
-    }
-
-    showNotification(message, type) {
-        // Simple notification - you can enhance this
-        const notification = document.createElement('div');
-        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`;
-        notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
-
-    refreshAllData() {
-        this.loadDashboardData();
-        switch (this.currentTab) {
-            case 'assets':
-                this.loadAssets();
-                break;
-            case 'maintenance':
-                this.loadMaintenance();
-                break;
-            case 'locations':
-                this.loadLocations();
-                break;
-            case 'analytics':
-                this.loadAnalytics();
-                break;
-        }
-    }
-
     async editAsset(id) {
-        // For now, just show an alert - you can implement a proper edit modal later
-        alert(`Edit functionality for asset ${id} - Coming soon!`);
-        console.log('Edit asset:', id);
+        const asset = this.assets.find(a => a.id === id);
+        if (asset) {
+            this.showAssetModal(asset);
+        } else {
+            console.error('Asset not found:', id);
+        }
     }
 
     async deleteAsset(id) {
@@ -574,12 +436,13 @@ class AssetManagementApp {
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Failed to delete asset: ${response.status} ${response.statusText}`);
+                    throw new Error(`Failed to delete asset: ${response.status}`);
                 }
 
                 // Remove from local array
                 this.assets = this.assets.filter(asset => asset.id !== id);
                 this.renderAssets();
+                this.updateAssetCount();
                 this.loadDashboardData(); // Refresh dashboard stats
                 this.showNotification('Asset deleted successfully!', 'success');
                 
@@ -591,14 +454,58 @@ class AssetManagementApp {
             }
         }
     }
+
+    refreshData() {
+        console.log('Refreshing all data...');
+        this.loadDashboardData();
+        this.loadAssets();
+    }
+
+    // Mock data for fallback
+    showMockDashboardData() {
+        this.dashboardData = {
+            totalAssets: 0,
+            activeAssets: 0,
+            maintenanceAssets: 0,
+            inactiveAssets: 0,
+            filtersNeeded: 0
+        };
+        this.renderDashboardStats();
+    }
+
+    showMockAssets() {
+        this.assets = [];
+        this.renderAssets();
+        this.updateAssetCount();
+    }
+
+    showLoading() {
+        document.getElementById('loadingSpinner').classList.remove('hidden');
+    }
+
+    hideLoading() {
+        document.getElementById('loadingSpinner').classList.add('hidden');
+    }
+
+    showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+            type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        }`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new AssetManagementApp();
+    window.app = new WaterTapAssetManager();
 });
 
-// Update API URL after deployment
-console.log('Water Tap Asset Management System initialized');
-console.log('API Base URL:', API_BASE_URL);
-console.log('Note: Update API_BASE_URL after deploying to AWS'); 
+console.log('Water Tap Asset Management System loaded');
+console.log('API Base URL:', API_BASE_URL); 

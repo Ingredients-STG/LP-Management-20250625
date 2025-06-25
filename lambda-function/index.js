@@ -155,10 +155,22 @@ async function getAsset(id) {
 async function createAsset(assetData) {
     const asset = {
         id: uuidv4(),
-        ...assetData,
+        assetBarcode: assetData.assetBarcode,
+        assetType: assetData.assetType,
+        primaryIdentifier: assetData.primaryIdentifier,
+        status: assetData.status || 'ACTIVE',
+        building: assetData.building || '',
+        floor: assetData.floor || '',
+        room: assetData.room || '',
+        filterNeeded: assetData.filterNeeded || false,
+        filterType: assetData.filterType || '',
+        lastMaintenanceDate: assetData.lastMaintenanceDate || '',
+        nextMaintenanceDate: assetData.nextMaintenanceDate || '',
+        installationDate: assetData.installationDate || '',
+        warrantyExpiry: assetData.warrantyExpiry || '',
+        notes: assetData.notes || '',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: assetData.status || 'ACTIVE'
+        updatedAt: new Date().toISOString()
     };
 
     const params = {
@@ -181,6 +193,13 @@ async function createAsset(assetData) {
 async function updateAsset(id, updates) {
     const timestamp = new Date().toISOString();
     
+    const allowedFields = [
+        'assetBarcode', 'assetType', 'primaryIdentifier', 'status',
+        'building', 'floor', 'room', 'filterNeeded', 'filterType',
+        'lastMaintenanceDate', 'nextMaintenanceDate', 'installationDate',
+        'warrantyExpiry', 'notes'
+    ];
+    
     const params = {
         TableName: ASSETS_TABLE,
         Key: { id },
@@ -191,11 +210,11 @@ async function updateAsset(id, updates) {
         ReturnValues: 'ALL_NEW'
     };
 
-    // Build update expression dynamically
+    // Build update expression dynamically for allowed fields only
     Object.keys(updates).forEach(key => {
-        if (key !== 'id') {
+        if (allowedFields.includes(key)) {
             params.UpdateExpression += `, ${key} = :${key}`;
-            params.ExpressionAttributeValues[`:${key}`] = updates[key];
+            params.ExpressionAttributeValues[`:${key}`] = updates[key] || '';
         }
     });
 

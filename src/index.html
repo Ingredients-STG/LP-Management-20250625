@@ -6,7 +6,6 @@
     <title>Water Tap Asset Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -18,20 +17,33 @@
         .transition-all {
             transition: all 0.3s ease;
         }
+        .table-container {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .sticky-header th {
+            position: sticky;
+            top: 0;
+            background: #f9fafb;
+            z-index: 10;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
     <!-- Navigation -->
     <nav class="gradient-bg shadow-lg">
-        <div class="max-w-7xl mx-auto px-4">
+        <div class="max-w-full mx-auto px-6">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <i class="fas fa-tint text-white text-2xl mr-3"></i>
-                    <h1 class="text-white text-xl font-bold">Water Tap Asset Management</h1>
+                    <h1 class="text-white text-xl font-bold">Water Tap Asset Management System</h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="refreshBtn" class="text-white hover:text-gray-200 transition-colors">
-                        <i class="fas fa-sync-alt"></i>
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                    <button id="addAssetBtn" class="bg-white text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors font-medium">
+                        <i class="fas fa-plus mr-2"></i>Add Asset
                     </button>
                 </div>
             </div>
@@ -39,158 +51,193 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="max-w-full mx-auto px-6 py-8">
         <!-- Dashboard Stats -->
         <div id="dashboardStats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <!-- Stats will be loaded here -->
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="bg-white rounded-lg shadow-md mb-6">
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-8 px-6">
-                    <button class="tab-btn active py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-tab="assets">
-                        <i class="fas fa-list mr-2"></i>Assets
-                    </button>
-                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="maintenance">
-                        <i class="fas fa-tools mr-2"></i>Maintenance
-                    </button>
-                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="locations">
-                        <i class="fas fa-map-marker-alt mr-2"></i>Locations
-                    </button>
-                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="analytics">
-                        <i class="fas fa-chart-bar mr-2"></i>Analytics
-                    </button>
-                </nav>
-            </div>
-        </div>
-
-        <!-- Tab Content -->
-        <div id="tabContent">
-            <!-- Assets Tab -->
-            <div id="assets-tab" class="tab-content">
-                <div class="bg-white rounded-lg shadow-md">
-                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-gray-900">Asset Management</h2>
-                        <button id="addAssetBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-plus mr-2"></i>Add Asset
-                        </button>
-                    </div>
-                    <div class="p-6">
-                        <div class="overflow-x-auto">
-                            <table id="assetsTable" class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barcode</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="assetsTableBody" class="bg-white divide-y divide-gray-200">
-                                    <!-- Assets will be loaded here -->
-                                </tbody>
-                            </table>
+        <!-- Assets Management -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-gray-900">Water Tap Assets</h2>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="searchInput" placeholder="Search assets..." 
+                                   class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <button id="searchBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-search"></i>
+                            </button>
                         </div>
+                        <span id="assetCount" class="text-sm text-gray-500">0 assets</span>
                     </div>
                 </div>
             </div>
-
-            <!-- Maintenance Tab -->
-            <div id="maintenance-tab" class="tab-content hidden">
-                <div class="bg-white rounded-lg shadow-md">
-                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-gray-900">Maintenance Records</h2>
-                        <button id="addMaintenanceBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-plus mr-2"></i>Schedule Maintenance
-                        </button>
-                    </div>
-                    <div class="p-6">
-                        <div id="maintenanceList">
-                            <!-- Maintenance records will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Locations Tab -->
-            <div id="locations-tab" class="tab-content hidden">
-                <div class="bg-white rounded-lg shadow-md">
-                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                        <h2 class="text-lg font-semibold text-gray-900">Location Management</h2>
-                        <button id="addLocationBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-plus mr-2"></i>Add Location
-                        </button>
-                    </div>
-                    <div class="p-6">
-                        <div id="locationsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <!-- Locations will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Analytics Tab -->
-            <div id="analytics-tab" class="tab-content hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Assets by Floor</h3>
-                        <canvas id="floorChart"></canvas>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Assets by Type</h3>
-                        <canvas id="typeChart"></canvas>
-                    </div>
-                    <div class="bg-white rounded-lg shadow-md p-6 lg:col-span-2">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Asset Status Overview</h3>
-                        <canvas id="statusChart"></canvas>
-                    </div>
-                </div>
+            
+            <div class="table-container">
+                <table id="assetsTable" class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50 sticky-header">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Barcode</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Primary ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Building</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Needed</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Maintenance</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Maintenance</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation Date</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warranty</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assetsTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Assets will be loaded here -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- Add Asset Modal -->
-    <div id="addAssetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <!-- Add/Edit Asset Modal -->
+    <div id="assetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Add New Asset</h3>
+                <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Add New Asset</h3>
             </div>
-            <form id="addAssetForm" class="p-6 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Asset Barcode</label>
-                    <input type="text" name="assetBarcode" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            <form id="assetForm" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Basic Information -->
+                    <div class="lg:col-span-3">
+                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Basic Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Asset Barcode *</label>
+                        <input type="text" name="assetBarcode" required 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Asset Type *</label>
+                        <select name="assetType" required 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Type</option>
+                            <option value="Water Tap">Water Tap</option>
+                            <option value="Drinking Fountain">Drinking Fountain</option>
+                            <option value="Water Cooler">Water Cooler</option>
+                            <option value="Water Dispenser">Water Dispenser</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Primary Identifier *</label>
+                        <input type="text" name="primaryIdentifier" required 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Status</label>
+                        <select name="status" 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="ACTIVE">Active</option>
+                            <option value="MAINTENANCE">Maintenance</option>
+                            <option value="INACTIVE">Inactive</option>
+                            <option value="DECOMMISSIONED">Decommissioned</option>
+                        </select>
+                    </div>
+
+                    <!-- Location Information -->
+                    <div class="lg:col-span-3 mt-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Location Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Building</label>
+                        <input type="text" name="building" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Floor</label>
+                        <input type="text" name="floor" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Room</label>
+                        <input type="text" name="room" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Filter Information -->
+                    <div class="lg:col-span-3 mt-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Filter Information</h4>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input type="checkbox" name="filterNeeded" 
+                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        <label class="ml-2 block text-sm text-gray-900">Filter Required</label>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Filter Type</label>
+                        <select name="filterType" 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Filter Type</option>
+                            <option value="Carbon">Carbon Filter</option>
+                            <option value="Sediment">Sediment Filter</option>
+                            <option value="UV">UV Filter</option>
+                            <option value="RO">RO Membrane</option>
+                            <option value="Multi-Stage">Multi-Stage</option>
+                        </select>
+                    </div>
+
+                    <!-- Maintenance Information -->
+                    <div class="lg:col-span-3 mt-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Maintenance Information</h4>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Last Maintenance Date</label>
+                        <input type="date" name="lastMaintenanceDate" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Next Maintenance Date</label>
+                        <input type="date" name="nextMaintenanceDate" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Installation Date</label>
+                        <input type="date" name="installationDate" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Warranty Expiry</label>
+                        <input type="date" name="warrantyExpiry" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Additional Notes -->
+                    <div class="lg:col-span-3 mt-6">
+                        <label class="block text-sm font-medium text-gray-700">Notes</label>
+                        <textarea name="notes" rows="3" 
+                                  class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Asset Type</label>
-                    <select name="assetType" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Select Type</option>
-                        <option value="Water Tap">Water Tap</option>
-                        <option value="Drinking Fountain">Drinking Fountain</option>
-                        <option value="Water Cooler">Water Cooler</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Primary Identifier</label>
-                    <input type="text" name="primaryIdentifier" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Floor</label>
-                    <input type="text" name="floor" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Room</label>
-                    <input type="text" name="room" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" name="filterNeeded" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label class="ml-2 block text-sm text-gray-900">Filter Needed</label>
-                </div>
-                <div class="flex justify-end space-x-3 pt-4">
-                    <button type="button" id="cancelAddAsset" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">Add Asset</button>
+                
+                <div class="flex justify-end space-x-3 pt-6 border-t mt-6">
+                    <button type="button" id="cancelAsset" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="submit" id="saveAsset" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">Save Asset</button>
                 </div>
             </form>
         </div>
@@ -198,10 +245,10 @@
 
     <!-- Loading Spinner -->
     <div id="loadingSpinner" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6">
-            <div class="flex items-center space-x-3">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span class="text-gray-700">Loading...</span>
+        <div class="bg-white p-6 rounded-lg shadow-xl">
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span class="ml-3 text-gray-700">Loading...</span>
             </div>
         </div>
     </div>
