@@ -1,0 +1,79 @@
+type Asset @model @auth(rules: [{allow: public}]) {
+  id: ID!
+  assetBarcode: String! @index(name: "byBarcode")
+  status: AssetStatus!
+  assetType: String!
+  primaryIdentifier: String!
+  secondaryIdentifier: String
+  value: Float
+  wireToShort: String
+  wireToShortValue: Float
+  floor: String
+  floorInWords: String
+  room: String
+  roomOffice: String
+  filterNeeded: Boolean
+  filtersOn: String
+  filterExpiry: String
+  filterExpiredDate: AWSDate
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+type AssetHistory @model @auth(rules: [{allow: public}]) {
+  id: ID!
+  assetId: ID! @index(name: "byAssetId")
+  action: String!
+  previousValue: AWSJSON
+  newValue: AWSJSON
+  changedBy: String!
+  timestamp: AWSDateTime!
+  notes: String
+}
+
+type MaintenanceRecord @model @auth(rules: [{allow: public}]) {
+  id: ID!
+  assetId: ID! @index(name: "byAssetId")
+  maintenanceType: MaintenanceType!
+  scheduledDate: AWSDate
+  completedDate: AWSDate
+  technician: String
+  notes: String
+  cost: Float
+  status: MaintenanceStatus!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+enum MaintenanceType {
+  FILTER_REPLACEMENT
+  INSPECTION
+  REPAIR
+  CLEANING
+  CALIBRATION
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+type Location @model @auth(rules: [{allow: public}]) {
+  id: ID!
+  building: String!
+  floor: String!
+  floorInWords: String
+  room: String!
+  roomOffice: String
+  description: String
+  assets: [Asset] @hasMany
+} 
