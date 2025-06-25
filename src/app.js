@@ -13,9 +13,12 @@ class AssetManagementApp {
     }
 
     init() {
+        console.log('Initializing AssetManagementApp...');
         this.setupEventListeners();
+        console.log('Event listeners set up, loading data...');
         this.loadDashboardData();
         this.loadAssets();
+        console.log('Initial data loading started');
     }
 
     setupEventListeners() {
@@ -90,18 +93,26 @@ class AssetManagementApp {
 
     async loadDashboardData() {
         try {
+            console.log('Starting loadDashboardData...');
+            const statsContainer = document.getElementById('dashboardStats');
+            console.log('Dashboard stats container found:', !!statsContainer);
+            
             this.showLoading();
             
+            console.log('Loading dashboard data from:', `${API_BASE_URL}/items/dashboard`);
             const response = await fetch(`${API_BASE_URL}/items/dashboard`);
+            console.log('Dashboard response status:', response.status);
             
             if (!response.ok) {
-                throw new Error('Failed to load dashboard data');
+                throw new Error(`Failed to load dashboard data: ${response.status} ${response.statusText}`);
             }
 
             this.dashboardData = await response.json();
+            console.log('Dashboard data loaded:', this.dashboardData);
             this.renderDashboardStats();
         } catch (error) {
             console.error('Error loading dashboard data:', error);
+            console.log('Falling back to mock data');
             this.showMockDashboardData();
         } finally {
             this.hideLoading();
@@ -178,19 +189,27 @@ class AssetManagementApp {
 
     async loadAssets() {
         try {
+            console.log('Starting loadAssets...');
+            const assetsTableBody = document.getElementById('assetsTableBody');
+            console.log('Assets table body found:', !!assetsTableBody);
+            
             this.showLoading();
             
+            console.log('Loading assets from:', `${API_BASE_URL}/items/assets`);
             const response = await fetch(`${API_BASE_URL}/items/assets`);
+            console.log('Assets response status:', response.status);
             
             if (!response.ok) {
-                throw new Error('Failed to load assets');
+                throw new Error(`Failed to load assets: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
+            console.log('Assets data loaded:', data);
             this.assets = data.assets || [];
             this.renderAssets();
         } catch (error) {
             console.error('Error loading assets:', error);
+            console.log('Falling back to mock data');
             this.showMockAssets();
         } finally {
             this.hideLoading();
@@ -272,6 +291,7 @@ class AssetManagementApp {
 
         try {
             this.showLoading();
+            console.log('Creating asset:', assetData);
             const response = await fetch(`${API_BASE_URL}/items/assets`, {
                 method: 'POST',
                 headers: {
@@ -280,16 +300,22 @@ class AssetManagementApp {
                 body: JSON.stringify(assetData)
             });
 
+            console.log('Create asset response status:', response.status);
+
             if (!response.ok) {
-                throw new Error('Failed to create asset');
+                throw new Error(`Failed to create asset: ${response.status} ${response.statusText}`);
             }
 
             const newAsset = await response.json();
+            console.log('New asset created:', newAsset);
             this.assets.push(newAsset);
             this.renderAssets();
             this.hideModal('addAssetModal');
             event.target.reset();
             this.showNotification('Asset added successfully!', 'success');
+            
+            // Reload dashboard to update stats
+            this.loadDashboardData();
         } catch (error) {
             console.error('Error adding asset:', error);
             this.showNotification('Failed to add asset. Please try again.', 'error');
@@ -531,15 +557,38 @@ class AssetManagementApp {
         }
     }
 
-    editAsset(id) {
-        // Implement edit functionality
+    async editAsset(id) {
+        // For now, just show an alert - you can implement a proper edit modal later
+        alert(`Edit functionality for asset ${id} - Coming soon!`);
         console.log('Edit asset:', id);
     }
 
-    deleteAsset(id) {
+    async deleteAsset(id) {
         if (confirm('Are you sure you want to delete this asset?')) {
-            // Implement delete functionality
-            console.log('Delete asset:', id);
+            try {
+                this.showLoading();
+                console.log('Deleting asset:', id);
+                
+                const response = await fetch(`${API_BASE_URL}/items/assets/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to delete asset: ${response.status} ${response.statusText}`);
+                }
+
+                // Remove from local array
+                this.assets = this.assets.filter(asset => asset.id !== id);
+                this.renderAssets();
+                this.loadDashboardData(); // Refresh dashboard stats
+                this.showNotification('Asset deleted successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error deleting asset:', error);
+                this.showNotification('Failed to delete asset. Please try again.', 'error');
+            } finally {
+                this.hideLoading();
+            }
         }
     }
 }

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Debug</title>
+</head>
+<body>
+    <h1>API Debug</h1>
+    <div id="results"></div>
+    
+    <script>
+        const API_BASE_URL = 'https://uliwzluwwi.execute-api.eu-west-2.amazonaws.com/dev';
+        
+        async function testAPI() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing API...</p>';
+            
+            try {
+                // Test Dashboard
+                console.log('Testing dashboard...');
+                const dashboardResponse = await fetch(`${API_BASE_URL}/items/dashboard`);
+                console.log('Dashboard response status:', dashboardResponse.status);
+                const dashboardData = await dashboardResponse.json();
+                console.log('Dashboard data:', dashboardData);
+                
+                // Test Assets
+                console.log('Testing assets...');
+                const assetsResponse = await fetch(`${API_BASE_URL}/items/assets`);
+                console.log('Assets response status:', assetsResponse.status);
+                const assetsData = await assetsResponse.json();
+                console.log('Assets data:', assetsData);
+                
+                results.innerHTML = `
+                    <h2>Dashboard Data:</h2>
+                    <pre>${JSON.stringify(dashboardData, null, 2)}</pre>
+                    
+                    <h2>Assets Data:</h2>
+                    <pre>${JSON.stringify(assetsData, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Run test when page loads
+        testAPI();
+    </script>
+</body>
+</html> 
