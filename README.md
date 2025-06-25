@@ -205,4 +205,4 @@ For support and questions:
 
 ---
 
-Built with ❤️ using AWS Amplify and modern web technologies. 
+Built with ❤️ using AWS Amplify and modern web technologies. ✅ IAM Fixed - Ready for Deployment! 
