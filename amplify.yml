@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "No pre-build commands needed for static site"
+    build:
+      commands:
+        - echo "Building static site..."
+        - ls -la src/
+    postBuild:
+      commands:
+        - echo "Build completed successfully"
+  artifacts:
+    baseDirectory: src
+    files:
+      - '**/*'
+  cache:
+    paths: [] 
