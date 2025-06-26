@@ -1,27 +1,27 @@
-type Asset @model @auth(rules: [{allow: public}]) {
+type Asset @model {
   id: ID!
-  assetBarcode: String! @index(name: "byBarcode")
+  assetBarcode: String!
   status: AssetStatus!
-  outletType: String!
-  tapType: String!
-  spareColumn: String
+  assetType: String!
+  primaryIdentifier: String!
+  secondaryIdentifier: String
   wing: String
-  buildingCode: String
-  roomId: String
-  floorNumber: Int
-  floorName: String
-  roomNumber: String
+  wingInShort: String
+  room: String
+  floor: String
+  floorInWords: String
+  roomNo: String
   roomName: String
-  hasFilter: Boolean
-  filterNeeded: Boolean
+  filterNeeded: Boolean!
+  filtersOn: Boolean!
   filterExpiryDate: AWSDate
-  filterInstalledDate: AWSDate
-  maintenanceNotes: String
-  inUse: Boolean
-  createdAt: AWSDateTime!
-  createdBy: String!
-  modifiedAt: AWSDateTime!
-  modifiedBy: String!
+  filterInstalledOn: AWSDate
+  notes: String
+  augmentedCare: Boolean!
+  created: AWSDateTime!
+  createdBy: String
+  modified: AWSDateTime!
+  modifiedBy: String
 }
 
 enum AssetStatus {
@@ -31,37 +31,45 @@ enum AssetStatus {
   DECOMMISSIONED
 }
 
-type AssetHistory @model @auth(rules: [{allow: public}]) {
+type Location @model {
   id: ID!
-  assetId: ID! @index(name: "byAssetId")
-  action: String!
-  previousValue: AWSJSON
-  newValue: AWSJSON
-  changedBy: String!
-  timestamp: AWSDateTime!
-  notes: String
+  wing: String!
+  wingInShort: String
+  room: String!
+  floor: String!
+  floorInWords: String
+  roomNo: String!
+  roomName: String!
+  buildingCode: String
+  description: String
+  isActive: Boolean!
+  created: AWSDateTime!
+  modified: AWSDateTime!
 }
 
-type MaintenanceRecord @model @auth(rules: [{allow: public}]) {
+type Maintenance @model {
   id: ID!
-  assetId: ID! @index(name: "byAssetId")
+  assetId: ID!
+  asset: Asset @belongsTo(fields: ["assetId"])
   maintenanceType: MaintenanceType!
+  description: String!
   scheduledDate: AWSDate
   completedDate: AWSDate
-  technician: String
-  notes: String
-  cost: Float
   status: MaintenanceStatus!
-  createdAt: AWSDateTime!
-  updatedAt: AWSDateTime!
+  technician: String
+  cost: Float
+  notes: String
+  created: AWSDateTime!
+  createdBy: String
+  modified: AWSDateTime!
+  modifiedBy: String
 }
 
 enum MaintenanceType {
-  FILTER_REPLACEMENT
+  PREVENTIVE
+  CORRECTIVE
+  EMERGENCY
   INSPECTION
-  REPAIR
-  CLEANING
-  CALIBRATION
 }
 
 enum MaintenanceStatus {
@@ -69,17 +77,5 @@ enum MaintenanceStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
-}
-
-type Location @model @auth(rules: [{allow: public}]) {
-  id: ID!
-  wing: String!
-  buildingCode: String!
-  floorNumber: Int!
-  floorName: String
-  roomNumber: String!
-  roomName: String
-  roomId: String
-  description: String
-  assets: [Asset] @hasMany
+  OVERDUE
 } 

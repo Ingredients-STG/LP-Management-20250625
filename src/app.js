@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
+const API_BASE_URL = 'https://yj3kxlj9lf.execute-api.us-east-1.amazonaws.com/prod';
 
 class WaterTapAssetManager {
     constructor() {
@@ -7,78 +7,53 @@ class WaterTapAssetManager {
         this.dashboardData = {};
         this.currentEditingAsset = null;
         this.bulkUploadData = [];
-        
-        this.init();
     }
 
     init() {
-        console.log('Initializing Water Tap Asset Manager...');
         this.setupEventListeners();
         this.loadDashboardData();
         this.loadAssets();
-        console.log('Initialization complete');
+        
+        // Show mock data if API is not available
+        setTimeout(() => {
+            if (this.assets.length === 0) {
+                this.showMockData();
+            }
+        }, 3000);
     }
 
     setupEventListeners() {
-        // Add Asset Button
-        document.getElementById('addAssetBtn').addEventListener('click', () => {
-            this.showAssetModal();
-        });
-
-        // Modal Controls
-        document.getElementById('cancelAsset').addEventListener('click', () => {
-            this.hideAssetModal();
-        });
-
-        document.getElementById('assetForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.handleSaveAsset(e);
-        });
-
-        // Refresh Button
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.refreshData();
-        });
-
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', (e) => {
+        // Navigation
+        document.getElementById('dashboardTab').addEventListener('click', () => this.showTab('dashboard'));
+        document.getElementById('assetsTab').addEventListener('click', () => this.showTab('assets'));
+        
+        // Asset management
+        document.getElementById('addAssetBtn').addEventListener('click', () => this.showAssetModal());
+        document.getElementById('cancelAsset').addEventListener('click', () => this.hideAssetModal());
+        document.getElementById('assetForm').addEventListener('submit', (e) => this.handleSaveAsset(e));
+        
+        // Search
+        document.getElementById('searchAssets').addEventListener('input', (e) => {
             this.filterAssets(e.target.value);
         });
-
-        document.getElementById('searchBtn').addEventListener('click', () => {
-            const searchTerm = document.getElementById('searchInput').value;
-            this.filterAssets(searchTerm);
-        });
-
-        // Close modal on background click
+        
+        // Bulk upload
+        document.getElementById('bulkUploadBtn').addEventListener('click', () => this.showBulkUploadModal());
+        document.getElementById('cancelBulkUpload').addEventListener('click', () => this.hideBulkUploadModal());
+        document.getElementById('downloadTemplateBtn').addEventListener('click', () => this.downloadTemplate());
+        document.getElementById('excelFileInput').addEventListener('change', (e) => this.handleFileUpload(e));
+        document.getElementById('importAssetsBtn').addEventListener('click', () => this.importAssets());
+        
+        // Refresh
+        document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
+        
+        // Close modal when clicking outside
         document.getElementById('assetModal').addEventListener('click', (e) => {
             if (e.target.id === 'assetModal') {
                 this.hideAssetModal();
             }
         });
-
-        // Bulk upload functionality
-        document.getElementById('downloadTemplateBtn').addEventListener('click', () => {
-            this.downloadTemplate();
-        });
-
-        document.getElementById('bulkUploadBtn').addEventListener('click', () => {
-            this.showBulkUploadModal();
-        });
-
-        document.getElementById('cancelBulkUpload').addEventListener('click', () => {
-            this.hideBulkUploadModal();
-        });
-
-        document.getElementById('excelFileInput').addEventListener('change', (e) => {
-            this.handleFileUpload(e);
-        });
-
-        document.getElementById('importAssetsBtn').addEventListener('click', () => {
-            this.importAssets();
-        });
-
-        // Close bulk upload modal on background click
+        
         document.getElementById('bulkUploadModal').addEventListener('click', (e) => {
             if (e.target.id === 'bulkUploadModal') {
                 this.hideBulkUploadModal();
@@ -86,114 +61,96 @@ class WaterTapAssetManager {
         });
     }
 
+    showTab(tabName) {
+        // Hide all tabs
+        document.getElementById('dashboardContent').classList.add('hidden');
+        document.getElementById('assetsContent').classList.add('hidden');
+        
+        // Remove active class from all tab buttons
+        document.getElementById('dashboardTab').classList.remove('border-blue-500', 'text-blue-600');
+        document.getElementById('dashboardTab').classList.add('border-transparent', 'text-gray-500');
+        document.getElementById('assetsTab').classList.remove('border-blue-500', 'text-blue-600');
+        document.getElementById('assetsTab').classList.add('border-transparent', 'text-gray-500');
+        
+        // Show selected tab
+        document.getElementById(tabName + 'Content').classList.remove('hidden');
+        document.getElementById(tabName + 'Tab').classList.remove('border-transparent', 'text-gray-500');
+        document.getElementById(tabName + 'Tab').classList.add('border-blue-500', 'text-blue-600');
+    }
+
     async loadDashboardData() {
         try {
-            console.log('Loading dashboard data...');
-            this.showLoading();
-            
-            const response = await fetch(`${API_BASE_URL}/items/dashboard`);
-            console.log('Dashboard response status:', response.status);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to load dashboard data: ${response.status}`);
+            const response = await fetch(`${API_BASE_URL}/dashboard`);
+            if (response.ok) {
+                this.dashboardData = await response.json();
+                this.renderDashboardStats();
+            } else {
+                console.error('Failed to load dashboard data');
+                this.showMockDashboardData();
             }
-
-            this.dashboardData = await response.json();
-            console.log('Dashboard data loaded:', this.dashboardData);
-            this.renderDashboardStats();
         } catch (error) {
             console.error('Error loading dashboard data:', error);
             this.showMockDashboardData();
-        } finally {
-            this.hideLoading();
         }
     }
 
     renderDashboardStats() {
-        const statsContainer = document.getElementById('dashboardStats');
         const stats = this.dashboardData;
+        
+        // Update dashboard cards
+        document.getElementById('totalAssets').textContent = stats.totalAssets || 0;
+        document.getElementById('activeAssets').textContent = stats.activeAssets || 0;
+        document.getElementById('maintenanceAssets').textContent = stats.maintenanceAssets || 0;
+        document.getElementById('filtersNeeded').textContent = stats.filtersNeeded || 0;
+        
+        // Update charts if data is available
+        if (stats.statusBreakdown) {
+            this.renderStatusChart(stats.statusBreakdown);
+        }
+        if (stats.assetTypeBreakdown) {
+            this.renderAssetTypeChart(stats.assetTypeBreakdown);
+        }
+        if (stats.wingBreakdown) {
+            this.renderWingChart(stats.wingBreakdown);
+        }
+        if (stats.filterStatus) {
+            this.renderFilterChart(stats.filterStatus);
+        }
+    }
 
-        statsContainer.innerHTML = `
-            <div class="bg-white overflow-hidden shadow rounded-lg card-hover transition-all">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-tint text-blue-600 text-2xl"></i>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Total Assets</dt>
-                                <dd class="text-lg font-medium text-gray-900">${stats.totalAssets || 0}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg card-hover transition-all">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Active Assets</dt>
-                                <dd class="text-lg font-medium text-gray-900">${stats.activeAssets || 0}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg card-hover transition-all">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-tools text-orange-600 text-2xl"></i>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Maintenance</dt>
-                                <dd class="text-lg font-medium text-gray-900">${stats.maintenanceAssets || 0}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white overflow-hidden shadow rounded-lg card-hover transition-all">
-                <div class="p-5">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-filter text-purple-600 text-2xl"></i>
-                        </div>
-                        <div class="ml-5 w-0 flex-1">
-                            <dl>
-                                <dt class="text-sm font-medium text-gray-500 truncate">Filters Needed</dt>
-                                <dd class="text-lg font-medium text-gray-900">${stats.filtersNeeded || 0}</dd>
-                            </dl>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+    renderStatusChart(data) {
+        // Placeholder for chart rendering
+        console.log('Status breakdown:', data);
+    }
+
+    renderAssetTypeChart(data) {
+        // Placeholder for chart rendering
+        console.log('Asset type breakdown:', data);
+    }
+
+    renderWingChart(data) {
+        // Placeholder for chart rendering
+        console.log('Wing breakdown:', data);
+    }
+
+    renderFilterChart(data) {
+        // Placeholder for chart rendering
+        console.log('Filter status:', data);
     }
 
     async loadAssets() {
         try {
-            console.log('Loading assets...');
             this.showLoading();
-            
             const response = await fetch(`${API_BASE_URL}/items/assets`);
-            console.log('Assets response status:', response.status);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to load assets: ${response.status}`);
+            if (response.ok) {
+                const data = await response.json();
+                this.assets = data.items || [];
+                this.renderAssets();
+                this.updateAssetCount();
+            } else {
+                console.error('Failed to load assets');
+                this.showMockAssets();
             }
-
-            const data = await response.json();
-            console.log('Assets data loaded:', data);
-            this.assets = data.assets || [];
-            this.renderAssets();
-            this.updateAssetCount();
         } catch (error) {
             console.error('Error loading assets:', error);
             this.showMockAssets();
@@ -225,37 +182,37 @@ class WaterTapAssetManager {
                         ${asset.status || 'ACTIVE'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.outletType || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.tapType || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.assetType || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.primaryIdentifier || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.secondaryIdentifier || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.wing || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.buildingCode || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.roomId || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.floorNumber || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.floorName || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.roomNumber || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.wingInShort || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.room || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.floor || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.floorInWords || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.roomNo || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.roomName || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.hasFilter ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                        ${asset.hasFilter ? 'Yes' : 'No'}
-                    </span>
-                </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.filterNeeded ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">
                         ${asset.filterNeeded ? 'Yes' : 'No'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.filterExpiryDate)}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.filterInstalledDate)}</td>
-                <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate" title="${asset.maintenanceNotes || ''}">${asset.maintenanceNotes || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.inUse ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                        ${asset.inUse ? 'Yes' : 'No'}
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.filtersOn ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                        ${asset.filtersOn ? 'Yes' : 'No'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.createdAt)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterExpiryDate)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterInstalledOn)}</td>
+                <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate" title="${asset.notes || ''}">${asset.notes || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.augmentedCare ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}">
+                        ${asset.augmentedCare ? 'Yes' : 'No'}
+                    </span>
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.created)}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.createdBy || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.modifiedAt)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.modified)}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.modifiedBy || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <button onclick="window.assetManager.editAsset('${asset.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
@@ -325,15 +282,17 @@ class WaterTapAssetManager {
             const searchFields = [
                 asset.assetBarcode,
                 asset.status,
-                asset.outletType,
-                asset.tapType,
+                asset.assetType,
+                asset.primaryIdentifier,
+                asset.secondaryIdentifier,
                 asset.wing,
-                asset.buildingCode,
-                asset.roomId,
-                asset.floorName,
-                asset.roomNumber,
+                asset.wingInShort,
+                asset.room,
+                asset.floor,
+                asset.floorInWords,
+                asset.roomNo,
                 asset.roomName,
-                asset.maintenanceNotes,
+                asset.notes,
                 asset.createdBy,
                 asset.modifiedBy
             ];
@@ -360,9 +319,9 @@ class WaterTapAssetManager {
             form.reset();
             // Set default values
             form.querySelector('[name="status"]').value = 'ACTIVE';
-            form.querySelector('[name="hasFilter"]').value = 'false';
             form.querySelector('[name="filterNeeded"]').value = 'false';
-            form.querySelector('[name="inUse"]').value = 'true';
+            form.querySelector('[name="filtersOn"]').value = 'false';
+            form.querySelector('[name="augmentedCare"]').value = 'false';
         }
         
         modal.classList.remove('hidden');
@@ -378,23 +337,28 @@ class WaterTapAssetManager {
         
         // Populate all form fields with asset data
         const fields = [
-            'assetBarcode', 'status', 'outletType', 'tapType', 'wing', 'buildingCode',
-            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
-            'filterExpiryDate', 'filterInstalledDate', 'maintenanceNotes',
-            'createdBy', 'modifiedBy'
+            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
+            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+            'filterExpiryDate', 'filterInstalledOn', 'notes'
         ];
         
         fields.forEach(field => {
             const input = form.querySelector(`[name="${field}"]`);
             if (input && asset[field] !== undefined) {
-                input.value = asset[field];
+                if (input.type === 'date' && asset[field]) {
+                    // Convert date to YYYY-MM-DD format for date inputs
+                    const date = new Date(asset[field]);
+                    input.value = date.toISOString().split('T')[0];
+                } else {
+                    input.value = asset[field];
+                }
             }
         });
 
         // Handle boolean fields
-        form.querySelector('[name="hasFilter"]').value = asset.hasFilter ? 'true' : 'false';
         form.querySelector('[name="filterNeeded"]').value = asset.filterNeeded ? 'true' : 'false';
-        form.querySelector('[name="inUse"]').value = asset.inUse ? 'true' : 'false';
+        form.querySelector('[name="filtersOn"]').value = asset.filtersOn ? 'true' : 'false';
+        form.querySelector('[name="augmentedCare"]').value = asset.augmentedCare ? 'true' : 'false';
     }
 
     async handleSaveAsset(event) {
@@ -405,17 +369,24 @@ class WaterTapAssetManager {
         
         // Convert form data to object
         for (let [key, value] of formData.entries()) {
-            if (key === 'hasFilter' || key === 'filterNeeded' || key === 'inUse') {
+            if (key === 'filterNeeded' || key === 'filtersOn' || key === 'augmentedCare') {
                 assetData[key] = value === 'true';
-            } else if (key === 'floorNumber') {
-                assetData[key] = value ? parseInt(value) : 0;
             } else {
                 assetData[key] = value;
             }
         }
 
-        // Set modification data
-        assetData.modifiedBy = assetData.modifiedBy || 'User';
+        // Set timestamps
+        const now = new Date().toISOString();
+        if (this.currentEditingAsset) {
+            assetData.modified = now;
+            assetData.modifiedBy = 'User';
+        } else {
+            assetData.created = now;
+            assetData.createdBy = 'User';
+            assetData.modified = now;
+            assetData.modifiedBy = 'User';
+        }
         
         try {
             this.showLoading();
@@ -432,7 +403,6 @@ class WaterTapAssetManager {
                 });
             } else {
                 // Create new asset
-                assetData.createdBy = assetData.createdBy || 'User';
                 response = await fetch(`${API_BASE_URL}/items/assets`, {
                     method: 'POST',
                     headers: {
@@ -509,18 +479,74 @@ class WaterTapAssetManager {
 
     showMockDashboardData() {
         this.dashboardData = {
-            totalAssets: 0,
-            activeAssets: 0,
-            maintenanceAssets: 0,
-            filtersNeeded: 0
+            totalAssets: 4,
+            activeAssets: 3,
+            maintenanceAssets: 1,
+            filtersNeeded: 2
         };
         this.renderDashboardStats();
     }
 
     showMockAssets() {
-        this.assets = [];
+        this.assets = [
+            {
+                id: '1',
+                assetBarcode: 'WT001',
+                status: 'ACTIVE',
+                assetType: 'Water Tap',
+                primaryIdentifier: 'TAP-001',
+                secondaryIdentifier: 'SEC-001',
+                wing: 'North Wing',
+                wingInShort: 'N',
+                room: 'Kitchen',
+                floor: '1',
+                floorInWords: 'Ground Floor',
+                roomNo: '101',
+                roomName: 'Main Kitchen',
+                filterNeeded: true,
+                filtersOn: false,
+                filterExpiryDate: '2024-12-31',
+                filterInstalledOn: '2024-01-15',
+                notes: 'Regular maintenance required',
+                augmentedCare: true,
+                created: '2024-01-01T10:00:00Z',
+                createdBy: 'Admin',
+                modified: '2024-01-15T14:30:00Z',
+                modifiedBy: 'Admin'
+            },
+            {
+                id: '2',
+                assetBarcode: 'WT002',
+                status: 'ACTIVE',
+                assetType: 'Drinking Fountain',
+                primaryIdentifier: 'DF-001',
+                secondaryIdentifier: '',
+                wing: 'South Wing',
+                wingInShort: 'S',
+                room: 'Lobby',
+                floor: '1',
+                floorInWords: 'Ground Floor',
+                roomNo: '102',
+                roomName: 'Main Lobby',
+                filterNeeded: false,
+                filtersOn: false,
+                filterExpiryDate: '',
+                filterInstalledOn: '',
+                notes: '',
+                augmentedCare: false,
+                created: '2024-01-02T09:00:00Z',
+                createdBy: 'Admin',
+                modified: '2024-01-02T09:00:00Z',
+                modifiedBy: 'Admin'
+            }
+        ];
         this.renderAssets();
         this.updateAssetCount();
+    }
+
+    showMockData() {
+        this.showMockDashboardData();
+        this.showMockAssets();
     }
 
     showLoading() {
@@ -533,19 +559,23 @@ class WaterTapAssetManager {
 
     showNotification(message, type) {
         const notification = document.getElementById('notification');
-        const icon = document.getElementById('notificationIcon');
         const messageEl = document.getElementById('notificationMessage');
+        const iconEl = document.getElementById('notificationIcon');
         
         messageEl.textContent = message;
         
+        // Set icon and colors based on type
         if (type === 'success') {
-            icon.className = 'fas fa-check-circle text-green-500 h-6 w-6';
-        } else {
-            icon.className = 'fas fa-exclamation-circle text-red-500 h-6 w-6';
+            iconEl.className = 'fas fa-check-circle h-6 w-6 text-green-400';
+            notification.className = notification.className.replace(/bg-\w+-50/, 'bg-green-50');
+        } else if (type === 'error') {
+            iconEl.className = 'fas fa-exclamation-circle h-6 w-6 text-red-400';
+            notification.className = notification.className.replace(/bg-\w+-50/, 'bg-red-50');
         }
         
         notification.classList.remove('hidden');
         
+        // Auto hide after 5 seconds
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 5000);
@@ -554,17 +584,16 @@ class WaterTapAssetManager {
     downloadTemplate() {
         // Create Excel template with new schema
         const headers = [
-            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
-            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
-            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate',
-            'maintenanceNotes', 'inUse', 'createdBy', 'modifiedBy'
+            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
+            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+            'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn', 'notes', 'augmentedCare'
         ];
 
         const sampleData = [
             [
-                'WT001', 'ACTIVE', 'Wall Mounted', 'Push Button', '', 'North Wing', 'B001',
-                'R101', '1', 'Ground Floor', '101', 'Reception', 'true', 'false',
-                '31/12/2024', '15/01/2024', 'Regular maintenance required', 'true', 'Admin', 'Admin'
+                'WT001', 'ACTIVE', 'Water Tap', 'TAP-001', 'SEC-001', 'North Wing', 'N',
+                'Kitchen', '1', 'Ground Floor', '101', 'Main Kitchen', 'true', 'false',
+                '31/12/2024', '15/01/2024', 'Regular maintenance required', 'true'
             ]
         ];
 
@@ -640,10 +669,9 @@ class WaterTapAssetManager {
 
         const headers = data[0];
         const expectedHeaders = [
-            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
-            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
-            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate',
-            'maintenanceNotes', 'inUse', 'createdBy', 'modifiedBy'
+            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
+            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+            'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn', 'notes', 'augmentedCare'
         ];
 
         // Validate headers (allow for some flexibility in naming)
@@ -666,35 +694,37 @@ class WaterTapAssetManager {
             const asset = {
                 assetBarcode: this.getCellValue(row, headerMap['assetBarcode']),
                 status: this.getCellValue(row, headerMap['status']) || 'ACTIVE',
-                outletType: this.getCellValue(row, headerMap['outletType']),
-                tapType: this.getCellValue(row, headerMap['tapType']),
-                spareColumn: this.getCellValue(row, headerMap['spareColumn']) || '',
+                assetType: this.getCellValue(row, headerMap['assetType']),
+                primaryIdentifier: this.getCellValue(row, headerMap['primaryIdentifier']),
+                secondaryIdentifier: this.getCellValue(row, headerMap['secondaryIdentifier']),
                 wing: this.getCellValue(row, headerMap['wing']),
-                buildingCode: this.getCellValue(row, headerMap['buildingCode']),
-                roomId: this.getCellValue(row, headerMap['roomId']),
-                floorNumber: this.parseNumber(this.getCellValue(row, headerMap['floorNumber'])),
-                floorName: this.getCellValue(row, headerMap['floorName']),
-                roomNumber: this.getCellValue(row, headerMap['roomNumber']),
+                wingInShort: this.getCellValue(row, headerMap['wingInShort']),
+                room: this.getCellValue(row, headerMap['room']),
+                floor: this.getCellValue(row, headerMap['floor']),
+                floorInWords: this.getCellValue(row, headerMap['floorInWords']),
+                roomNo: this.getCellValue(row, headerMap['roomNo']),
                 roomName: this.getCellValue(row, headerMap['roomName']),
-                hasFilter: this.parseBoolean(this.getCellValue(row, headerMap['hasFilter'])),
                 filterNeeded: this.parseBoolean(this.getCellValue(row, headerMap['filterNeeded'])),
+                filtersOn: this.parseBoolean(this.getCellValue(row, headerMap['filtersOn'])),
                 filterExpiryDate: this.parseDate(this.getCellValue(row, headerMap['filterExpiryDate'])),
-                filterInstalledDate: this.parseDate(this.getCellValue(row, headerMap['filterInstalledDate'])),
-                maintenanceNotes: this.getCellValue(row, headerMap['maintenanceNotes']),
-                inUse: this.parseBoolean(this.getCellValue(row, headerMap['inUse']), true),
-                createdBy: this.getCellValue(row, headerMap['createdBy']) || 'Bulk Upload',
-                modifiedBy: this.getCellValue(row, headerMap['modifiedBy']) || 'Bulk Upload'
+                filterInstalledOn: this.parseDate(this.getCellValue(row, headerMap['filterInstalledOn'])),
+                notes: this.getCellValue(row, headerMap['notes']),
+                augmentedCare: this.parseBoolean(this.getCellValue(row, headerMap['augmentedCare'])),
+                created: new Date().toISOString(),
+                createdBy: 'Bulk Upload',
+                modified: new Date().toISOString(),
+                modifiedBy: 'Bulk Upload'
             };
 
             // Validate required fields
             if (!asset.assetBarcode) {
                 throw new Error(`Row ${i + 1}: assetBarcode is required`);
             }
-            if (!asset.outletType) {
-                throw new Error(`Row ${i + 1}: outletType is required`);
+            if (!asset.assetType) {
+                throw new Error(`Row ${i + 1}: assetType is required`);
             }
-            if (!asset.tapType) {
-                throw new Error(`Row ${i + 1}: tapType is required`);
+            if (!asset.primaryIdentifier) {
+                throw new Error(`Row ${i + 1}: primaryIdentifier is required`);
             }
 
             processedAssets.push(asset);
@@ -707,12 +737,6 @@ class WaterTapAssetManager {
         if (index === undefined || index < 0 || index >= row.length) return '';
         const value = row[index];
         return value !== null && value !== undefined ? value.toString().trim() : '';
-    }
-
-    parseNumber(value) {
-        if (!value) return 0;
-        const num = parseInt(value);
-        return isNaN(num) ? 0 : num;
     }
 
     parseBoolean(value, defaultValue = false) {
@@ -739,9 +763,9 @@ class WaterTapAssetManager {
         const previewAssets = assets.slice(0, 5);
         
         const headers = [
-            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
-            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
-            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate', 'maintenanceNotes', 'inUse'
+            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
+            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+            'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn', 'notes', 'augmentedCare'
         ];
 
         table.innerHTML = `
@@ -751,28 +775,28 @@ class WaterTapAssetManager {
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                                 ${previewAssets.map(asset => `
-                     <tr>
-                         <td class="px-2 py-2 text-xs">${asset.assetBarcode}</td>
-                         <td class="px-2 py-2 text-xs">${asset.status}</td>
-                         <td class="px-2 py-2 text-xs">${asset.outletType}</td>
-                         <td class="px-2 py-2 text-xs">${asset.tapType}</td>
-                         <td class="px-2 py-2 text-xs">-</td>
-                         <td class="px-2 py-2 text-xs">${asset.wing}</td>
-                         <td class="px-2 py-2 text-xs">${asset.buildingCode}</td>
-                         <td class="px-2 py-2 text-xs">${asset.roomId}</td>
-                         <td class="px-2 py-2 text-xs">${asset.floorNumber}</td>
-                         <td class="px-2 py-2 text-xs">${asset.floorName}</td>
-                         <td class="px-2 py-2 text-xs">${asset.roomNumber}</td>
-                         <td class="px-2 py-2 text-xs">${asset.roomName}</td>
-                         <td class="px-2 py-2 text-xs">${asset.hasFilter ? 'Yes' : 'No'}</td>
-                         <td class="px-2 py-2 text-xs">${asset.filterNeeded ? 'Yes' : 'No'}</td>
-                         <td class="px-2 py-2 text-xs">${this.formatDateTimeDDMMYYYY(asset.filterExpiryDate)}</td>
-                         <td class="px-2 py-2 text-xs">${this.formatDateTimeDDMMYYYY(asset.filterInstalledDate)}</td>
-                         <td class="px-2 py-2 text-xs">${asset.maintenanceNotes || '-'}</td>
-                         <td class="px-2 py-2 text-xs">${asset.inUse ? 'Yes' : 'No'}</td>
-                     </tr>
-                 `).join('')}
+                ${previewAssets.map(asset => `
+                    <tr>
+                        <td class="px-2 py-2 text-xs">${asset.assetBarcode}</td>
+                        <td class="px-2 py-2 text-xs">${asset.status}</td>
+                        <td class="px-2 py-2 text-xs">${asset.assetType}</td>
+                        <td class="px-2 py-2 text-xs">${asset.primaryIdentifier}</td>
+                        <td class="px-2 py-2 text-xs">${asset.secondaryIdentifier || '-'}</td>
+                        <td class="px-2 py-2 text-xs">${asset.wing}</td>
+                        <td class="px-2 py-2 text-xs">${asset.wingInShort}</td>
+                        <td class="px-2 py-2 text-xs">${asset.room}</td>
+                        <td class="px-2 py-2 text-xs">${asset.floor}</td>
+                        <td class="px-2 py-2 text-xs">${asset.floorInWords}</td>
+                        <td class="px-2 py-2 text-xs">${asset.roomNo}</td>
+                        <td class="px-2 py-2 text-xs">${asset.roomName}</td>
+                        <td class="px-2 py-2 text-xs">${asset.filterNeeded ? 'Yes' : 'No'}</td>
+                        <td class="px-2 py-2 text-xs">${asset.filtersOn ? 'Yes' : 'No'}</td>
+                        <td class="px-2 py-2 text-xs">${this.formatDateDDMMYYYY(asset.filterExpiryDate)}</td>
+                        <td class="px-2 py-2 text-xs">${this.formatDateDDMMYYYY(asset.filterInstalledOn)}</td>
+                        <td class="px-2 py-2 text-xs">${asset.notes || '-'}</td>
+                        <td class="px-2 py-2 text-xs">${asset.augmentedCare ? 'Yes' : 'No'}</td>
+                    </tr>
+                `).join('')}
             </tbody>
         `;
 
@@ -841,6 +865,7 @@ class WaterTapAssetManager {
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     window.assetManager = new WaterTapAssetManager();
+    window.assetManager.init();
 });
 
 console.log('Water Tap Asset Management System loaded');

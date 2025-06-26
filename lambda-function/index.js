@@ -4,108 +4,144 @@ const { v4: uuidv4 } = require('uuid');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 // Table names from environment variables
-const ASSETS_TABLE = process.env.ASSETS_TABLE || 'WaterTapAssetAssets';
-const MAINTENANCE_TABLE = process.env.MAINTENANCE_TABLE || 'WaterTapAssetMaintenance';
-const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapAssetLocations';
+const ASSETS_TABLE = process.env.ASSETS_TABLE || 'WaterTapAssets';
+const MAINTENANCE_TABLE = process.env.MAINTENANCE_TABLE || 'WaterTapMaintenance';
+const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapLocations';
+
+// CORS headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400'
+};
 
 /**
  * @type {import('@types/aws-lambda').APIGatewayProxyHandler}
  */
 exports.handler = async (event) => {
-    console.log(`EVENT: ${JSON.stringify(event)}`);
+    console.log('Event:', JSON.stringify(event, null, 2));
     
-    const headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Max-Age": "86400"
-    };
-
+    // Handle preflight OPTIONS requests
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: corsHeaders,
+            body: ''
+        };
+    }
+    
     try {
-        const { httpMethod, pathParameters, body, path } = event;
+        const { httpMethod, path, pathParameters } = event;
+        const body = event.body ? JSON.parse(event.body) : {};
         
-        // Handle CORS preflight
-        if (httpMethod === 'OPTIONS') {
-            return {
-                statusCode: 200,
-                headers,
-                body: JSON.stringify('OK')
+        let response;
+        
+        // Route requests
+        if (path === '/dashboard' && httpMethod === 'GET') {
+            response = await getDashboardData();
+        } else if (path === '/items/assets' && httpMethod === 'GET') {
+            response = await getAssets();
+        } else if (path === '/items/assets' && httpMethod === 'POST') {
+            response = await createAsset(body);
+        } else if (path.startsWith('/items/assets/') && httpMethod === 'PUT') {
+            const assetId = pathParameters.id;
+            response = await updateAsset(assetId, body);
+        } else if (path.startsWith('/items/assets/') && httpMethod === 'DELETE') {
+            const assetId = pathParameters.id;
+            response = await deleteAsset(assetId);
+        } else if (path === '/items/locations' && httpMethod === 'GET') {
+            response = await getLocations();
+        } else if (path === '/items/maintenance' && httpMethod === 'GET') {
+            response = await getMaintenanceRecords();
+        } else {
+            response = {
+                statusCode: 404,
+                body: JSON.stringify({ error: 'Not found' })
             };
         }
-
-        // Extract resource from path
-        const pathParts = path.split('/').filter(part => part !== '');
-        console.log('Path parts:', pathParts);
         
-        // Handle different path structures: /items/{resource} or /dev/items/{resource}
-        let resourceIndex = pathParts.indexOf('items') + 1;
-        if (resourceIndex === 0) {
-            // Fallback: assume items is at index 1
-            resourceIndex = 2;
-        }
+        return {
+            ...response,
+            headers: { ...corsHeaders, ...response.headers }
+        };
         
-        const resource = pathParts[resourceIndex]; // resource after 'items'
-        const id = pathParts[resourceIndex + 1]; // optional ID
-
-        console.log(`Resource: ${resource}, ID: ${id}, Method: ${httpMethod}`);
-
-        switch (resource) {
-            case 'assets':
-                return await handleAssets(httpMethod, id, body);
-            case 'maintenance':
-                return await handleMaintenance(httpMethod, id, body);
-            case 'locations':
-                return await handleLocations(httpMethod, id, body);
-            case 'dashboard':
-                return await handleDashboard();
-            default:
-                return {
-                    statusCode: 404,
-                    headers,
-                    body: JSON.stringify({ error: 'Resource not found' })
-                };
-        }
     } catch (error) {
         console.error('Error:', error);
         return {
             statusCode: 500,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify({ error: 'Internal server error', details: error.message })
+            headers: corsHeaders,
+            body: JSON.stringify({ error: error.message })
         };
     }
 };
 
-// Asset Management Functions
-async function handleAssets(method, id, body) {
-    const headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-    };
+async function getDashboardData() {
+    try {
+        const assets = await getAllAssets();
+        
+        // Calculate dashboard statistics
+        const totalAssets = assets.length;
+        const activeAssets = assets.filter(asset => asset.status === 'ACTIVE').length;
+        const maintenanceAssets = assets.filter(asset => asset.status === 'MAINTENANCE').length;
+        const filtersNeeded = assets.filter(asset => asset.filterNeeded === true).length;
+        
+        // Status breakdown
+        const statusBreakdown = assets.reduce((acc, asset) => {
+            acc[asset.status] = (acc[asset.status] || 0) + 1;
+            return acc;
+        }, {});
+        
+        // Asset type breakdown
+        const assetTypeBreakdown = assets.reduce((acc, asset) => {
+            const type = asset.assetType || 'Unknown';
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+        }, {});
+        
+        // Wing breakdown
+        const wingBreakdown = assets.reduce((acc, asset) => {
+            const wing = asset.wing || 'Unknown';
+            acc[wing] = (acc[wing] || 0) + 1;
+            return acc;
+        }, {});
+        
+        // Filter status
+        const filterStatus = {
+            filtersOn: assets.filter(asset => asset.filtersOn === true).length,
+            filtersNeeded: filtersNeeded,
+            augmentedCare: assets.filter(asset => asset.augmentedCare === true).length
+        };
+        
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                totalAssets,
+                activeAssets,
+                maintenanceAssets,
+                filtersNeeded,
+                statusBreakdown,
+                assetTypeBreakdown,
+                wingBreakdown,
+                filterStatus
+            })
+        };
+    } catch (error) {
+        console.error('Error getting dashboard data:', error);
+        throw error;
+    }
+}
 
-    switch (method) {
-        case 'GET':
-            if (id) {
-                return await getAsset(id);
-            } else {
-                return await getAllAssets();
-            }
-        case 'POST':
-            return await createAsset(JSON.parse(body || '{}'));
-        case 'PUT':
-            return await updateAsset(id, JSON.parse(body || '{}'));
-        case 'DELETE':
-            return await deleteAsset(id);
-        default:
-            return {
-                statusCode: 405,
-                headers,
-                body: JSON.stringify({ error: 'Method not allowed' })
-            };
+async function getAssets() {
+    try {
+        const assets = await getAllAssets();
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ items: assets })
+        };
+    } catch (error) {
+        console.error('Error getting assets:', error);
+        throw error;
     }
 }
 
@@ -113,473 +149,178 @@ async function getAllAssets() {
     const params = {
         TableName: ASSETS_TABLE
     };
-
+    
     const result = await dynamodb.scan(params).promise();
-    
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify({
-            assets: result.Items,
-            count: result.Count
-        })
-    };
-}
-
-async function getAsset(id) {
-    const params = {
-        TableName: ASSETS_TABLE,
-        Key: { id }
-    };
-
-    const result = await dynamodb.get(params).promise();
-    
-    if (!result.Item) {
-        return {
-            statusCode: 404,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify({ error: 'Asset not found' })
-        };
-    }
-
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify(result.Item)
-    };
+    return result.Items || [];
 }
 
 async function createAsset(assetData) {
-    const currentTimestamp = new Date().toISOString();
-    const asset = {
-        id: uuidv4(),
-        // New 22-field schema
-        assetBarcode: assetData.assetBarcode || '',
-        status: assetData.status || 'ACTIVE',
-        outletType: assetData.outletType || '',
-        tapType: assetData.tapType || '',
-        spareColumn: assetData.spareColumn || '',
-        wing: assetData.wing || '',
-        buildingCode: assetData.buildingCode || '',
-        roomId: assetData.roomId || '',
-        floorNumber: assetData.floorNumber || 0,
-        floorName: assetData.floorName || '',
-        roomNumber: assetData.roomNumber || '',
-        roomName: assetData.roomName || '',
-        hasFilter: assetData.hasFilter || false,
-        filterNeeded: assetData.filterNeeded || false,
-        filterExpiryDate: assetData.filterExpiryDate || '',
-        filterInstalledDate: assetData.filterInstalledDate || '',
-        maintenanceNotes: assetData.maintenanceNotes || '',
-        inUse: assetData.inUse !== undefined ? assetData.inUse : true,
-        createdAt: assetData.createdAt || currentTimestamp,
-        createdBy: assetData.createdBy || 'System',
-        modifiedAt: currentTimestamp,
-        modifiedBy: assetData.modifiedBy || 'System'
-    };
-
-    const params = {
-        TableName: ASSETS_TABLE,
-        Item: asset,
-        ConditionExpression: 'attribute_not_exists(assetBarcode)',
-        ExpressionAttributeNames: {
-            '#assetBarcode': 'assetBarcode'
-        }
-    };
-
     try {
+        // Validate required fields
+        if (!assetData.assetBarcode) {
+            throw new Error('assetBarcode is required');
+        }
+        if (!assetData.assetType) {
+            throw new Error('assetType is required');
+        }
+        if (!assetData.primaryIdentifier) {
+            throw new Error('primaryIdentifier is required');
+        }
+        
+        // Generate ID
+        const assetId = generateId();
+        const now = new Date().toISOString();
+        
+        const asset = {
+            id: assetId,
+            assetBarcode: assetData.assetBarcode,
+            status: assetData.status || 'ACTIVE',
+            assetType: assetData.assetType,
+            primaryIdentifier: assetData.primaryIdentifier,
+            secondaryIdentifier: assetData.secondaryIdentifier || '',
+            wing: assetData.wing || '',
+            wingInShort: assetData.wingInShort || '',
+            room: assetData.room || '',
+            floor: assetData.floor || '',
+            floorInWords: assetData.floorInWords || '',
+            roomNo: assetData.roomNo || '',
+            roomName: assetData.roomName || '',
+            filterNeeded: assetData.filterNeeded === true,
+            filtersOn: assetData.filtersOn === true,
+            filterExpiryDate: assetData.filterExpiryDate || '',
+            filterInstalledOn: assetData.filterInstalledOn || '',
+            notes: assetData.notes || '',
+            augmentedCare: assetData.augmentedCare === true,
+            created: assetData.created || now,
+            createdBy: assetData.createdBy || 'System',
+            modified: assetData.modified || now,
+            modifiedBy: assetData.modifiedBy || 'System'
+        };
+        
+        const params = {
+            TableName: ASSETS_TABLE,
+            Item: asset
+        };
+        
         await dynamodb.put(params).promise();
+        
         return {
             statusCode: 201,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
             body: JSON.stringify(asset)
         };
     } catch (error) {
-        if (error.code === 'ConditionalCheckFailedException') {
-            return {
-                statusCode: 409,
-                headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-                },
-                body: JSON.stringify({ error: 'Asset with this barcode already exists' })
-            };
-        }
+        console.error('Error creating asset:', error);
         throw error;
     }
 }
 
-async function updateAsset(id, updates) {
-    const currentTimestamp = new Date().toISOString();
-    
-    // Build update expression dynamically
-    const updateExpressions = [];
-    const expressionAttributeNames = {};
-    const expressionAttributeValues = {};
-    
-    // Always update modifiedAt
-    updates.modifiedAt = currentTimestamp;
-    
-    // Fields that can be updated
-    const allowedFields = [
-        'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn',
-        'wing', 'buildingCode', 'roomId', 'floorNumber', 'floorName',
-        'roomNumber', 'roomName', 'hasFilter', 'filterNeeded',
-        'filterExpiryDate', 'filterInstalledDate', 'maintenanceNotes',
-        'inUse', 'modifiedAt', 'modifiedBy'
-    ];
-    
-    Object.keys(updates).forEach(key => {
-        if (allowedFields.includes(key) && updates[key] !== undefined) {
-            updateExpressions.push(`#${key} = :${key}`);
-            expressionAttributeNames[`#${key}`] = key;
-            expressionAttributeValues[`:${key}`] = updates[key];
-        }
-    });
-    
-    if (updateExpressions.length === 0) {
-        return {
-            statusCode: 400,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify({ error: 'No valid fields to update' })
-        };
-    }
-
-    const params = {
-        TableName: ASSETS_TABLE,
-        Key: { id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW'
-    };
-
+async function updateAsset(assetId, assetData) {
     try {
+        const now = new Date().toISOString();
+        
+        // Build update expression
+        const updateExpressions = [];
+        const expressionAttributeNames = {};
+        const expressionAttributeValues = {};
+        
+        const fields = [
+            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
+            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+            'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn', 'notes', 'augmentedCare'
+        ];
+        
+        fields.forEach(field => {
+            if (assetData.hasOwnProperty(field)) {
+                updateExpressions.push(`#${field} = :${field}`);
+                expressionAttributeNames[`#${field}`] = field;
+                expressionAttributeValues[`:${field}`] = assetData[field];
+            }
+        });
+        
+        // Always update modified timestamp and user
+        updateExpressions.push('#modified = :modified');
+        updateExpressions.push('#modifiedBy = :modifiedBy');
+        expressionAttributeNames['#modified'] = 'modified';
+        expressionAttributeNames['#modifiedBy'] = 'modifiedBy';
+        expressionAttributeValues[':modified'] = now;
+        expressionAttributeValues[':modifiedBy'] = assetData.modifiedBy || 'System';
+        
+        const params = {
+            TableName: ASSETS_TABLE,
+            Key: { id: assetId },
+            UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+            ExpressionAttributeNames: expressionAttributeNames,
+            ExpressionAttributeValues: expressionAttributeValues,
+            ReturnValues: 'ALL_NEW'
+        };
+        
         const result = await dynamodb.update(params).promise();
+        
         return {
             statusCode: 200,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
             body: JSON.stringify(result.Attributes)
         };
     } catch (error) {
-        return {
-            statusCode: 404,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify({ error: 'Asset not found' })
-        };
+        console.error('Error updating asset:', error);
+        throw error;
     }
 }
 
-async function deleteAsset(id) {
-    const params = {
-        TableName: ASSETS_TABLE,
-        Key: { id }
-    };
-
-    await dynamodb.delete(params).promise();
-    
-    return {
-        statusCode: 204,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: ''
-    };
-}
-
-// Maintenance Management Functions
-async function handleMaintenance(method, id, body) {
-    const headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-    };
-
-    switch (method) {
-        case 'GET':
-            if (id) {
-                return await getMaintenanceRecord(id);
-            } else {
-                return await getAllMaintenanceRecords();
-            }
-        case 'POST':
-            return await createMaintenanceRecord(JSON.parse(body || '{}'));
-        case 'PUT':
-            return await updateMaintenanceRecord(id, JSON.parse(body || '{}'));
-        default:
-            return {
-                statusCode: 405,
-                headers,
-                body: JSON.stringify({ error: 'Method not allowed' })
-            };
-    }
-}
-
-async function getAllMaintenanceRecords() {
-    const params = {
-        TableName: MAINTENANCE_TABLE
-    };
-
-    const result = await dynamodb.scan(params).promise();
-    
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify({
-            maintenance: result.Items,
-            count: result.Count
-        })
-    };
-}
-
-async function getMaintenanceRecord(id) {
-    const params = {
-        TableName: MAINTENANCE_TABLE,
-        Key: { id }
-    };
-
-    const result = await dynamodb.get(params).promise();
-    
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify(result.Item)
-    };
-}
-
-async function createMaintenanceRecord(maintenanceData) {
-    const maintenance = {
-        id: uuidv4(),
-        assetId: maintenanceData.assetId,
-        maintenanceType: maintenanceData.maintenanceType,
-        scheduledDate: maintenanceData.scheduledDate,
-        completedDate: maintenanceData.completedDate,
-        technician: maintenanceData.technician,
-        notes: maintenanceData.notes,
-        cost: maintenanceData.cost,
-        status: maintenanceData.status || 'SCHEDULED',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-
-    const params = {
-        TableName: MAINTENANCE_TABLE,
-        Item: maintenance
-    };
-
-    await dynamodb.put(params).promise();
-    
-    return {
-        statusCode: 201,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify(maintenance)
-    };
-}
-
-async function updateMaintenanceRecord(id, updates) {
-    updates.updatedAt = new Date().toISOString();
-    
-    const updateExpressions = [];
-    const expressionAttributeNames = {};
-    const expressionAttributeValues = {};
-    
-    Object.keys(updates).forEach(key => {
-        if (updates[key] !== undefined) {
-            updateExpressions.push(`#${key} = :${key}`);
-            expressionAttributeNames[`#${key}`] = key;
-            expressionAttributeValues[`:${key}`] = updates[key];
-        }
-    });
-
-    const params = {
-        TableName: MAINTENANCE_TABLE,
-        Key: { id },
-        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW'
-    };
-
-    const result = await dynamodb.update(params).promise();
-    
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify(result.Attributes)
-    };
-}
-
-// Location Management Functions
-async function handleLocations(method, id, body) {
-    const headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-    };
-
-    switch (method) {
-        case 'GET':
-            return await getAllLocations();
-        case 'POST':
-            return await createLocation(JSON.parse(body || '{}'));
-        default:
-            return {
-                statusCode: 405,
-                headers,
-                body: JSON.stringify({ error: 'Method not allowed' })
-            };
-    }
-}
-
-async function getAllLocations() {
-    const params = {
-        TableName: LOCATIONS_TABLE
-    };
-
-    const result = await dynamodb.scan(params).promise();
-    
-    return {
-        statusCode: 200,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify({
-            locations: result.Items,
-            count: result.Count
-        })
-    };
-}
-
-async function createLocation(locationData) {
-    const location = {
-        id: uuidv4(),
-        wing: locationData.wing,
-        buildingCode: locationData.buildingCode,
-        floorNumber: locationData.floorNumber,
-        floorName: locationData.floorName,
-        roomNumber: locationData.roomNumber,
-        roomName: locationData.roomName,
-        roomId: locationData.roomId,
-        description: locationData.description
-    };
-
-    const params = {
-        TableName: LOCATIONS_TABLE,
-        Item: location
-    };
-
-    await dynamodb.put(params).promise();
-    
-    return {
-        statusCode: 201,
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-        },
-        body: JSON.stringify(location)
-    };
-}
-
-// Dashboard Functions
-async function handleDashboard() {
+async function deleteAsset(assetId) {
     try {
         const params = {
-            TableName: ASSETS_TABLE
+            TableName: ASSETS_TABLE,
+            Key: { id: assetId }
         };
-
-        const result = await dynamodb.scan(params).promise();
-        const assets = result.Items;
-
-        const stats = {
-            totalAssets: assets.length,
-            activeAssets: assets.filter(asset => asset.status === 'ACTIVE').length,
-            maintenanceAssets: assets.filter(asset => asset.status === 'MAINTENANCE').length,
-            inactiveAssets: assets.filter(asset => asset.status === 'INACTIVE').length,
-            decommissionedAssets: assets.filter(asset => asset.status === 'DECOMMISSIONED').length,
-            assetsWithFilters: assets.filter(asset => asset.hasFilter === true).length,
-            filtersNeeded: assets.filter(asset => asset.filterNeeded === true).length,
-            assetsInUse: assets.filter(asset => asset.inUse === true).length,
-            // Breakdown by outlet type
-            outletTypes: assets.reduce((acc, asset) => {
-                acc[asset.outletType] = (acc[asset.outletType] || 0) + 1;
-                return acc;
-            }, {}),
-            // Breakdown by tap type
-            tapTypes: assets.reduce((acc, asset) => {
-                acc[asset.tapType] = (acc[asset.tapType] || 0) + 1;
-                return acc;
-            }, {})
-        };
-
+        
+        await dynamodb.delete(params).promise();
+        
         return {
             statusCode: 200,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify(stats)
+            body: JSON.stringify({ message: 'Asset deleted successfully' })
         };
     } catch (error) {
-        console.error('Dashboard error:', error);
-        return {
-            statusCode: 500,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS"
-            },
-            body: JSON.stringify({ error: 'Failed to load dashboard data' })
-        };
+        console.error('Error deleting asset:', error);
+        throw error;
     }
+}
+
+async function getLocations() {
+    try {
+        const params = {
+            TableName: LOCATIONS_TABLE
+        };
+        
+        const result = await dynamodb.scan(params).promise();
+        
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ items: result.Items || [] })
+        };
+    } catch (error) {
+        console.error('Error getting locations:', error);
+        throw error;
+    }
+}
+
+async function getMaintenanceRecords() {
+    try {
+        const params = {
+            TableName: MAINTENANCE_TABLE
+        };
+        
+        const result = await dynamodb.scan(params).promise();
+        
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ items: result.Items || [] })
+        };
+    } catch (error) {
+        console.error('Error getting maintenance records:', error);
+        throw error;
+    }
+}
+
+function generateId() {
+    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 } 
