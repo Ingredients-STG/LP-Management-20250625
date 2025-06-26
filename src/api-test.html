@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>API Test Suite</h1>
+    
+    <div>
+        <button onclick="testCORS()">Test CORS</button>
+        <button onclick="testAssets()">Test Assets API</button>
+        <button onclick="testDashboard()">Test Dashboard API</button>
+        <button onclick="testCreateAsset()">Test Create Asset</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
+        const resultsDiv = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+        }
+        
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+        
+        async function testCORS() {
+            addResult('<h3>Testing CORS...</h3>');
+            try {
+                const response = await fetch(`${API_BASE_URL}/items/assets`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': window.location.origin
+                    }
+                });
+                
+                addResult(`OPTIONS request status: ${response.status}`, response.status === 200 ? 'success' : 'error');
+                
+                const headers = {};
+                for (let [key, value] of response.headers.entries()) {
+                    headers[key] = value;
+                }
+                
+                addResult(`<strong>Response Headers:</strong><pre>${JSON.stringify(headers, null, 2)}</pre>`);
+                
+            } catch (error) {
+                addResult(`CORS test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAssets() {
+            addResult('<h3>Testing Assets API...</h3>');
+            try {
+                const response = await fetch(`${API_BASE_URL}/items/assets`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addResult(`GET Assets status: ${response.status}`, response.status === 200 ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`<strong>Assets Response:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`);
+                } else {
+                    const errorText = await response.text();
+                    addResult(`Error response: ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`Assets API test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testDashboard() {
+            addResult('<h3>Testing Dashboard API...</h3>');
+            try {
+                const response = await fetch(`${API_BASE_URL}/dashboard`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addResult(`GET Dashboard status: ${response.status}`, response.status === 200 ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`<strong>Dashboard Response:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`);
+                } else {
+                    const errorText = await response.text();
+                    addResult(`Error response: ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`Dashboard API test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCreateAsset() {
+            addResult('<h3>Testing Create Asset API...</h3>');
+            
+            const testAsset = {
+                assetBarcode: 'TEST-' + Date.now(),
+                status: 'ACTIVE',
+                assetType: 'Water Tap',
+                primaryIdentifier: 'Test Asset',
+                secondaryIdentifier: 'Test Secondary',
+                wing: 'Test Wing',
+                wingInShort: 'TW',
+                room: 'Test Room',
+                floor: '1',
+                floorInWords: 'First',
+                roomNo: '101',
+                roomName: 'Test Room Name',
+                filterNeeded: true,
+                filtersOn: false,
+                filterExpiryDate: '2025-12-31',
+                filterInstalledOn: '2025-01-01',
+                notes: 'Test asset created via API test',
+                augmentedCare: false
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/items/assets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testAsset)
+                });
+                
+                addResult(`POST Asset status: ${response.status}`, response.status === 201 ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`<strong>Created Asset Response:</strong><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    addResult(`Error response: ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`Create Asset test failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-run basic tests on load
+        window.onload = function() {
+            addResult('<h2>Automatic Tests</h2>');
+            addResult(`Current Origin: ${window.location.origin}`);
+            addResult(`API Base URL: ${API_BASE_URL}`);
+        };
+    </script>
+</body>
+</html> 
