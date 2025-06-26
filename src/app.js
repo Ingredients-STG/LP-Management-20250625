@@ -141,15 +141,23 @@ class WaterTapAssetManager {
     async loadAssets() {
         try {
             this.showLoading();
+            console.log('Making API call to:', `${API_BASE_URL}/items/assets`);
             const response = await fetch(`${API_BASE_URL}/items/assets`);
+            console.log('Response status:', response.status);
             if (response.ok) {
                 const data = await response.json();
+                console.log('API Response data:', data);
+                console.log('Data type:', typeof data);
+                console.log('Data keys:', Object.keys(data));
                 // Handle both old and new data structures
                 this.assets = data.items || data.assets || [];
+                console.log('Assets array:', this.assets);
+                console.log('Assets length:', this.assets.length);
                 this.renderAssets();
                 this.updateAssetCount();
             } else {
-                console.error('Failed to load assets');
+                const errorText = await response.text();
+                console.error('Failed to load assets. Status:', response.status, 'Error:', errorText);
                 this.showMockAssets();
             }
         } catch (error) {
