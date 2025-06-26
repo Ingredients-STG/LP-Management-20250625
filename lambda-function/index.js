@@ -4,15 +4,15 @@ const { v4: uuidv4 } = require('uuid');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 // Table names from environment variables
-const ASSETS_TABLE = process.env.ASSETS_TABLE || 'WaterTapAssets';
+const ASSETS_TABLE = process.env.ASSETS_TABLE || 'WaterTapAssetAssets';
 const MAINTENANCE_TABLE = process.env.MAINTENANCE_TABLE || 'WaterTapMaintenance';
 const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapLocations';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://main.d25j5qt77sjegi.amplifyapp.com',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Amz-Date, X-Api-Key, X-Amz-Security-Token',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Allow-Credentials': 'false'
 };
@@ -41,6 +41,16 @@ exports.handler = async (event) => {
         // Route requests
         if (path === '/dashboard' && httpMethod === 'GET') {
             response = await getDashboardData();
+        } else if (path === '/assets' && httpMethod === 'GET') {
+            response = await getAssets();
+        } else if (path === '/assets' && httpMethod === 'POST') {
+            response = await createAsset(body);
+        } else if (path.startsWith('/assets/') && httpMethod === 'PUT') {
+            const assetId = pathParameters.id;
+            response = await updateAsset(assetId, body);
+        } else if (path.startsWith('/assets/') && httpMethod === 'DELETE') {
+            const assetId = pathParameters.id;
+            response = await deleteAsset(assetId);
         } else if (path === '/items/assets' && httpMethod === 'GET') {
             response = await getAssets();
         } else if (path === '/items/assets' && httpMethod === 'POST') {
