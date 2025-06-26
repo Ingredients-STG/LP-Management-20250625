@@ -58,10 +58,16 @@ exports.handler = async (event) => {
         } else if (path === '/items/assets' && httpMethod === 'POST') {
             response = await createAsset(body);
         } else if (path.startsWith('/items/assets/') && httpMethod === 'PUT') {
-            const assetId = pathParameters.id;
+            console.log('PUT request - pathParameters:', JSON.stringify(pathParameters));
+            console.log('PUT request - path:', path);
+            const assetId = pathParameters.id || path.split('/').pop();
+            console.log('PUT request - extracted assetId:', assetId);
             response = await updateAsset(assetId, body);
         } else if (path.startsWith('/items/assets/') && httpMethod === 'DELETE') {
-            const assetId = pathParameters.id;
+            console.log('DELETE request - pathParameters:', JSON.stringify(pathParameters));
+            console.log('DELETE request - path:', path);
+            const assetId = pathParameters.id || path.split('/').pop();
+            console.log('DELETE request - extracted assetId:', assetId);
             response = await deleteAsset(assetId);
         } else if (path === '/items/locations' && httpMethod === 'GET') {
             response = await getLocations();
