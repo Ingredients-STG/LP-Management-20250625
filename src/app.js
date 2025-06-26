@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
+const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev/items';
 
 class WaterTapAssetManager {
     constructor() {

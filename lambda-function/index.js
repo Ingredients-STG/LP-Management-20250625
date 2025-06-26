@@ -41,6 +41,8 @@ exports.handler = async (event) => {
         // Route requests
         if (path === '/dashboard' && httpMethod === 'GET') {
             response = await getDashboardData();
+        } else if (path === '/items/dashboard' && httpMethod === 'GET') {
+            response = await getDashboardData();
         } else if (path === '/assets' && httpMethod === 'GET') {
             response = await getAssets();
         } else if (path === '/assets' && httpMethod === 'POST') {
