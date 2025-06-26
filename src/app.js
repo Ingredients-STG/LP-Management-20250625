@@ -282,7 +282,7 @@ class WaterTapAssetManager {
                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${asset.assetBarcode || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${this.getStatusColor(asset.status)}">
-                        ${asset.status || 'ACTIVE'}
+                        ${this.normalizeStatusDisplay(asset.status)}
                     </span>
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.assetType || '-'}</td>
@@ -330,7 +330,9 @@ class WaterTapAssetManager {
     }
 
     getStatusColor(status) {
-        switch (status) {
+        // Normalize status to uppercase for comparison
+        const normalizedStatus = status ? status.toString().toUpperCase() : '';
+        switch (normalizedStatus) {
             case 'ACTIVE':
                 return 'bg-green-100 text-green-800';
             case 'INACTIVE':
@@ -342,6 +344,12 @@ class WaterTapAssetManager {
             default:
                 return 'bg-gray-100 text-gray-800';
         }
+    }
+
+    normalizeStatusDisplay(status) {
+        if (!status) return 'ACTIVE';
+        // Convert to uppercase for consistent display
+        return status.toString().toUpperCase();
     }
 
     formatDate(dateString) {

@@ -177,7 +177,7 @@ async function createAsset(assetData) {
         const asset = {
             id: assetId,
             assetBarcode: assetData.assetBarcode,
-            status: assetData.status || 'ACTIVE',
+            status: (assetData.status || 'ACTIVE').toUpperCase(),
             assetType: assetData.assetType,
             primaryIdentifier: assetData.primaryIdentifier,
             secondaryIdentifier: assetData.secondaryIdentifier || '',
@@ -247,7 +247,12 @@ async function updateAsset(assetId, assetData) {
             if (assetData.hasOwnProperty(field)) {
                 updateExpressions.push(`#${field} = :${field}`);
                 expressionAttributeNames[`#${field}`] = field;
-                expressionAttributeValues[`:${field}`] = assetData[field];
+                // Normalize status to uppercase
+                if (field === 'status' && assetData[field]) {
+                    expressionAttributeValues[`:${field}`] = assetData[field].toUpperCase();
+                } else {
+                    expressionAttributeValues[`:${field}`] = assetData[field];
+                }
             }
         });
         
