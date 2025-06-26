@@ -3,50 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Debug</title>
+    <title>API Debug Test</title>
 </head>
 <body>
-    <h1>API Debug</h1>
-    <div id="results"></div>
+    <h1>API Debug Test</h1>
+    <button onclick="testAPI()">Test API</button>
+    <div id="result"></div>
     
     <script>
-        const API_BASE_URL = 'https://uliwzluwwi.execute-api.eu-west-2.amazonaws.com/dev';
+        const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
         
         async function testAPI() {
-            const results = document.getElementById('results');
-            results.innerHTML = '<p>Testing API...</p>';
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing API...';
             
             try {
-                // Test Dashboard
-                console.log('Testing dashboard...');
-                const dashboardResponse = await fetch(`${API_BASE_URL}/items/dashboard`);
-                console.log('Dashboard response status:', dashboardResponse.status);
-                const dashboardData = await dashboardResponse.json();
-                console.log('Dashboard data:', dashboardData);
+                console.log('Making API call to:', `${API_BASE_URL}/items/assets`);
+                const response = await fetch(`${API_BASE_URL}/items/assets`);
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
                 
-                // Test Assets
-                console.log('Testing assets...');
-                const assetsResponse = await fetch(`${API_BASE_URL}/items/assets`);
-                console.log('Assets response status:', assetsResponse.status);
-                const assetsData = await assetsResponse.json();
-                console.log('Assets data:', assetsData);
-                
-                results.innerHTML = `
-                    <h2>Dashboard Data:</h2>
-                    <pre>${JSON.stringify(dashboardData, null, 2)}</pre>
-                    
-                    <h2>Assets Data:</h2>
-                    <pre>${JSON.stringify(assetsData, null, 2)}</pre>
-                `;
-                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('API Response data:', data);
+                    resultDiv.innerHTML = `
+                        <h2>Success!</h2>
+                        <p>Status: ${response.status}</p>
+                        <p>Items count: ${data.items ? data.items.length : 'N/A'}</p>
+                        <p>Assets count: ${data.assets ? data.assets.length : 'N/A'}</p>
+                        <p>Total count: ${data.count || 'N/A'}</p>
+                        <h3>Raw Response:</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    const errorText = await response.text();
+                    console.error('API Error:', errorText);
+                    resultDiv.innerHTML = `
+                        <h2>Error!</h2>
+                        <p>Status: ${response.status}</p>
+                        <p>Error: ${errorText}</p>
+                    `;
+                }
             } catch (error) {
-                console.error('Error:', error);
-                results.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Exception:', error);
+                resultDiv.innerHTML = `
+                    <h2>Exception!</h2>
+                    <p>Error: ${error.message}</p>
+                `;
             }
         }
-        
-        // Run test when page loads
-        testAPI();
     </script>
 </body>
 </html> 
