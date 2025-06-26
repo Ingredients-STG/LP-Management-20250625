@@ -1,243 +1,322 @@
 # Water Tap Asset Management System
 
-A comprehensive web application for managing water tap assets using AWS services including Lambda, DynamoDB, API Gateway, and Amplify.
+A comprehensive web application for managing water tap assets, drinking fountains, and water outlets using AWS services including Lambda, DynamoDB, API Gateway, and Amplify.
 
 ## 🚰 Features
 
-- **Asset Management**: Track water outlets, taps, drinking fountains, and water coolers
-- **Outlet Type Classification**: Wall Mounted, Floor Standing, Countertop, and more
-- **Tap Type Tracking**: Push Button, Sensor, Lever, Turn Handle systems
-- **Location Management**: Organize assets by wing, building code, room ID, and floor details
-- **Filter Tracking**: Monitor filter installation, expiry dates, and maintenance needs
-- **Usage Status**: Track which assets are currently in use
-- **Dashboard Analytics**: Visual insights into asset status and distribution
-- **Bulk Import/Export**: Excel-based data management with template download
-- **Real-time Updates**: Live data synchronization across all devices
+- **Asset Management**: Track water taps, drinking fountains, LNS outlets, water coolers, and other water assets
+- **22-Field Asset Schema**: Comprehensive tracking with barcode, status, type, location, and maintenance details
+- **Location Management**: Organize assets by wing, room, floor with detailed location information
+- **Filter Management**: Track filter needs, installation dates, expiry dates, and filter status
+- **Status Tracking**: Monitor asset status (Active, Inactive, Maintenance, Decommissioned)
+- **Dashboard Analytics**: Real-time insights into asset distribution, status breakdown, and filter requirements
+- **Bulk Import/Export**: Excel-based data management with standardized template
+- **Search & Filter**: Advanced search functionality across all asset fields
+- **Real-time Updates**: Live data synchronization with instant updates
 
 ## 🏗️ Architecture
 
-- **Frontend**: Modern HTML5, CSS3 (Tailwind), JavaScript (ES6+)
-- **Backend**: AWS Lambda (Node.js)
+- **Frontend**: Modern HTML5, CSS3 (Tailwind CSS), Vanilla JavaScript (ES6+)
+- **Backend**: AWS Lambda (Node.js 18+)
 - **Database**: Amazon DynamoDB
-- **API**: Amazon API Gateway (REST API)
+- **API**: Amazon API Gateway (REST API with CORS)
 - **Hosting**: AWS Amplify
-- **Authentication**: AWS IAM
-- **Deployment**: AWS CloudFormation
+- **Deployment**: GitHub + AWS Amplify CI/CD pipeline
 
-## 📋 New Asset Schema (22 Fields)
+## 📋 Current Asset Schema (22 Fields)
 
-Based on the updated water tap asset data structure:
+The system uses a comprehensive 22-field schema for complete asset tracking:
 
 ```javascript
 {
-  id: "unique-id",
-  assetBarcode: "WT001",
-  status: "ACTIVE|INACTIVE|MAINTENANCE|DECOMMISSIONED",
-  outletType: "Wall Mounted|Floor Standing|Countertop|Drinking Fountain|Water Cooler",
-  tapType: "Push Button|Sensor|Lever|Turn Handle",
-  spareColumn: "Reserved for future use",
-  wing: "North Wing",
-  buildingCode: "B001",
-  roomId: "R101",
-  floorNumber: 1,
-  floorName: "Ground Floor",
-  roomNumber: "101",
-  roomName: "Reception",
-  hasFilter: true,
-  filterNeeded: false,
-  filterExpiryDate: "2024-12-31",
-  filterInstalledDate: "2024-01-15",
-  maintenanceNotes: "Regular maintenance required",
-  inUse: true,
-  createdAt: "2024-01-01T00:00:00Z",
-  createdBy: "Admin",
-  modifiedAt: "2024-01-01T00:00:00Z",
-  modifiedBy: "Admin"
+  // Core Asset Information
+  id: "uuid-v4-string",                    // Auto-generated UUID
+  assetBarcode: "b30674",                  // Unique asset identifier (Required)
+  status: "ACTIVE",                        // ACTIVE|INACTIVE|MAINTENANCE|DECOMMISSIONED (Required)
+  assetType: "Water Tap",                  // Asset type classification (Required)
+  
+  // Identifiers
+  primaryIdentifier: "gah",                // Primary asset identifier (Required)
+  secondaryIdentifier: "SEC-001",          // Optional secondary identifier
+  
+  // Location Information
+  wing: "North Wing",                      // Building wing/section
+  wingInShort: "N",                       // Wing abbreviation (N, S, E, W)
+  room: "112",                            // Room identifier
+  floor: "1",                             // Floor number/identifier
+  floorInWords: "Ground Floor",           // Floor description
+  roomNo: "112",                          // Room number
+  roomName: "Reception Area",             // Room name/description
+  
+  // Filter Management
+  filterNeeded: true,                     // Boolean - Does asset need filters? (Required)
+  filtersOn: false,                       // Boolean - Are filters currently active? (Required)
+  filterExpiryDate: "31/12/2024",        // Filter expiry date (dd/mm/yyyy format)
+  filterInstalledOn: "15/01/2024",       // Filter installation date (dd/mm/yyyy format)
+  
+  // Additional Information
+  notes: "Regular maintenance required",   // Free text notes/comments
+  augmentedCare: false,                   // Boolean - Special care requirements (Required)
+  
+  // System Fields (Auto-managed)
+  created: "2024-01-01T10:00:00.000Z",   // ISO timestamp - creation date
+  createdBy: "User",                      // User who created the record
+  modified: "2024-01-01T10:00:00.000Z",  // ISO timestamp - last modification
+  modifiedBy: "User"                      // User who last modified the record
 }
 ```
 
 ## 🚀 API Endpoints
 
+**Base URL**: `https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev/items`
+
 ### Assets
-- `GET /items/assets` - List all assets
-- `GET /items/assets/{id}` - Get specific asset
-- `POST /items/assets` - Create new asset
-- `PUT /items/assets/{id}` - Update asset
-- `DELETE /items/assets/{id}` - Delete asset
-
-### Maintenance
-- `GET /items/maintenance` - List maintenance records
-- `POST /items/maintenance` - Create maintenance record
-- `PUT /items/maintenance/{id}` - Update maintenance record
-
-### Locations
-- `GET /items/locations` - List all locations
-- `POST /items/locations` - Create new location
+- `GET /assets` - List all assets (returns 10 assets currently)
+- `POST /assets` - Create new asset
+- `PUT /assets/{id}` - Update existing asset
+- `DELETE /assets/{id}` - Delete asset
 
 ### Dashboard
-- `GET /items/dashboard` - Get dashboard analytics
+- `GET /dashboard` - Get dashboard analytics and statistics
+
+### Future Endpoints
+- `GET /locations` - List all locations
+- `GET /maintenance` - List maintenance records
 
 ## 🛠️ Setup Instructions
 
 ### Prerequisites
 - AWS CLI configured with appropriate permissions
 - Node.js 18+ installed
-- Amplify CLI installed
+- Git installed
 
 ### Local Development
 
 1. **Clone the repository**
    ```bash
    git clone https://github.com/Ingredients-STG/LP-Management-20250625.git
-   cd LP-Management-20250625
+   cd "LP Management"
    ```
 
-2. **Install dependencies**
+2. **Install Lambda dependencies**
    ```bash
+   cd lambda-function
    npm install
+   cd ..
    ```
 
-3. **Initialize Amplify (if not already done)**
+3. **Configure API endpoint**
+   - The API endpoint is already configured in `src/app.js`
+   - Current endpoint: `https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev/items`
+
+4. **Test locally**
    ```bash
-   amplify init
+   # Serve the frontend locally
+   cd src
+   python -m http.server 8000
+   # Or use any local server
    ```
 
-4. **Deploy backend resources**
-   ```bash
-   amplify push
-   ```
-
-5. **Update API endpoint**
-   - After deployment, update the `API_BASE_URL` in `src/app.js` with your actual API Gateway URL
-
-6. **Test locally**
-   - Open `src/index.html` in a web browser
-   - Or use a local server: `python -m http.server 8000` (from src directory)
+5. **Access the application**
+   - Open http://localhost:8000 in your browser
 
 ### AWS Deployment
 
-1. **Push to GitHub**
+The system is configured for automatic deployment:
+
+1. **Push changes to GitHub**
    ```bash
    git add .
-   git commit -m "Full schema reset & cleanup"
+   git commit -m "Your commit message"
    git push origin main
    ```
 
-2. **Deploy with Amplify Console**
+2. **Automatic deployment**
+   - Frontend automatically deploys via AWS Amplify
+   - Lambda function updates manually via AWS CLI:
    ```bash
-   amplify publish
+   cd lambda-function
+   zip -r ../lambda-function.zip .
+   cd ..
+   aws lambda update-function-code --function-name water-tap-asset-lambda --region eu-west-2 --zip-file fileb://lambda-function.zip
    ```
 
-## 📊 Database Tables
+## 📊 Database Configuration
 
-### Assets Table
+### DynamoDB Table: WaterTapAssetAssets
+- **Table Name**: `WaterTapAssetAssets`
 - **Primary Key**: `id` (String)
-- **Global Secondary Index**: `assetBarcode-index`
-- **Attributes**: All 22 asset properties as defined in new schema
+- **Region**: `eu-west-2`
+- **Current Records**: 10 assets with mixed legacy and new field structures
 
-### Maintenance Table
-- **Primary Key**: `id` (String)
-- **Global Secondary Index**: `assetId-index`
-- **Attributes**: Maintenance record properties
+### Data Migration Status
+- ✅ **Status normalization**: All status values converted to UPPERCASE
+- ✅ **Field compatibility**: System handles both old and new field structures
+- ✅ **Date formatting**: Unified date format (dd/mm/yyyy for dates, dd/mm/yyyy hh:mm for timestamps)
+- ✅ **Boolean handling**: Consistent true/false values with "Yes"/"No" display
 
-### Locations Table
-- **Primary Key**: `id` (String)
-- **Attributes**: Wing, building code, floor, and room information
+## 🔐 Security & CORS
 
-## 🔐 Security
+### CORS Configuration
+- **Allowed Origin**: `https://main.d25j5qt77sjegi.amplifyapp.com`
+- **Allowed Methods**: GET, POST, PUT, DELETE, OPTIONS
+- **Allowed Headers**: Content-Type, Authorization, X-Requested-With, X-Amz-Date, X-Api-Key, X-Amz-Security-Token
 
-- **IAM Roles**: Properly configured Lambda execution roles
-- **API Gateway**: CORS enabled for cross-origin requests
-- **DynamoDB**: Fine-grained access control
-- **Amplify**: Secure hosting with HTTPS
+### Authentication
+- Currently using AWS IAM for API Gateway access
+- Lambda function has appropriate DynamoDB permissions
 
-## 🎨 UI Components
+## 🎨 UI Features
 
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **Interactive Dashboard**: Real-time stats and charts
-- **Modal Forms**: User-friendly asset creation/editing with 22 fields
-- **Data Tables**: Sortable and filterable asset lists (21 visible columns)
-- **Status Indicators**: Visual status badges and icons
-- **Bulk Upload**: Excel template with all 22 fields
+### Dashboard
+- **Total Assets**: Shows count of all assets (currently 10)
+- **Active Assets**: Count of assets with ACTIVE status (currently 9)
+- **Maintenance**: Count of assets requiring maintenance (currently 0)
+- **Filters Needed**: Count of assets needing filter replacement (currently 8)
+
+### Asset Table
+- **22 columns**: All asset fields displayed in organized table
+- **Status indicators**: Color-coded status badges (green for ACTIVE, etc.)
+- **Boolean displays**: Yes/No badges with color coding
+- **Date formatting**: Consistent dd/mm/yyyy display format
+- **Action buttons**: Edit and delete buttons for each asset
+
+### Asset Form
+- **Comprehensive form**: All 22 fields with appropriate input types
+- **Validation**: Required field validation for core fields
+- **Status dropdown**: ACTIVE, INACTIVE, MAINTENANCE, DECOMMISSIONED options
+- **Boolean selectors**: Yes/No dropdowns for filter and care fields
+- **Date pickers**: Proper date input fields for filter dates
+
+### Search & Filter
+- **Global search**: Search across all text fields
+- **Real-time filtering**: Instant results as you type
+- **Field coverage**: Searches barcode, status, type, identifiers, location, notes, and user fields
 
 ## 📱 Mobile Support
 
-- Fully responsive design
-- Touch-friendly interface
-- Optimized for tablets and smartphones
-- Progressive Web App (PWA) ready
+- **Responsive design**: Mobile-first approach with Tailwind CSS
+- **Touch-friendly**: Optimized for tablet and mobile interaction
+- **Horizontal scrolling**: Table scrolls horizontally on smaller screens
+- **Modal forms**: Full-screen modals on mobile devices
 
-## 🔧 Configuration
+## 🔧 Configuration Files
 
-### Environment Variables
-- `ASSETS_TABLE`: DynamoDB table name for assets
-- `MAINTENANCE_TABLE`: DynamoDB table name for maintenance
-- `LOCATIONS_TABLE`: DynamoDB table name for locations
-
-### API Configuration
-Update `src/app.js` with your deployed API Gateway URL:
+### Frontend Configuration (`src/app.js`)
 ```javascript
-const API_BASE_URL = 'https://your-api-id.execute-api.eu-west-2.amazonaws.com/dev';
+const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev/items';
 ```
 
-## 📈 Monitoring
+### Lambda Configuration (`lambda-function/index.js`)
+```javascript
+const ASSETS_TABLE = 'WaterTapAssetAssets';
+const MAINTENANCE_TABLE = 'WaterTapMaintenance';
+const LOCATIONS_TABLE = 'WaterTapLocations';
+```
 
-- **CloudWatch Logs**: Lambda function logs
-- **CloudWatch Metrics**: API Gateway and DynamoDB metrics
-- **X-Ray Tracing**: Request tracing for debugging
-- **Amplify Console**: Deployment and hosting metrics
+## 📈 Current System Status
+
+### ✅ Working Features
+- **Asset Loading**: All 10 assets load correctly
+- **Create Assets**: New asset creation with UUID generation
+- **Update Assets**: Edit existing assets with proper validation
+- **Delete Assets**: Remove assets from database
+- **Dashboard Analytics**: Real-time statistics and breakdowns
+- **Search Functionality**: Filter assets by any field
+- **Status Management**: Normalized UPPERCASE status values
+- **CORS Handling**: Proper cross-origin request support
+
+### 🔧 Recent Fixes Applied
+- **API URL corrections**: Fixed duplicate /items prefix issues
+- **Path parameter extraction**: Added fallback for asset ID extraction
+- **Status normalization**: Unified all status values to UPPERCASE
+- **Search clearing**: Auto-clear search when loading assets
+- **Date formatting**: Consistent dd/mm/yyyy format across system
+- **Boolean handling**: Proper true/false handling with display formatting
 
 ## 📋 Excel Template Format
 
-The bulk upload template includes these columns in order:
-1. Asset Barcode (Required)
-2. Status
-3. Outlet Type (Required)
-4. Tap Type (Required)
-5. Wing
-6. Building Code
-7. Room ID
-8. Floor Number
-9. Floor Name
-10. Room Number
-11. Room Name
-12. Has Filter (true/false)
-13. Filter Needed (true/false)
-14. Filter Expiry Date (YYYY-MM-DD)
-15. Filter Installed Date (YYYY-MM-DD)
-16. Maintenance Notes
-17. In Use (true/false)
-18. Created By
-19. Modified By
+For bulk upload, the Excel template includes these columns in exact order:
+
+1. **assetBarcode** (Required) - Unique identifier
+2. **status** - ACTIVE, INACTIVE, MAINTENANCE, DECOMMISSIONED
+3. **assetType** (Required) - Water Tap, LNS Outlet, Water Cooler, etc.
+4. **primaryIdentifier** (Required) - Primary asset ID
+5. **secondaryIdentifier** - Secondary ID (optional)
+6. **wing** - Building wing/section
+7. **wingInShort** - Wing abbreviation
+8. **room** - Room identifier
+9. **floor** - Floor number
+10. **floorInWords** - Floor description
+11. **roomNo** - Room number
+12. **roomName** - Room name
+13. **filterNeeded** (Required) - true/false
+14. **filtersOn** (Required) - true/false
+15. **filterExpiryDate** - dd/mm/yyyy format
+16. **filterInstalledOn** - dd/mm/yyyy format
+17. **notes** - Free text
+18. **augmentedCare** (Required) - true/false
+
+*System fields (created, createdBy, modified, modifiedBy) are auto-generated*
+
+## 🚀 Deployment URLs
+
+- **Production Site**: https://main.d25j5qt77sjegi.amplifyapp.com
+- **API Gateway**: https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev
+- **GitHub Repository**: https://github.com/Ingredients-STG/LP-Management-20250625
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch (`git checkout -b feature/new-feature`)
+3. Make your changes
+4. Test thoroughly (both frontend and API)
+5. Commit changes (`git commit -m 'Add new feature'`)
+6. Push to branch (`git push origin feature/new-feature`)
+7. Create Pull Request
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+1. **"Not found" errors when editing**
+   - ✅ **RESOLVED**: Lambda function now properly extracts asset IDs from URL paths
+
+2. **CORS errors**
+   - ✅ **RESOLVED**: Proper CORS headers configured for production domain
+
+3. **Only showing 2 assets instead of 10**
+   - ✅ **RESOLVED**: Search clearing implemented to show all assets
+
+4. **Status display inconsistencies**
+   - ✅ **RESOLVED**: All status values normalized to UPPERCASE
+
+### Debug Steps
+1. Check browser console for JavaScript errors
+2. Verify API endpoint in `src/app.js`
+3. Check AWS CloudWatch logs for Lambda errors
+4. Verify DynamoDB table permissions
 
 ## 📄 License
 
-This project is licensed under the ISC License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-- Create an issue in this repository
-- Contact: [Your contact information]
+This project is licensed under the ISC License.
 
 ## 🔄 Version History
 
-### v2.0.0 - Full Schema Reset
-- Complete rebuild with new 22-field asset schema
-- Updated outlet type and tap type classification
-- Enhanced location tracking with building codes and room IDs
-- Improved filter management system
-- Updated bulk import/export functionality
-- Modernized UI components and dashboard
+### v3.0.0 - Current Production Version (December 2024)
+- ✅ **Complete system overhaul**: New 22-field schema implementation
+- ✅ **CRUD operations**: Full Create, Read, Update, Delete functionality
+- ✅ **Status normalization**: UPPERCASE status values throughout
+- ✅ **API fixes**: Resolved path parameter and CORS issues
+- ✅ **Search improvements**: Auto-clearing and comprehensive field coverage
+- ✅ **UI enhancements**: Responsive design with proper data formatting
+- ✅ **Production deployment**: Live system with 10 active assets
+
+### v2.0.0 - Schema Migration
+- Updated to 22-field asset schema
+- Enhanced location tracking
+- Improved filter management
 
 ### v1.0.0 - Initial Release
 - Basic asset management functionality
-- Legacy schema with 22 fields 
+- Legacy schema support 
