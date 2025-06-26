@@ -209,7 +209,7 @@ class WaterTapAssetManager {
         if (assets.length === 0) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="22" class="px-6 py-4 text-center text-gray-500">
+                    <td colspan="23" class="px-6 py-4 text-center text-gray-500">
                         No assets found. <button class="text-blue-600 hover:text-blue-800" onclick="document.getElementById('addAssetBtn').click()">Add your first asset</button>
                     </td>
                 </tr>
@@ -227,6 +227,7 @@ class WaterTapAssetManager {
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.outletType || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.tapType || '-'}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">-</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.wing || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.buildingCode || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.roomId || '-'}</td>
@@ -244,17 +245,17 @@ class WaterTapAssetManager {
                         ${asset.filterNeeded ? 'Yes' : 'No'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDate(asset.filterExpiryDate)}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDate(asset.filterInstalledDate)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterExpiryDate)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterInstalledDate)}</td>
                 <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate" title="${asset.maintenanceNotes || ''}">${asset.maintenanceNotes || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.inUse ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
                         ${asset.inUse ? 'Yes' : 'No'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDate(asset.createdAt)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.createdAt)}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.createdBy || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDate(asset.modifiedAt)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.modifiedAt)}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.modifiedBy || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <button onclick="window.assetManager.editAsset('${asset.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
@@ -286,6 +287,28 @@ class WaterTapAssetManager {
     formatDate(dateString) {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleDateString();
+    }
+
+    formatDateDDMMYYYY(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '-';
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+
+    formatDateTimeDDMMYYYY(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '-';
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
     }
 
     updateAssetCount() {
@@ -531,7 +554,7 @@ class WaterTapAssetManager {
     downloadTemplate() {
         // Create Excel template with new schema
         const headers = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Wing', 'Building Code',
+            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
             'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
             'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date',
             'Maintenance Notes', 'In Use', 'Created By', 'Modified By'
@@ -539,9 +562,9 @@ class WaterTapAssetManager {
 
         const sampleData = [
             [
-                'WT001', 'ACTIVE', 'Wall Mounted', 'Push Button', 'North Wing', 'B001',
+                'WT001', 'ACTIVE', 'Wall Mounted', 'Push Button', '', 'North Wing', 'B001',
                 'R101', '1', 'Ground Floor', '101', 'Reception', 'true', 'false',
-                '2024-12-31', '2024-01-15', 'Regular maintenance required', 'true', 'Admin', 'Admin'
+                '31/12/2024', '15/01/2024', 'Regular maintenance required', 'true', 'Admin', 'Admin'
             ]
         ];
 
@@ -617,7 +640,7 @@ class WaterTapAssetManager {
 
         const headers = data[0];
         const expectedHeaders = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Wing', 'Building Code',
+            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
             'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
             'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date',
             'Maintenance Notes', 'In Use', 'Created By', 'Modified By'
@@ -645,6 +668,7 @@ class WaterTapAssetManager {
                 status: this.getCellValue(row, headerMap['Status']) || 'ACTIVE',
                 outletType: this.getCellValue(row, headerMap['Outlet Type']),
                 tapType: this.getCellValue(row, headerMap['Tap Type']),
+                spareColumn: this.getCellValue(row, headerMap['Spare Column']) || '',
                 wing: this.getCellValue(row, headerMap['Wing']),
                 buildingCode: this.getCellValue(row, headerMap['Building Code']),
                 roomId: this.getCellValue(row, headerMap['Room ID']),
@@ -715,9 +739,9 @@ class WaterTapAssetManager {
         const previewAssets = assets.slice(0, 5);
         
         const headers = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Wing', 'Building Code',
+            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
             'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
-            'Has Filter', 'Filter Needed', 'In Use'
+            'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date', 'Maintenance Notes', 'In Use'
         ];
 
         table.innerHTML = `
@@ -727,24 +751,28 @@ class WaterTapAssetManager {
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                ${previewAssets.map(asset => `
-                    <tr>
-                        <td class="px-2 py-2 text-xs">${asset.assetBarcode}</td>
-                        <td class="px-2 py-2 text-xs">${asset.status}</td>
-                        <td class="px-2 py-2 text-xs">${asset.outletType}</td>
-                        <td class="px-2 py-2 text-xs">${asset.tapType}</td>
-                        <td class="px-2 py-2 text-xs">${asset.wing}</td>
-                        <td class="px-2 py-2 text-xs">${asset.buildingCode}</td>
-                        <td class="px-2 py-2 text-xs">${asset.roomId}</td>
-                        <td class="px-2 py-2 text-xs">${asset.floorNumber}</td>
-                        <td class="px-2 py-2 text-xs">${asset.floorName}</td>
-                        <td class="px-2 py-2 text-xs">${asset.roomNumber}</td>
-                        <td class="px-2 py-2 text-xs">${asset.roomName}</td>
-                        <td class="px-2 py-2 text-xs">${asset.hasFilter ? 'Yes' : 'No'}</td>
-                        <td class="px-2 py-2 text-xs">${asset.filterNeeded ? 'Yes' : 'No'}</td>
-                        <td class="px-2 py-2 text-xs">${asset.inUse ? 'Yes' : 'No'}</td>
-                    </tr>
-                `).join('')}
+                                 ${previewAssets.map(asset => `
+                     <tr>
+                         <td class="px-2 py-2 text-xs">${asset.assetBarcode}</td>
+                         <td class="px-2 py-2 text-xs">${asset.status}</td>
+                         <td class="px-2 py-2 text-xs">${asset.outletType}</td>
+                         <td class="px-2 py-2 text-xs">${asset.tapType}</td>
+                         <td class="px-2 py-2 text-xs">-</td>
+                         <td class="px-2 py-2 text-xs">${asset.wing}</td>
+                         <td class="px-2 py-2 text-xs">${asset.buildingCode}</td>
+                         <td class="px-2 py-2 text-xs">${asset.roomId}</td>
+                         <td class="px-2 py-2 text-xs">${asset.floorNumber}</td>
+                         <td class="px-2 py-2 text-xs">${asset.floorName}</td>
+                         <td class="px-2 py-2 text-xs">${asset.roomNumber}</td>
+                         <td class="px-2 py-2 text-xs">${asset.roomName}</td>
+                         <td class="px-2 py-2 text-xs">${asset.hasFilter ? 'Yes' : 'No'}</td>
+                         <td class="px-2 py-2 text-xs">${asset.filterNeeded ? 'Yes' : 'No'}</td>
+                         <td class="px-2 py-2 text-xs">${asset.filterExpiryDate || '-'}</td>
+                         <td class="px-2 py-2 text-xs">${asset.filterInstalledDate || '-'}</td>
+                         <td class="px-2 py-2 text-xs">${asset.maintenanceNotes || '-'}</td>
+                         <td class="px-2 py-2 text-xs">${asset.inUse ? 'Yes' : 'No'}</td>
+                     </tr>
+                 `).join('')}
             </tbody>
         `;
 
