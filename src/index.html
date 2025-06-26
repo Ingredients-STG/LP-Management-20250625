@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
+    <meta name="payment-form" content="false">
     <title>Water Tap Asset Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -42,9 +45,17 @@
                     <button id="refreshBtn" class="text-white hover:text-gray-200 transition-colors">
                         <i class="fas fa-sync-alt mr-2"></i>Refresh
                     </button>
-                    <button id="addAssetBtn" class="bg-white text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors font-medium">
-                        <i class="fas fa-plus mr-2"></i>Add Asset
-                    </button>
+                    <div class="flex gap-3">
+                        <button id="downloadTemplateBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                            <i class="fas fa-download mr-2"></i>Download Template
+                        </button>
+                        <button id="bulkUploadBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors font-medium">
+                            <i class="fas fa-upload mr-2"></i>Bulk Upload
+                        </button>
+                        <button id="addAssetBtn" class="bg-white text-blue-600 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors font-medium">
+                            <i class="fas fa-plus mr-2"></i>Add Asset
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -61,7 +72,7 @@
         <div class="bg-white rounded-lg shadow-md">
             <div class="px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
-                    <h2 class="text-xl font-semibold text-gray-900">Water Tap Assets</h2>
+                    <h2 class="text-xl font-semibold text-gray-900">Assets</h2>
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center space-x-2">
                             <input type="text" id="searchInput" placeholder="Search assets..." 
@@ -80,18 +91,26 @@
                     <thead class="bg-gray-50 sticky-header">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Barcode</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Primary ID</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Building</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outlet Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tap Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wing</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Building Code</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor Number</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room Number</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room Name</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Has Filter</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Needed</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Type</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Maintenance</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Maintenance</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Installation Date</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warranty</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Expiry</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filter Installed</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maintenance Notes</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Use</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modified By</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -105,7 +124,7 @@
 
     <!-- Add/Edit Asset Modal -->
     <div id="assetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-screen overflow-y-auto">
             <div class="px-6 py-4 border-b border-gray-200">
                 <h3 id="modalTitle" class="text-lg font-semibold text-gray-900">Add New Asset</h3>
             </div>
@@ -123,31 +142,40 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Asset Type *</label>
-                        <select name="assetType" required 
-                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Select Type</option>
-                            <option value="Water Tap">Water Tap</option>
-                            <option value="Drinking Fountain">Drinking Fountain</option>
-                            <option value="Water Cooler">Water Cooler</option>
-                            <option value="Water Dispenser">Water Dispenser</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Primary Identifier *</label>
-                        <input type="text" name="primaryIdentifier" required 
-                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div>
                         <label class="block text-sm font-medium text-gray-700">Status</label>
                         <select name="status" 
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="ACTIVE">Active</option>
-                            <option value="MAINTENANCE">Maintenance</option>
                             <option value="INACTIVE">Inactive</option>
+                            <option value="MAINTENANCE">Maintenance</option>
                             <option value="DECOMMISSIONED">Decommissioned</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Outlet Type *</label>
+                        <select name="outletType" required 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Outlet Type</option>
+                            <option value="Wall Mounted">Wall Mounted</option>
+                            <option value="Floor Standing">Floor Standing</option>
+                            <option value="Countertop">Countertop</option>
+                            <option value="Drinking Fountain">Drinking Fountain</option>
+                            <option value="Water Cooler">Water Cooler</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tap Type *</label>
+                        <select name="tapType" required 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Select Tap Type</option>
+                            <option value="Push Button">Push Button</option>
+                            <option value="Sensor">Sensor</option>
+                            <option value="Lever">Lever</option>
+                            <option value="Turn Handle">Turn Handle</option>
+                            <option value="Other">Other</option>
                         </select>
                     </div>
 
@@ -157,20 +185,44 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Building</label>
-                        <input type="text" name="building" 
+                        <label class="block text-sm font-medium text-gray-700">Wing</label>
+                        <input type="text" name="wing" 
                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Floor</label>
-                        <input type="text" name="floor" 
+                        <label class="block text-sm font-medium text-gray-700">Building Code</label>
+                        <input type="text" name="buildingCode" 
                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Room</label>
-                        <input type="text" name="room" 
+                        <label class="block text-sm font-medium text-gray-700">Room ID</label>
+                        <input type="text" name="roomId" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Floor Number</label>
+                        <input type="number" name="floorNumber" min="0" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Floor Name</label>
+                        <input type="text" name="floorName" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Room Number</label>
+                        <input type="text" name="roomNumber" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Room Name</label>
+                        <input type="text" name="roomName" 
                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
@@ -179,76 +231,154 @@
                         <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Filter Information</h4>
                     </div>
                     
-                    <div class="flex items-center">
-                        <input type="checkbox" name="filterNeeded" 
-                               class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                        <label class="ml-2 block text-sm text-gray-900">Filter Required</label>
-                    </div>
-                    
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Filter Type</label>
-                        <select name="filterType" 
+                        <label class="block text-sm font-medium text-gray-700">Has Filter</label>
+                        <select name="hasFilter" 
                                 class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <option value="">Select Filter Type</option>
-                            <option value="Carbon">Carbon Filter</option>
-                            <option value="Sediment">Sediment Filter</option>
-                            <option value="UV">UV Filter</option>
-                            <option value="RO">RO Membrane</option>
-                            <option value="Multi-Stage">Multi-Stage</option>
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
                         </select>
                     </div>
-
-                    <!-- Maintenance Information -->
-                    <div class="lg:col-span-3 mt-6">
-                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Maintenance Information</h4>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Filter Needed</label>
+                        <select name="filterNeeded" 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Last Maintenance Date</label>
-                        <input type="date" name="lastMaintenanceDate" 
+                        <label class="block text-sm font-medium text-gray-700">Filter Expiry Date</label>
+                        <input type="date" name="filterExpiryDate" 
                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Next Maintenance Date</label>
-                        <input type="date" name="nextMaintenanceDate" 
-                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Installation Date</label>
-                        <input type="date" name="installationDate" 
-                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Warranty Expiry</label>
-                        <input type="date" name="warrantyExpiry" 
+                        <label class="block text-sm font-medium text-gray-700">Filter Installed Date</label>
+                        <input type="date" name="filterInstalledDate" 
                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
 
-                    <!-- Additional Notes -->
+                    <!-- Additional Information -->
                     <div class="lg:col-span-3 mt-6">
-                        <label class="block text-sm font-medium text-gray-700">Notes</label>
-                        <textarea name="notes" rows="3" 
+                        <h4 class="text-md font-medium text-gray-900 mb-4 border-b pb-2">Additional Information</h4>
+                    </div>
+                    
+                    <div class="lg:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">Maintenance Notes</label>
+                        <textarea name="maintenanceNotes" rows="3" 
                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">In Use</label>
+                        <select name="inUse" 
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="true">Yes</option>
+                            <option value="false">No</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Created By</label>
+                        <input type="text" name="createdBy" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Modified By</label>
+                        <input type="text" name="modifiedBy" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
                 
-                <div class="flex justify-end space-x-3 pt-6 border-t mt-6">
-                    <button type="button" id="cancelAsset" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-                    <button type="submit" id="saveAsset" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">Save Asset</button>
+                <div class="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200">
+                    <button type="button" id="cancelAsset" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700">
+                        Save Asset
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg shadow-xl">
-            <div class="flex items-center">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span class="ml-3 text-gray-700">Loading...</span>
+    <!-- Bulk Upload Modal -->
+    <div id="bulkUploadModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Bulk Upload Assets</h3>
+            </div>
+            <div class="p-6">
+                <div class="mb-6">
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload an Excel file with asset data. The file should contain the following columns in order:
+                    </p>
+                    <div class="bg-gray-50 p-4 rounded-lg text-xs text-gray-700">
+                        Asset Barcode, Status, Outlet Type, Tap Type, Wing, Building Code, Room ID, Floor Number, 
+                        Floor Name, Room Number, Room Name, Has Filter, Filter Needed, Filter Expiry Date, 
+                        Filter Installed Date, Maintenance Notes, In Use, Created By, Modified By
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Excel File</label>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" 
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
+                
+                <div id="previewContainer" class="hidden mb-6">
+                    <h4 class="text-md font-medium text-gray-900 mb-3">Preview (First 5 rows)</h4>
+                    <div class="overflow-x-auto">
+                        <table id="previewTable" class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <!-- Headers will be populated dynamically -->
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Preview data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelBulkUpload" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="button" id="importAssetsBtn" class="px-4 py-2 bg-blue-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400" disabled>
+                        Import Assets
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span class="text-gray-700">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="fixed top-4 right-4 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 hidden z-50">
+        <div class="p-4">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i id="notificationIcon" class="h-6 w-6"></i>
+                </div>
+                <div class="ml-3 w-0 flex-1 pt-0.5">
+                    <p id="notificationMessage" class="text-sm font-medium text-gray-900"></p>
+                </div>
+                <div class="ml-4 flex-shrink-0 flex">
+                    <button class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500" onclick="document.getElementById('notification').classList.add('hidden')">
+                        <i class="fas fa-times h-5 w-5"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>

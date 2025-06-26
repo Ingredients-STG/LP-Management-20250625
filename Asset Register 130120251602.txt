@@ -1,0 +1,22 @@
+Asset Barcode
+Status
+Outlet Type
+Tap Type
+Spare Column
+Wing
+Building Code
+Room ID
+Floor Number
+Floor Name
+Room Number
+Room Name
+Has Filter
+Filter Needed
+Filter Expiry Date
+Filter Installed Date
+Maintenance Notes
+In Use
+Created At
+Created By
+Modified At
+Modified By

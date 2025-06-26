@@ -4,11 +4,14 @@ A comprehensive web application for managing water tap assets using AWS services
 
 ## 🚰 Features
 
-- **Asset Management**: Track water taps, drinking fountains, and water coolers
-- **Maintenance Scheduling**: Schedule and track maintenance activities
-- **Location Management**: Organize assets by building, floor, and room
-- **Filter Tracking**: Monitor filter replacement needs and schedules
+- **Asset Management**: Track water outlets, taps, drinking fountains, and water coolers
+- **Outlet Type Classification**: Wall Mounted, Floor Standing, Countertop, and more
+- **Tap Type Tracking**: Push Button, Sensor, Lever, Turn Handle systems
+- **Location Management**: Organize assets by wing, building code, room ID, and floor details
+- **Filter Tracking**: Monitor filter installation, expiry dates, and maintenance needs
+- **Usage Status**: Track which assets are currently in use
 - **Dashboard Analytics**: Visual insights into asset status and distribution
+- **Bulk Import/Export**: Excel-based data management with template download
 - **Real-time Updates**: Live data synchronization across all devices
 
 ## 🏗️ Architecture
@@ -21,31 +24,35 @@ A comprehensive web application for managing water tap assets using AWS services
 - **Authentication**: AWS IAM
 - **Deployment**: AWS CloudFormation
 
-## 📋 Asset Schema
+## 📋 New Asset Schema (22 Fields)
 
-Based on your water tap asset data structure:
+Based on the updated water tap asset data structure:
 
 ```javascript
 {
   id: "unique-id",
   assetBarcode: "WT001",
-  status: "ACTIVE|INACTIVE|MAINTENANCE|RETIRED",
-  assetType: "Water Tap|Drinking Fountain|Water Cooler",
-  primaryIdentifier: "Main Hall Tap",
-  secondaryIdentifier: "Optional secondary ID",
-  value: 150.00,
-  wireToShort: "Connection info",
-  wireToShortValue: 25.5,
-  floor: "Ground",
-  floorInWords: "Ground Floor",
-  room: "Main Hall",
-  roomOffice: "Reception Area",
-  filterNeeded: true,
-  filtersOn: "Active filters",
-  filterExpiry: "2024-12-31",
-  filterExpiredDate: "2024-01-15",
+  status: "ACTIVE|INACTIVE|MAINTENANCE|DECOMMISSIONED",
+  outletType: "Wall Mounted|Floor Standing|Countertop|Drinking Fountain|Water Cooler",
+  tapType: "Push Button|Sensor|Lever|Turn Handle",
+  spareColumn: "Reserved for future use",
+  wing: "North Wing",
+  buildingCode: "B001",
+  roomId: "R101",
+  floorNumber: 1,
+  floorName: "Ground Floor",
+  roomNumber: "101",
+  roomName: "Reception",
+  hasFilter: true,
+  filterNeeded: false,
+  filterExpiryDate: "2024-12-31",
+  filterInstalledDate: "2024-01-15",
+  maintenanceNotes: "Regular maintenance required",
+  inUse: true,
   createdAt: "2024-01-01T00:00:00Z",
-  updatedAt: "2024-01-01T00:00:00Z"
+  createdBy: "Admin",
+  modifiedAt: "2024-01-01T00:00:00Z",
+  modifiedBy: "Admin"
 }
 ```
 
@@ -112,7 +119,7 @@ Based on your water tap asset data structure:
 1. **Push to GitHub**
    ```bash
    git add .
-   git commit -m "Initial commit"
+   git commit -m "Full schema reset & cleanup"
    git push origin main
    ```
 
@@ -126,7 +133,7 @@ Based on your water tap asset data structure:
 ### Assets Table
 - **Primary Key**: `id` (String)
 - **Global Secondary Index**: `assetBarcode-index`
-- **Attributes**: All asset properties as defined in schema
+- **Attributes**: All 22 asset properties as defined in new schema
 
 ### Maintenance Table
 - **Primary Key**: `id` (String)
@@ -135,7 +142,7 @@ Based on your water tap asset data structure:
 
 ### Locations Table
 - **Primary Key**: `id` (String)
-- **Attributes**: Building, floor, room information
+- **Attributes**: Wing, building code, floor, and room information
 
 ## 🔐 Security
 
@@ -148,9 +155,10 @@ Based on your water tap asset data structure:
 
 - **Responsive Design**: Mobile-first approach with Tailwind CSS
 - **Interactive Dashboard**: Real-time stats and charts
-- **Modal Forms**: User-friendly asset creation/editing
-- **Data Tables**: Sortable and filterable asset lists
+- **Modal Forms**: User-friendly asset creation/editing with 22 fields
+- **Data Tables**: Sortable and filterable asset lists (21 visible columns)
 - **Status Indicators**: Visual status badges and icons
+- **Bulk Upload**: Excel template with all 22 fields
 
 ## 📱 Mobile Support
 
@@ -179,6 +187,29 @@ const API_BASE_URL = 'https://your-api-id.execute-api.eu-west-2.amazonaws.com/de
 - **X-Ray Tracing**: Request tracing for debugging
 - **Amplify Console**: Deployment and hosting metrics
 
+## 📋 Excel Template Format
+
+The bulk upload template includes these columns in order:
+1. Asset Barcode (Required)
+2. Status
+3. Outlet Type (Required)
+4. Tap Type (Required)
+5. Wing
+6. Building Code
+7. Room ID
+8. Floor Number
+9. Floor Name
+10. Room Number
+11. Room Name
+12. Has Filter (true/false)
+13. Filter Needed (true/false)
+14. Filter Expiry Date (YYYY-MM-DD)
+15. Filter Installed Date (YYYY-MM-DD)
+16. Maintenance Notes
+17. In Use (true/false)
+18. Created By
+19. Modified By
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -199,10 +230,14 @@ For support and questions:
 
 ## 🔄 Version History
 
-- **v1.0.0** - Initial release with core asset management features
-- **v1.1.0** - Added maintenance scheduling
-- **v1.2.0** - Enhanced dashboard analytics
+### v2.0.0 - Full Schema Reset
+- Complete rebuild with new 22-field asset schema
+- Updated outlet type and tap type classification
+- Enhanced location tracking with building codes and room IDs
+- Improved filter management system
+- Updated bulk import/export functionality
+- Modernized UI components and dashboard
 
----
-
-Built with ❤️ using AWS Amplify and modern web technologies. ✅ IAM Fixed - Ready for Deployment! 
+### v1.0.0 - Initial Release
+- Basic asset management functionality
+- Legacy schema with 22 fields 

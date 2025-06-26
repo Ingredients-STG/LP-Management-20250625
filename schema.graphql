@@ -2,29 +2,33 @@ type Asset @model @auth(rules: [{allow: public}]) {
   id: ID!
   assetBarcode: String! @index(name: "byBarcode")
   status: AssetStatus!
-  assetType: String!
-  primaryIdentifier: String!
-  secondaryIdentifier: String
-  value: Float
-  wireToShort: String
-  wireToShortValue: Float
-  floor: String
-  floorInWords: String
-  room: String
-  roomOffice: String
+  outletType: String!
+  tapType: String!
+  spareColumn: String
+  wing: String
+  buildingCode: String
+  roomId: String
+  floorNumber: Int
+  floorName: String
+  roomNumber: String
+  roomName: String
+  hasFilter: Boolean
   filterNeeded: Boolean
-  filtersOn: String
-  filterExpiry: String
-  filterExpiredDate: AWSDate
+  filterExpiryDate: AWSDate
+  filterInstalledDate: AWSDate
+  maintenanceNotes: String
+  inUse: Boolean
   createdAt: AWSDateTime!
-  updatedAt: AWSDateTime!
+  createdBy: String!
+  modifiedAt: AWSDateTime!
+  modifiedBy: String!
 }
 
 enum AssetStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE
-  RETIRED
+  DECOMMISSIONED
 }
 
 type AssetHistory @model @auth(rules: [{allow: public}]) {
@@ -69,11 +73,13 @@ enum MaintenanceStatus {
 
 type Location @model @auth(rules: [{allow: public}]) {
   id: ID!
-  building: String!
-  floor: String!
-  floorInWords: String
-  room: String!
-  roomOffice: String
+  wing: String!
+  buildingCode: String!
+  floorNumber: Int!
+  floorName: String
+  roomNumber: String!
+  roomName: String
+  roomId: String
   description: String
   assets: [Asset] @hasMany
 } 
