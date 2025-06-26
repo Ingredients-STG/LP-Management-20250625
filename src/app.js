@@ -227,8 +227,8 @@ class WaterTapAssetManager {
     async loadAssets() {
         try {
             this.showLoading();
-            console.log('Making API call to:', `${API_BASE_URL}/items/assets`);
-            const response = await fetch(`${API_BASE_URL}/items/assets`, {
+            console.log('Making API call to:', `${API_BASE_URL}/assets`);
+            const response = await fetch(`${API_BASE_URL}/assets`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -508,7 +508,7 @@ class WaterTapAssetManager {
             let response;
             if (this.currentEditingAsset) {
                 // Update existing asset
-                response = await fetch(`${API_BASE_URL}/items/assets/${this.currentEditingAsset.id}`, {
+                response = await fetch(`${API_BASE_URL}/assets/${this.currentEditingAsset.id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -517,7 +517,7 @@ class WaterTapAssetManager {
                 });
             } else {
                 // Create new asset
-                response = await fetch(`${API_BASE_URL}/items/assets`, {
+                response = await fetch(`${API_BASE_URL}/assets`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -566,7 +566,7 @@ class WaterTapAssetManager {
         try {
             this.showLoading();
             
-            const response = await fetch(`${API_BASE_URL}/items/assets/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/assets/${id}`, {
                 method: 'DELETE'
             });
 
