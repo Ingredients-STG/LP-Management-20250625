@@ -12,8 +12,9 @@ const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapLocations';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Max-Age': '86400'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    'Access-Control-Max-Age': '86400',
+    'Access-Control-Allow-Credentials': 'false'
 };
 
 /**
@@ -156,6 +157,8 @@ async function getAllAssets() {
 
 async function createAsset(assetData) {
     try {
+        console.log('Creating asset with data:', JSON.stringify(assetData, null, 2));
+        
         // Validate required fields
         if (!assetData.assetBarcode) {
             throw new Error('assetBarcode is required');
@@ -167,8 +170,8 @@ async function createAsset(assetData) {
             throw new Error('primaryIdentifier is required');
         }
         
-        // Generate ID
-        const assetId = generateId();
+        // Generate ID using UUID format to match existing data
+        const assetId = uuidv4();
         const now = new Date().toISOString();
         
         const asset = {
@@ -197,12 +200,18 @@ async function createAsset(assetData) {
             modifiedBy: assetData.modifiedBy || 'System'
         };
         
+        console.log('Asset to be saved:', JSON.stringify(asset, null, 2));
+        
         const params = {
             TableName: ASSETS_TABLE,
             Item: asset
         };
         
+        console.log('DynamoDB params:', JSON.stringify(params, null, 2));
+        
         await dynamodb.put(params).promise();
+        
+        console.log('Asset created successfully');
         
         return {
             statusCode: 201,
@@ -210,12 +219,17 @@ async function createAsset(assetData) {
         };
     } catch (error) {
         console.error('Error creating asset:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
         throw error;
     }
 }
 
 async function updateAsset(assetId, assetData) {
     try {
+        console.log('Updating asset ID:', assetId);
+        console.log('Update data:', JSON.stringify(assetData, null, 2));
+        
         const now = new Date().toISOString();
         
         // Build update expression
@@ -254,7 +268,11 @@ async function updateAsset(assetId, assetData) {
             ReturnValues: 'ALL_NEW'
         };
         
+        console.log('DynamoDB update params:', JSON.stringify(params, null, 2));
+        
         const result = await dynamodb.update(params).promise();
+        
+        console.log('Asset updated successfully');
         
         return {
             statusCode: 200,
@@ -262,6 +280,8 @@ async function updateAsset(assetId, assetData) {
         };
     } catch (error) {
         console.error('Error updating asset:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
         throw error;
     }
 }
@@ -321,6 +341,4 @@ async function getMaintenanceRecords() {
     }
 }
 
-function generateId() {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-} 
+// Using uuidv4() for ID generation 
