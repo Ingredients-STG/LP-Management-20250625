@@ -142,8 +142,15 @@ class WaterTapAssetManager {
         try {
             this.showLoading();
             console.log('Making API call to:', `${API_BASE_URL}/items/assets`);
-            const response = await fetch(`${API_BASE_URL}/items/assets`);
+            const response = await fetch(`${API_BASE_URL}/items/assets`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                mode: 'cors'
+            });
             console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
             if (response.ok) {
                 const data = await response.json();
                 console.log('API Response data:', data);
@@ -162,6 +169,7 @@ class WaterTapAssetManager {
             }
         } catch (error) {
             console.error('Error loading assets:', error);
+            console.error('Error details:', error.message);
             this.showMockAssets();
         } finally {
             this.hideLoading();
@@ -484,6 +492,27 @@ class WaterTapAssetManager {
     refreshData() {
         this.loadDashboardData();
         this.loadAssets();
+    }
+
+    // Test function for debugging
+    async testAPI() {
+        try {
+            console.log('Testing API directly...');
+            const response = await fetch(`${API_BASE_URL}/items/assets`);
+            console.log('Test API Response status:', response.status);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Test API Response data:', data);
+                return data;
+            } else {
+                const errorText = await response.text();
+                console.error('Test API Error:', errorText);
+                return null;
+            }
+        } catch (error) {
+            console.error('Test API Exception:', error);
+            return null;
+        }
     }
 
     showMockDashboardData() {
