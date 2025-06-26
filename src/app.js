@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'https://yj3kxlj9lf.execute-api.us-east-1.amazonaws.com/prod';
+const API_BASE_URL = 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
 
 class WaterTapAssetManager {
     constructor() {
@@ -144,7 +144,8 @@ class WaterTapAssetManager {
             const response = await fetch(`${API_BASE_URL}/items/assets`);
             if (response.ok) {
                 const data = await response.json();
-                this.assets = data.items || [];
+                // Handle both old and new data structures
+                this.assets = data.items || data.assets || [];
                 this.renderAssets();
                 this.updateAssetCount();
             } else {

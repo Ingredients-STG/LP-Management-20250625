@@ -137,7 +137,7 @@ async function getAssets() {
         const assets = await getAllAssets();
         return {
             statusCode: 200,
-            body: JSON.stringify({ items: assets })
+            body: JSON.stringify({ items: assets, assets: assets, count: assets.length })
         };
     } catch (error) {
         console.error('Error getting assets:', error);
