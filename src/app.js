@@ -23,60 +23,83 @@ class WaterTapAssetManager {
     }
 
     setupEventListeners() {
-        // Navigation
-        document.getElementById('dashboardTab').addEventListener('click', () => this.showTab('dashboard'));
-        document.getElementById('assetsTab').addEventListener('click', () => this.showTab('assets'));
-        
         // Asset management
-        document.getElementById('addAssetBtn').addEventListener('click', () => this.showAssetModal());
-        document.getElementById('cancelAsset').addEventListener('click', () => this.hideAssetModal());
-        document.getElementById('assetForm').addEventListener('submit', (e) => this.handleSaveAsset(e));
+        const addAssetBtn = document.getElementById('addAssetBtn');
+        if (addAssetBtn) {
+            addAssetBtn.addEventListener('click', () => this.showAssetModal());
+        }
+        
+        const cancelAsset = document.getElementById('cancelAsset');
+        if (cancelAsset) {
+            cancelAsset.addEventListener('click', () => this.hideAssetModal());
+        }
+        
+        const assetForm = document.getElementById('assetForm');
+        if (assetForm) {
+            assetForm.addEventListener('submit', (e) => this.handleSaveAsset(e));
+        }
         
         // Search
-        document.getElementById('searchAssets').addEventListener('input', (e) => {
-            this.filterAssets(e.target.value);
-        });
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.filterAssets(e.target.value);
+            });
+        }
         
         // Bulk upload
-        document.getElementById('bulkUploadBtn').addEventListener('click', () => this.showBulkUploadModal());
-        document.getElementById('cancelBulkUpload').addEventListener('click', () => this.hideBulkUploadModal());
-        document.getElementById('downloadTemplateBtn').addEventListener('click', () => this.downloadTemplate());
-        document.getElementById('excelFileInput').addEventListener('change', (e) => this.handleFileUpload(e));
-        document.getElementById('importAssetsBtn').addEventListener('click', () => this.importAssets());
+        const bulkUploadBtn = document.getElementById('bulkUploadBtn');
+        if (bulkUploadBtn) {
+            bulkUploadBtn.addEventListener('click', () => this.showBulkUploadModal());
+        }
+        
+        const cancelBulkUpload = document.getElementById('cancelBulkUpload');
+        if (cancelBulkUpload) {
+            cancelBulkUpload.addEventListener('click', () => this.hideBulkUploadModal());
+        }
+        
+        const downloadTemplateBtn = document.getElementById('downloadTemplateBtn');
+        if (downloadTemplateBtn) {
+            downloadTemplateBtn.addEventListener('click', () => this.downloadTemplate());
+        }
+        
+        const excelFileInput = document.getElementById('excelFileInput');
+        if (excelFileInput) {
+            excelFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        }
+        
+        const importAssetsBtn = document.getElementById('importAssetsBtn');
+        if (importAssetsBtn) {
+            importAssetsBtn.addEventListener('click', () => this.importAssets());
+        }
         
         // Refresh
-        document.getElementById('refreshBtn').addEventListener('click', () => this.refreshData());
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshData());
+        }
         
         // Close modal when clicking outside
-        document.getElementById('assetModal').addEventListener('click', (e) => {
-            if (e.target.id === 'assetModal') {
-                this.hideAssetModal();
-            }
-        });
+        const assetModal = document.getElementById('assetModal');
+        if (assetModal) {
+            assetModal.addEventListener('click', (e) => {
+                if (e.target.id === 'assetModal') {
+                    this.hideAssetModal();
+                }
+            });
+        }
         
-        document.getElementById('bulkUploadModal').addEventListener('click', (e) => {
-            if (e.target.id === 'bulkUploadModal') {
-                this.hideBulkUploadModal();
-            }
-        });
+        const bulkUploadModal = document.getElementById('bulkUploadModal');
+        if (bulkUploadModal) {
+            bulkUploadModal.addEventListener('click', (e) => {
+                if (e.target.id === 'bulkUploadModal') {
+                    this.hideBulkUploadModal();
+                }
+            });
+        }
     }
 
-    showTab(tabName) {
-        // Hide all tabs
-        document.getElementById('dashboardContent').classList.add('hidden');
-        document.getElementById('assetsContent').classList.add('hidden');
-        
-        // Remove active class from all tab buttons
-        document.getElementById('dashboardTab').classList.remove('border-blue-500', 'text-blue-600');
-        document.getElementById('dashboardTab').classList.add('border-transparent', 'text-gray-500');
-        document.getElementById('assetsTab').classList.remove('border-blue-500', 'text-blue-600');
-        document.getElementById('assetsTab').classList.add('border-transparent', 'text-gray-500');
-        
-        // Show selected tab
-        document.getElementById(tabName + 'Content').classList.remove('hidden');
-        document.getElementById(tabName + 'Tab').classList.remove('border-transparent', 'text-gray-500');
-        document.getElementById(tabName + 'Tab').classList.add('border-blue-500', 'text-blue-600');
-    }
+
 
     async loadDashboardData() {
         try {
@@ -96,12 +119,75 @@ class WaterTapAssetManager {
 
     renderDashboardStats() {
         const stats = this.dashboardData;
+        const dashboardContainer = document.getElementById('dashboardStats');
         
-        // Update dashboard cards
-        document.getElementById('totalAssets').textContent = stats.totalAssets || 0;
-        document.getElementById('activeAssets').textContent = stats.activeAssets || 0;
-        document.getElementById('maintenanceAssets').textContent = stats.maintenanceAssets || 0;
-        document.getElementById('filtersNeeded').textContent = stats.filtersNeeded || 0;
+        if (dashboardContainer) {
+            dashboardContainer.innerHTML = `
+                <div class="bg-white overflow-hidden shadow-md rounded-lg card-hover transition-all">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-tint text-blue-500 text-2xl"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Total Assets</dt>
+                                    <dd class="text-lg font-medium text-gray-900">${stats.totalAssets || 0}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white overflow-hidden shadow-md rounded-lg card-hover transition-all">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Active Assets</dt>
+                                    <dd class="text-lg font-medium text-gray-900">${stats.activeAssets || 0}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white overflow-hidden shadow-md rounded-lg card-hover transition-all">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-tools text-yellow-500 text-2xl"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Maintenance</dt>
+                                    <dd class="text-lg font-medium text-gray-900">${stats.maintenanceAssets || 0}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white overflow-hidden shadow-md rounded-lg card-hover transition-all">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-filter text-red-500 text-2xl"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">Filters Needed</dt>
+                                    <dd class="text-lg font-medium text-gray-900">${stats.filtersNeeded || 0}</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
         
         // Update charts if data is available
         if (stats.statusBreakdown) {
@@ -286,7 +372,10 @@ class WaterTapAssetManager {
     }
 
     updateAssetCount() {
-        document.getElementById('assetCount').textContent = `${this.assets.length} assets`;
+        const assetCountElement = document.getElementById('assetCount');
+        if (assetCountElement) {
+            assetCountElement.textContent = `${this.assets.length} assets`;
+        }
     }
 
     filterAssets(searchTerm) {
