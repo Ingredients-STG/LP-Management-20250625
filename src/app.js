@@ -246,6 +246,7 @@ class WaterTapAssetManager {
                 this.assets = data.items || data.assets || [];
                 console.log('Assets array:', this.assets);
                 console.log('Assets length:', this.assets.length);
+                this.clearSearch(); // Clear any active search
                 this.renderAssets();
                 this.updateAssetCount();
             } else {
@@ -383,6 +384,14 @@ class WaterTapAssetManager {
         const assetCountElement = document.getElementById('assetCount');
         if (assetCountElement) {
             assetCountElement.textContent = `${this.assets.length} assets`;
+        }
+    }
+
+    clearSearch() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.value = '';
+            this.renderAssets();
         }
     }
 
