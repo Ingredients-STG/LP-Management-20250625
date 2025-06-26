@@ -554,10 +554,10 @@ class WaterTapAssetManager {
     downloadTemplate() {
         // Create Excel template with new schema
         const headers = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
-            'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
-            'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date',
-            'Maintenance Notes', 'In Use', 'Created By', 'Modified By'
+            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
+            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
+            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate',
+            'maintenanceNotes', 'inUse', 'createdBy', 'modifiedBy'
         ];
 
         const sampleData = [
@@ -640,10 +640,10 @@ class WaterTapAssetManager {
 
         const headers = data[0];
         const expectedHeaders = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
-            'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
-            'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date',
-            'Maintenance Notes', 'In Use', 'Created By', 'Modified By'
+            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
+            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
+            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate',
+            'maintenanceNotes', 'inUse', 'createdBy', 'modifiedBy'
         ];
 
         // Validate headers (allow for some flexibility in naming)
@@ -664,37 +664,37 @@ class WaterTapAssetManager {
             if (!row || row.length === 0) continue;
 
             const asset = {
-                assetBarcode: this.getCellValue(row, headerMap['Asset Barcode']),
-                status: this.getCellValue(row, headerMap['Status']) || 'ACTIVE',
-                outletType: this.getCellValue(row, headerMap['Outlet Type']),
-                tapType: this.getCellValue(row, headerMap['Tap Type']),
-                spareColumn: this.getCellValue(row, headerMap['Spare Column']) || '',
-                wing: this.getCellValue(row, headerMap['Wing']),
-                buildingCode: this.getCellValue(row, headerMap['Building Code']),
-                roomId: this.getCellValue(row, headerMap['Room ID']),
-                floorNumber: this.parseNumber(this.getCellValue(row, headerMap['Floor Number'])),
-                floorName: this.getCellValue(row, headerMap['Floor Name']),
-                roomNumber: this.getCellValue(row, headerMap['Room Number']),
-                roomName: this.getCellValue(row, headerMap['Room Name']),
-                hasFilter: this.parseBoolean(this.getCellValue(row, headerMap['Has Filter'])),
-                filterNeeded: this.parseBoolean(this.getCellValue(row, headerMap['Filter Needed'])),
-                filterExpiryDate: this.parseDate(this.getCellValue(row, headerMap['Filter Expiry Date'])),
-                filterInstalledDate: this.parseDate(this.getCellValue(row, headerMap['Filter Installed Date'])),
-                maintenanceNotes: this.getCellValue(row, headerMap['Maintenance Notes']),
-                inUse: this.parseBoolean(this.getCellValue(row, headerMap['In Use']), true),
-                createdBy: this.getCellValue(row, headerMap['Created By']) || 'Bulk Upload',
-                modifiedBy: this.getCellValue(row, headerMap['Modified By']) || 'Bulk Upload'
+                assetBarcode: this.getCellValue(row, headerMap['assetBarcode']),
+                status: this.getCellValue(row, headerMap['status']) || 'ACTIVE',
+                outletType: this.getCellValue(row, headerMap['outletType']),
+                tapType: this.getCellValue(row, headerMap['tapType']),
+                spareColumn: this.getCellValue(row, headerMap['spareColumn']) || '',
+                wing: this.getCellValue(row, headerMap['wing']),
+                buildingCode: this.getCellValue(row, headerMap['buildingCode']),
+                roomId: this.getCellValue(row, headerMap['roomId']),
+                floorNumber: this.parseNumber(this.getCellValue(row, headerMap['floorNumber'])),
+                floorName: this.getCellValue(row, headerMap['floorName']),
+                roomNumber: this.getCellValue(row, headerMap['roomNumber']),
+                roomName: this.getCellValue(row, headerMap['roomName']),
+                hasFilter: this.parseBoolean(this.getCellValue(row, headerMap['hasFilter'])),
+                filterNeeded: this.parseBoolean(this.getCellValue(row, headerMap['filterNeeded'])),
+                filterExpiryDate: this.parseDate(this.getCellValue(row, headerMap['filterExpiryDate'])),
+                filterInstalledDate: this.parseDate(this.getCellValue(row, headerMap['filterInstalledDate'])),
+                maintenanceNotes: this.getCellValue(row, headerMap['maintenanceNotes']),
+                inUse: this.parseBoolean(this.getCellValue(row, headerMap['inUse']), true),
+                createdBy: this.getCellValue(row, headerMap['createdBy']) || 'Bulk Upload',
+                modifiedBy: this.getCellValue(row, headerMap['modifiedBy']) || 'Bulk Upload'
             };
 
             // Validate required fields
             if (!asset.assetBarcode) {
-                throw new Error(`Row ${i + 1}: Asset Barcode is required`);
+                throw new Error(`Row ${i + 1}: assetBarcode is required`);
             }
             if (!asset.outletType) {
-                throw new Error(`Row ${i + 1}: Outlet Type is required`);
+                throw new Error(`Row ${i + 1}: outletType is required`);
             }
             if (!asset.tapType) {
-                throw new Error(`Row ${i + 1}: Tap Type is required`);
+                throw new Error(`Row ${i + 1}: tapType is required`);
             }
 
             processedAssets.push(asset);
@@ -739,9 +739,9 @@ class WaterTapAssetManager {
         const previewAssets = assets.slice(0, 5);
         
         const headers = [
-            'Asset Barcode', 'Status', 'Outlet Type', 'Tap Type', 'Spare Column', 'Wing', 'Building Code',
-            'Room ID', 'Floor Number', 'Floor Name', 'Room Number', 'Room Name',
-            'Has Filter', 'Filter Needed', 'Filter Expiry Date', 'Filter Installed Date', 'Maintenance Notes', 'In Use'
+            'assetBarcode', 'status', 'outletType', 'tapType', 'spareColumn', 'wing', 'buildingCode',
+            'roomId', 'floorNumber', 'floorName', 'roomNumber', 'roomName',
+            'hasFilter', 'filterNeeded', 'filterExpiryDate', 'filterInstalledDate', 'maintenanceNotes', 'inUse'
         ];
 
         table.innerHTML = `
