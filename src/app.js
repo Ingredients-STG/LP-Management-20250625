@@ -245,8 +245,8 @@ class WaterTapAssetManager {
                         ${asset.filterNeeded ? 'Yes' : 'No'}
                     </span>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterExpiryDate)}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateDDMMYYYY(asset.filterInstalledDate)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.filterExpiryDate)}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.filterInstalledDate)}</td>
                 <td class="px-4 py-4 text-sm text-gray-900 max-w-xs truncate" title="${asset.maintenanceNotes || ''}">${asset.maintenanceNotes || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.inUse ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
@@ -767,8 +767,8 @@ class WaterTapAssetManager {
                          <td class="px-2 py-2 text-xs">${asset.roomName}</td>
                          <td class="px-2 py-2 text-xs">${asset.hasFilter ? 'Yes' : 'No'}</td>
                          <td class="px-2 py-2 text-xs">${asset.filterNeeded ? 'Yes' : 'No'}</td>
-                         <td class="px-2 py-2 text-xs">${asset.filterExpiryDate || '-'}</td>
-                         <td class="px-2 py-2 text-xs">${asset.filterInstalledDate || '-'}</td>
+                         <td class="px-2 py-2 text-xs">${this.formatDateTimeDDMMYYYY(asset.filterExpiryDate)}</td>
+                         <td class="px-2 py-2 text-xs">${this.formatDateTimeDDMMYYYY(asset.filterInstalledDate)}</td>
                          <td class="px-2 py-2 text-xs">${asset.maintenanceNotes || '-'}</td>
                          <td class="px-2 py-2 text-xs">${asset.inUse ? 'Yes' : 'No'}</td>
                      </tr>
