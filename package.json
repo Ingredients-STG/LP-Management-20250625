@@ -1,7 +1,7 @@
 {
   "name": "water-tap-asset-management",
-  "version": "2.0.0",
-  "description": "Water Tap Asset Management System - Comprehensive tracking of water outlets, taps, and filters",
+  "version": "3.0.0",
+  "description": "Water Tap Asset Management System - Comprehensive 22-field tracking of water outlets, taps, and filters with enhanced location and maintenance management",
   "main": "index.js",
   "scripts": {
     "start": "node src/server.js",
@@ -13,7 +13,7 @@
     "type": "git",
     "url": "git+https://github.com/Ingredients-STG/LP-Management-20250625.git"
   },
-  "keywords": ["asset-management", "water-taps", "outlet-management", "filter-tracking", "aws", "amplify", "dynamodb"],
+  "keywords": ["asset-management", "water-taps", "outlet-management", "filter-tracking", "22-field-schema", "location-tracking", "maintenance-management", "aws", "amplify", "dynamodb"],
   "author": "Ingredients-STG",
   "license": "ISC",
   "dependencies": {

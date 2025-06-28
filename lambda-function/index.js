@@ -5,8 +5,8 @@ const dynamodb = new AWS.DynamoDB.DocumentClient();
 
 // Table names from environment variables
 const ASSETS_TABLE = process.env.ASSETS_TABLE || 'WaterTapAssetAssets';
-const MAINTENANCE_TABLE = process.env.MAINTENANCE_TABLE || 'WaterTapMaintenance';
-const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapLocations';
+const MAINTENANCE_TABLE = process.env.MAINTENANCE_TABLE || 'WaterTapAssetMaintenance';
+const LOCATIONS_TABLE = process.env.LOCATIONS_TABLE || 'WaterTapAssetLocations';
 
 // CORS headers
 const corsHeaders = {
@@ -111,9 +111,9 @@ async function getDashboardData() {
             return acc;
         }, {});
         
-        // Asset type breakdown
-        const assetTypeBreakdown = assets.reduce((acc, asset) => {
-            const type = asset.assetType || 'Unknown';
+        // Outlet type breakdown
+        const outletTypeBreakdown = assets.reduce((acc, asset) => {
+            const type = asset.outletType || 'Unknown';
             acc[type] = (acc[type] || 0) + 1;
             return acc;
         }, {});
@@ -127,9 +127,9 @@ async function getDashboardData() {
         
         // Filter status
         const filterStatus = {
-            filtersOn: assets.filter(asset => asset.filtersOn === true).length,
+            hasFilter: assets.filter(asset => asset.hasFilter === true).length,
             filtersNeeded: filtersNeeded,
-            augmentedCare: assets.filter(asset => asset.augmentedCare === true).length
+            inUse: assets.filter(asset => asset.inUse === true).length
         };
         
         return {
@@ -140,7 +140,7 @@ async function getDashboardData() {
                 maintenanceAssets,
                 filtersNeeded,
                 statusBreakdown,
-                assetTypeBreakdown,
+                outletTypeBreakdown,
                 wingBreakdown,
                 filterStatus
             })
@@ -177,18 +177,21 @@ async function createAsset(assetData) {
     try {
         console.log('Creating asset with data:', JSON.stringify(assetData, null, 2));
         
-        // Validate required fields
+        // Validate required fields for new 22-field schema
         if (!assetData.assetBarcode) {
             throw new Error('assetBarcode is required');
         }
-        if (!assetData.assetType) {
-            throw new Error('assetType is required');
+        if (!assetData.outletType) {
+            throw new Error('outletType is required');
         }
-        if (!assetData.primaryIdentifier) {
-            throw new Error('primaryIdentifier is required');
+        if (!assetData.tapType) {
+            throw new Error('tapType is required');
+        }
+        if (!assetData.wing) {
+            throw new Error('wing is required');
         }
         
-        // Generate ID using UUID format to match existing data
+        // Generate ID using UUID format
         const assetId = uuidv4();
         const now = new Date().toISOString();
         
@@ -196,121 +199,138 @@ async function createAsset(assetData) {
             id: assetId,
             assetBarcode: assetData.assetBarcode,
             status: (assetData.status || 'ACTIVE').toUpperCase(),
-            assetType: assetData.assetType,
-            primaryIdentifier: assetData.primaryIdentifier,
-            secondaryIdentifier: assetData.secondaryIdentifier || '',
-            wing: assetData.wing || '',
-            wingInShort: assetData.wingInShort || '',
-            room: assetData.room || '',
-            floor: assetData.floor || '',
-            floorInWords: assetData.floorInWords || '',
-            roomNo: assetData.roomNo || '',
-            roomName: assetData.roomName || '',
-            filterNeeded: assetData.filterNeeded === true,
-            filtersOn: assetData.filtersOn === true,
-            filterExpiryDate: assetData.filterExpiryDate || '',
-            filterInstalledOn: assetData.filterInstalledOn || '',
-            notes: assetData.notes || '',
-            augmentedCare: assetData.augmentedCare === true,
-            created: assetData.created || now,
+            outletType: assetData.outletType,
+            tapType: assetData.tapType,
+            spareColumn: assetData.spareColumn || null,
+            wing: assetData.wing,
+            buildingCode: assetData.buildingCode || null,
+            roomId: assetData.roomId || null,
+            floorNumber: assetData.floorNumber || null,
+            floorName: assetData.floorName || null,
+            roomNumber: assetData.roomNumber || null,
+            roomName: assetData.roomName || null,
+            hasFilter: Boolean(assetData.hasFilter),
+            filterNeeded: Boolean(assetData.filterNeeded),
+            filterExpiryDate: assetData.filterExpiryDate || null,
+            filterInstalledDate: assetData.filterInstalledDate || null,
+            maintenanceNotes: assetData.maintenanceNotes || null,
+            inUse: Boolean(assetData.inUse !== false), // Default to true
+            createdAt: now,
             createdBy: assetData.createdBy || 'System',
-            modified: assetData.modified || now,
+            modifiedAt: now,
             modifiedBy: assetData.modifiedBy || 'System'
         };
-        
-        console.log('Asset to be saved:', JSON.stringify(asset, null, 2));
         
         const params = {
             TableName: ASSETS_TABLE,
             Item: asset
         };
         
-        console.log('DynamoDB params:', JSON.stringify(params, null, 2));
-        
         await dynamodb.put(params).promise();
-        
-        console.log('Asset created successfully');
         
         return {
             statusCode: 201,
-            body: JSON.stringify(asset)
+            body: JSON.stringify({ asset, message: 'Asset created successfully' })
         };
     } catch (error) {
         console.error('Error creating asset:', error);
-        console.error('Error details:', error.message);
-        console.error('Error stack:', error.stack);
         throw error;
     }
 }
 
 async function updateAsset(assetId, assetData) {
     try {
-        console.log('Updating asset ID:', assetId);
-        console.log('Update data:', JSON.stringify(assetData, null, 2));
+        console.log('Updating asset:', assetId, 'with data:', JSON.stringify(assetData, null, 2));
+        
+        if (!assetId) {
+            throw new Error('Asset ID is required');
+        }
         
         const now = new Date().toISOString();
         
-        // Build update expression
+        // Build update expression dynamically for new 22-field schema
         const updateExpressions = [];
         const expressionAttributeNames = {};
         const expressionAttributeValues = {};
         
-        const fields = [
-            'assetBarcode', 'status', 'assetType', 'primaryIdentifier', 'secondaryIdentifier',
-            'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
-            'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn', 'notes', 'augmentedCare'
-        ];
+        const fieldMappings = {
+            'assetBarcode': 'assetBarcode',
+            'status': 'status',
+            'outletType': 'outletType',
+            'tapType': 'tapType',
+            'spareColumn': 'spareColumn',
+            'wing': 'wing',
+            'buildingCode': 'buildingCode',
+            'roomId': 'roomId',
+            'floorNumber': 'floorNumber',
+            'floorName': 'floorName',
+            'roomNumber': 'roomNumber',
+            'roomName': 'roomName',
+            'hasFilter': 'hasFilter',
+            'filterNeeded': 'filterNeeded',
+            'filterExpiryDate': 'filterExpiryDate',
+            'filterInstalledDate': 'filterInstalledDate',
+            'maintenanceNotes': 'maintenanceNotes',
+            'inUse': 'inUse',
+            'modifiedBy': 'modifiedBy'
+        };
         
-        fields.forEach(field => {
+        Object.keys(fieldMappings).forEach(field => {
             if (assetData.hasOwnProperty(field)) {
-                updateExpressions.push(`#${field} = :${field}`);
-                expressionAttributeNames[`#${field}`] = field;
-                // Normalize status to uppercase
+                const dbField = fieldMappings[field];
+                updateExpressions.push(`#${dbField} = :${dbField}`);
+                expressionAttributeNames[`#${dbField}`] = dbField;
+                
                 if (field === 'status' && assetData[field]) {
-                    expressionAttributeValues[`:${field}`] = assetData[field].toUpperCase();
+                    expressionAttributeValues[`:${dbField}`] = assetData[field].toUpperCase();
+                } else if (field === 'hasFilter' || field === 'filterNeeded' || field === 'inUse') {
+                    expressionAttributeValues[`:${dbField}`] = Boolean(assetData[field]);
                 } else {
-                    expressionAttributeValues[`:${field}`] = assetData[field];
+                    expressionAttributeValues[`:${dbField}`] = assetData[field];
                 }
             }
         });
         
-        // Always update modified timestamp and user
-        updateExpressions.push('#modified = :modified');
-        updateExpressions.push('#modifiedBy = :modifiedBy');
-        expressionAttributeNames['#modified'] = 'modified';
-        expressionAttributeNames['#modifiedBy'] = 'modifiedBy';
-        expressionAttributeValues[':modified'] = now;
-        expressionAttributeValues[':modifiedBy'] = assetData.modifiedBy || 'System';
+        // Always update modifiedAt
+        updateExpressions.push('#modifiedAt = :modifiedAt');
+        expressionAttributeNames['#modifiedAt'] = 'modifiedAt';
+        expressionAttributeValues[':modifiedAt'] = now;
+        
+        if (updateExpressions.length === 0) {
+            throw new Error('No valid fields to update');
+        }
         
         const params = {
             TableName: ASSETS_TABLE,
             Key: { id: assetId },
-            UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+            UpdateExpression: 'SET ' + updateExpressions.join(', '),
             ExpressionAttributeNames: expressionAttributeNames,
             ExpressionAttributeValues: expressionAttributeValues,
             ReturnValues: 'ALL_NEW'
         };
         
-        console.log('DynamoDB update params:', JSON.stringify(params, null, 2));
+        console.log('Update params:', JSON.stringify(params, null, 2));
         
         const result = await dynamodb.update(params).promise();
         
-        console.log('Asset updated successfully');
-        
         return {
             statusCode: 200,
-            body: JSON.stringify(result.Attributes)
+            body: JSON.stringify({ asset: result.Attributes, message: 'Asset updated successfully' })
         };
     } catch (error) {
         console.error('Error updating asset:', error);
-        console.error('Error details:', error.message);
-        console.error('Error stack:', error.stack);
         throw error;
     }
 }
 
 async function deleteAsset(assetId) {
     try {
+        console.log('Deleting asset:', assetId);
+        
+        if (!assetId) {
+            throw new Error('Asset ID is required');
+        }
+        
         const params = {
             TableName: ASSETS_TABLE,
             Key: { id: assetId }
@@ -335,14 +355,16 @@ async function getLocations() {
         };
         
         const result = await dynamodb.scan(params).promise();
-        
         return {
             statusCode: 200,
-            body: JSON.stringify({ items: result.Items || [] })
+            body: JSON.stringify({ items: result.Items || [], count: (result.Items || []).length })
         };
     } catch (error) {
         console.error('Error getting locations:', error);
-        throw error;
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ items: [], count: 0 })
+        };
     }
 }
 
@@ -353,15 +375,15 @@ async function getMaintenanceRecords() {
         };
         
         const result = await dynamodb.scan(params).promise();
-        
         return {
             statusCode: 200,
-            body: JSON.stringify({ items: result.Items || [] })
+            body: JSON.stringify({ items: result.Items || [], count: (result.Items || []).length })
         };
     } catch (error) {
         console.error('Error getting maintenance records:', error);
-        throw error;
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ items: [], count: 0 })
+        };
     }
-}
-
-// Using uuidv4() for ID generation 
+} 

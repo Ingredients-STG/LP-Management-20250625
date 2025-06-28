@@ -2,25 +2,25 @@ type Asset @model {
   id: ID!
   assetBarcode: String!
   status: AssetStatus!
-  assetType: String!
-  primaryIdentifier: String!
-  secondaryIdentifier: String
-  wing: String
-  wingInShort: String
-  room: String
-  floor: String
-  floorInWords: String
-  roomNo: String
+  outletType: String!
+  tapType: String!
+  spareColumn: String
+  wing: String!
+  buildingCode: String
+  roomId: String
+  floorNumber: String
+  floorName: String
+  roomNumber: String
   roomName: String
+  hasFilter: Boolean!
   filterNeeded: Boolean!
-  filtersOn: Boolean!
   filterExpiryDate: AWSDate
-  filterInstalledOn: AWSDate
-  notes: String
-  augmentedCare: Boolean!
-  created: AWSDateTime!
+  filterInstalledDate: AWSDate
+  maintenanceNotes: String
+  inUse: Boolean!
+  createdAt: AWSDateTime!
   createdBy: String
-  modified: AWSDateTime!
+  modifiedAt: AWSDateTime!
   modifiedBy: String
 }
 
@@ -34,17 +34,16 @@ enum AssetStatus {
 type Location @model {
   id: ID!
   wing: String!
-  wingInShort: String
-  room: String!
-  floor: String!
-  floorInWords: String
-  roomNo: String!
+  buildingCode: String!
+  roomId: String!
+  floorNumber: String!
+  floorName: String!
+  roomNumber: String!
   roomName: String!
-  buildingCode: String
   description: String
   isActive: Boolean!
-  created: AWSDateTime!
-  modified: AWSDateTime!
+  createdAt: AWSDateTime!
+  modifiedAt: AWSDateTime!
 }
 
 type Maintenance @model {
@@ -59,9 +58,9 @@ type Maintenance @model {
   technician: String
   cost: Float
   notes: String
-  created: AWSDateTime!
+  createdAt: AWSDateTime!
   createdBy: String
-  modified: AWSDateTime!
+  modifiedAt: AWSDateTime!
   modifiedBy: String
 }
 
