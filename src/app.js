@@ -227,6 +227,14 @@ class WaterTapAssetManager {
         
         tableBody.innerHTML = assets.map(asset => `
             <tr class="hover:bg-gray-50">
+                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="window.assetManager.editAsset('${asset.id}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Edit Asset">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="window.assetManager.deleteAsset('${asset.id}')" class="text-red-600 hover:text-red-900" title="Delete Asset">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${asset.assetBarcode || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${this.getStatusColor(asset.status)}">
@@ -265,14 +273,6 @@ class WaterTapAssetManager {
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.createdBy || '-'}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${this.formatDateTimeDDMMYYYY(asset.modifiedAt)}</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${asset.modifiedBy || '-'}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onclick="assetManager.editAsset('${asset.id}')" class="text-blue-600 hover:text-blue-900 mr-3">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button onclick="assetManager.deleteAsset('${asset.id}')" class="text-red-600 hover:text-red-900">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
             </tr>
         `).join('');
     }
@@ -918,8 +918,13 @@ class WaterTapAssetManager {
     }
 }
 
-// Global instance
-const assetManager = new WaterTapAssetManager();
+// Global instance (will be attached to window in DOMContentLoaded)
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
+    window.assetManager = new WaterTapAssetManager();
+    window.assetManager.init();
+});
 
 console.log('Water Tap Asset Management System loaded');
 console.log('API Base URL:', API_BASE_URL); 
