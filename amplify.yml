@@ -17,6 +17,12 @@ frontend:
         - cat package.json | grep -A 10 '"scripts"'
     build:
       commands:
+        - echo "Creating .env.production file with environment variables..."
+        - env | grep -e AMPLIFY_ACCESS_KEY_ID >> .env.production
+        - env | grep -e AMPLIFY_SECRET_ACCESS_KEY >> .env.production
+        - env | grep -e AMPLIFY_AWS_REGION >> .env.production
+        - echo "Environment variables added to .env.production:"
+        - cat .env.production
         - echo "Starting Next.js build..."
         - npm run build
         - echo "Build completed successfully"
