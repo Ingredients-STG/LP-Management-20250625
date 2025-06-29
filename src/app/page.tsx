@@ -466,7 +466,6 @@ export default function HomePage() {
 
   const handleAddAsset = async (values: any) => {
     try {
-      // In a real app, this would make an API call
       const newAsset: Asset = {
         ...values,
         id: Date.now().toString(),
@@ -479,6 +478,36 @@ export default function HomePage() {
         modifiedBy: 'Current User',
       };
 
+      console.log("Creating asset:", newAsset);
+
+      // Make API call to create asset in backend
+      const response = await fetch(`/api/proxy?endpoint=assets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "create",
+          asset: newAsset
+        }),
+      });
+
+      console.log("Create response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Create error response:", errorText);
+        throw new Error(`Failed to create asset: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log("Create result:", result);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create asset");
+      }
+
+      // Update local state only after successful API call
       setAssets(prev => [...prev, newAsset]);
       
       // Create audit log entry for asset creation
@@ -489,14 +518,15 @@ export default function HomePage() {
       
       notifications.show({
         title: 'Success',
-        message: 'Asset added successfully!',
+        message: 'Asset added successfully and saved to database!',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
     } catch (error) {
+      console.error("Error creating asset:", error);
       notifications.show({
         title: 'Error',
-        message: 'Failed to add asset.',
+        message: `Failed to add asset: ${error instanceof Error ? error.message : "Unknown error"}`,
         color: 'red',
         icon: <IconX size={16} />,
       });
@@ -521,6 +551,8 @@ export default function HomePage() {
       };
 
       // Make API call to update asset in backend
+      console.log("Updating asset:", updatedAsset);
+      
       const response = await fetch(`/api/proxy?endpoint=assets`, {
         method: "POST",
         headers: {
@@ -532,11 +564,16 @@ export default function HomePage() {
         }),
       });
 
+      console.log("Update response status:", response.status);
+
       if (!response.ok) {
-        throw new Error(`Failed to update asset: ${response.status}`);
+        const errorText = await response.text();
+        console.error("Update error response:", errorText);
+        throw new Error(`Failed to update asset: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log("Update result:", result);
       
       if (!result.success) {
         throw new Error(result.error || "Failed to update asset");
@@ -583,17 +620,54 @@ export default function HomePage() {
       ),
       labels: { confirm: 'Delete', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
-      onConfirm: () => {
-        // Create audit log entry for asset deletion
-        createAuditLogEntry(asset, 'DELETE');
-        
-        setAssets(prev => prev.filter(a => a.id !== asset.id));
-        notifications.show({
-          title: 'Success',
-          message: 'Asset deleted successfully!',
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
+      onConfirm: async () => {
+        try {
+          console.log("Deleting asset:", asset);
+
+          // Make API call to delete asset from backend
+          const response = await fetch(`/api/proxy?endpoint=assets/${asset.id}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          console.log("Delete response status:", response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Delete error response:", errorText);
+            throw new Error(`Failed to delete asset: ${response.status} - ${errorText}`);
+          }
+
+          const result = await response.json();
+          console.log("Delete result:", result);
+          
+          if (!result.success) {
+            throw new Error(result.error || "Failed to delete asset");
+          }
+
+          // Create audit log entry for asset deletion
+          createAuditLogEntry(asset, 'DELETE');
+          
+          // Update local state only after successful API call
+          setAssets(prev => prev.filter(a => a.id !== asset.id));
+          
+          notifications.show({
+            title: 'Success',
+            message: 'Asset deleted successfully from database!',
+            color: 'green',
+            icon: <IconCheck size={16} />,
+          });
+        } catch (error) {
+          console.error("Error deleting asset:", error);
+          notifications.show({
+            title: 'Error',
+            message: `Failed to delete asset: ${error instanceof Error ? error.message : "Unknown error"}`,
+            color: 'red',
+            icon: <IconX size={16} />,
+          });
+        }
       },
     });
   };
