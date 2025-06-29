@@ -1,13 +1,28 @@
-import AWS from 'aws-sdk';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { 
+  DynamoDBDocumentClient, 
+  ScanCommand, 
+  GetCommand, 
+  PutCommand, 
+  UpdateCommand, 
+  DeleteCommand 
+} from '@aws-sdk/lib-dynamodb';
+import { 
+  CreateTableCommand, 
+  DescribeTableCommand, 
+  waitUntilTableExists 
+} from '@aws-sdk/client-dynamodb';
 
-// Configure AWS SDK
-AWS.config.update({
-  region: 'eu-west-2',
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+// Configure AWS SDK v3 with environment variables
+const client = new DynamoDBClient({
+  region: process.env.AWS_REGION || 'eu-west-2',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  },
 });
 
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = 'water-tap-assets';
 
@@ -41,14 +56,22 @@ export class DynamoDBService {
   // Get all assets
   static async getAllAssets(): Promise<Asset[]> {
     try {
-      const params = {
-        TableName: TABLE_NAME,
-      };
+      console.log('Fetching all assets from DynamoDB table:', TABLE_NAME);
       
-      const result = await dynamodb.scan(params).promise();
+      const command = new ScanCommand({
+        TableName: TABLE_NAME,
+      });
+      
+      const result = await dynamodb.send(command);
+      console.log(`Found ${result.Items?.length || 0} assets`);
       return result.Items as Asset[] || [];
     } catch (error) {
       console.error('Error getting assets:', error);
+      console.error('AWS Config:', {
+        region: 'eu-west-2',
+        hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+        hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+      });
       throw error;
     }
   }
@@ -56,12 +79,12 @@ export class DynamoDBService {
   // Get asset by ID
   static async getAssetById(id: string): Promise<Asset | null> {
     try {
-      const params = {
+      const command = new GetCommand({
         TableName: TABLE_NAME,
         Key: { id },
-      };
+      });
       
-      const result = await dynamodb.get(params).promise();
+      const result = await dynamodb.send(command);
       return result.Item as Asset || null;
     } catch (error) {
       console.error('Error getting asset by ID:', error);
@@ -80,12 +103,12 @@ export class DynamoDBService {
         modified: now,
       };
 
-      const params = {
+      const command = new PutCommand({
         TableName: TABLE_NAME,
         Item: newAsset,
-      };
+      });
 
-      await dynamodb.put(params).promise();
+      await dynamodb.send(command);
       return newAsset;
     } catch (error) {
       console.error('Error creating asset:', error);
@@ -115,16 +138,16 @@ export class DynamoDBService {
       expressionAttributeNames['#modified'] = 'modified';
       expressionAttributeValues[':modified'] = now;
 
-      const params = {
+      const command = new UpdateCommand({
         TableName: TABLE_NAME,
         Key: { id },
         UpdateExpression: `SET ${updateExpression.join(', ')}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW' as const,
-      };
+        ReturnValues: 'ALL_NEW',
+      });
 
-      const result = await dynamodb.update(params).promise();
+      const result = await dynamodb.send(command);
       return result.Attributes as Asset;
     } catch (error) {
       console.error('Error updating asset:', error);
@@ -135,12 +158,12 @@ export class DynamoDBService {
   // Delete asset
   static async deleteAsset(id: string): Promise<void> {
     try {
-      const params = {
+      const command = new DeleteCommand({
         TableName: TABLE_NAME,
         Key: { id },
-      };
+      });
 
-      await dynamodb.delete(params).promise();
+      await dynamodb.send(command);
     } catch (error) {
       console.error('Error deleting asset:', error);
       throw error;
@@ -185,21 +208,20 @@ export class DynamoDBService {
   // Create table if it doesn't exist
   static async createTableIfNotExists(): Promise<void> {
     try {
-      const dynamodbClient = new AWS.DynamoDB();
-      
       // Check if table exists
       try {
-        await dynamodbClient.describeTable({ TableName: TABLE_NAME }).promise();
+        const command = new DescribeTableCommand({ TableName: TABLE_NAME });
+        await client.send(command);
         console.log(`Table ${TABLE_NAME} already exists`);
         return;
       } catch (error: any) {
-        if (error.code !== 'ResourceNotFoundException') {
+        if (error.name !== 'ResourceNotFoundException') {
           throw error;
         }
       }
 
       // Create table
-      const params = {
+      const createCommand = new CreateTableCommand({
         TableName: TABLE_NAME,
         KeySchema: [
           { AttributeName: 'id', KeyType: 'HASH' },
@@ -208,13 +230,16 @@ export class DynamoDBService {
           { AttributeName: 'id', AttributeType: 'S' },
         ],
         BillingMode: 'PAY_PER_REQUEST',
-      };
+      });
 
       console.log(`Creating table ${TABLE_NAME}...`);
-      await dynamodbClient.createTable(params).promise();
+      await client.send(createCommand);
       
       // Wait for table to be active
-      await dynamodbClient.waitFor('tableExists', { TableName: TABLE_NAME }).promise();
+      await waitUntilTableExists(
+        { client, maxWaitTime: 300 },
+        { TableName: TABLE_NAME }
+      );
       console.log(`Table ${TABLE_NAME} created successfully`);
     } catch (error) {
       console.error('Error creating table:', error);
