@@ -8,10 +8,23 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
+        - echo "Node version:" && node --version
+        - echo "NPM version:" && npm --version
+        - echo "Installing dependencies with legacy peer deps..."
+        - npm install --legacy-peer-deps
+        - echo "Dependencies installed successfully"
+        - echo "Checking package.json scripts..."
+        - cat package.json | grep -A 10 '"scripts"'
     build:
       commands:
+        - echo "Starting Next.js build..."
         - npm run build
+        - echo "Build completed successfully"
+        - echo "Checking build output..."
+        - ls -la
+        - if [ -d ".next" ]; then echo "Found .next directory" && ls -la .next/; fi
+        - if [ -d "out" ]; then echo "Found out directory" && ls -la out/; fi
+        - if [ -d "build" ]; then echo "Found build directory" && ls -la build/; fi
   artifacts:
     baseDirectory: .next
     files:
