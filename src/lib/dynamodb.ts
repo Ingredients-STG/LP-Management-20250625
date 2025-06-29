@@ -69,8 +69,8 @@ export class DynamoDBService {
       console.error('Error getting assets:', error);
       console.error('AWS Config:', {
         region: 'eu-west-2',
-        hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-        hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+        hasAccessKey: !!process.env.AMPLIFY_ACCESS_KEY_ID,
+        hasSecretKey: !!process.env.AMPLIFY_SECRET_ACCESS_KEY,
       });
       throw error;
     }
