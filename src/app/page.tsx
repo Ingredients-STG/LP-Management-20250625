@@ -77,6 +77,7 @@ import {
   IconExclamationMark,
   IconChevronDown,
   IconChevronRight,
+  IconInfoCircle,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -400,38 +401,85 @@ export default function HomePage() {
         fetch('/api/proxy?endpoint=dashboard')
       ]);
       
-      if (!assetsResponse.ok || !dashboardResponse.ok) {
-        throw new Error('Failed to fetch data');
+      let backendAssets: Asset[] = [];
+      let backendStats: any = {};
+      
+      // Handle assets response
+      if (assetsResponse.ok) {
+        const assetsData = await assetsResponse.json();
+        if (assetsData.success && assetsData.data) {
+          backendAssets = assetsData.data.items || assetsData.data.assets || [];
+        }
       }
       
-      const [assetsData, dashboardData] = await Promise.all([
-        assetsResponse.json(),
-        dashboardResponse.json()
-      ]);
-      
-      if (assetsData.success && assetsData.data) {
-        const assetsArray = assetsData.data.items || assetsData.data.assets || [];
-        setAssets(assetsArray);
+      // Handle dashboard response
+      if (dashboardResponse.ok) {
+        const dashboardData = await dashboardResponse.json();
+        if (dashboardData.success && dashboardData.data) {
+          backendStats = dashboardData.data;
+        }
       }
 
-      if (dashboardData.success && dashboardData.data) {
-        setStats(dashboardData.data);
-      }
+      // Get local assets from localStorage
+      const localAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
+      
+      // Merge backend and local assets (local assets take precedence for same IDs)
+      const backendAssetIds = new Set(backendAssets.map((asset: Asset) => asset.id));
+      const localOnlyAssets = localAssets.filter((asset: Asset) => !backendAssetIds.has(asset.id));
+      
+      // Combine backend assets with local-only assets
+      const allAssets = [...backendAssets, ...localOnlyAssets];
+      setAssets(allAssets);
+
+      // Update dashboard stats to include local assets
+      const updatedStats = {
+        ...backendStats,
+        totalAssets: allAssets.length,
+        activeAssets: allAssets.filter(a => a.status === 'ACTIVE').length,
+        maintenanceAssets: allAssets.filter(a => a.status === 'MAINTENANCE').length,
+        filtersNeeded: allAssets.filter(a => a.filterNeeded === true || a.filterNeeded === 'true').length,
+      };
+      setStats(updatedStats);
+
+      const message = localAssets.length > 0 
+        ? `Data loaded successfully! (${backendAssets.length} from server, ${localOnlyAssets.length} local changes)`
+        : `Data loaded successfully! (${backendAssets.length} assets)`;
 
       notifications.show({
         title: 'Success',
-        message: `Data loaded successfully!`,
+        message: message,
         color: 'green',
         icon: <IconCheck size={16} />,
       });
     } catch (error) {
       console.error('Error fetching data:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to load data. Please try again.',
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
+      
+      // Fallback to local data only
+      const localAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
+      if (localAssets.length > 0) {
+        setAssets(localAssets);
+        const localStats = {
+          totalAssets: localAssets.length,
+          activeAssets: localAssets.filter((a: Asset) => a.status === 'ACTIVE').length,
+          maintenanceAssets: localAssets.filter((a: Asset) => a.status === 'MAINTENANCE').length,
+          filtersNeeded: localAssets.filter((a: Asset) => a.filterNeeded === true || a.filterNeeded === 'true').length,
+        };
+        setStats(localStats);
+        
+        notifications.show({
+          title: 'Offline Mode',
+          message: `Using locally stored data (${localAssets.length} assets). Server connection failed.`,
+          color: 'yellow',
+          icon: <IconX size={16} />,
+        });
+      } else {
+        notifications.show({
+          title: 'Error',
+          message: 'Failed to load data from server and no local data available.',
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -478,37 +526,18 @@ export default function HomePage() {
         modifiedBy: 'Current User',
       };
 
-      console.log("Creating asset:", newAsset);
+      console.log("Creating asset locally:", newAsset);
 
-      // Make API call to create asset in backend
-      const response = await fetch(`/api/proxy?endpoint=assets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "create",
-          asset: newAsset
-        }),
-      });
-
-      console.log("Create response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Create error response:", errorText);
-        throw new Error(`Failed to create asset: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log("Create result:", result);
+      // Note: Backend API only supports GET operations
+      // For now, we'll store locally and sync when backend supports CRUD
       
-      if (!result.success) {
-        throw new Error(result.error || "Failed to create asset");
-      }
-
-      // Update local state only after successful API call
+      // Update local state
       setAssets(prev => [...prev, newAsset]);
+      
+      // Store in localStorage for persistence
+      const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
+      existingAssets.push(newAsset);
+      localStorage.setItem('localAssets', JSON.stringify(existingAssets));
       
       // Create audit log entry for asset creation
       createAuditLogEntry(newAsset, 'CREATE');
@@ -518,7 +547,7 @@ export default function HomePage() {
       
       notifications.show({
         title: 'Success',
-        message: 'Asset added successfully and saved to database!',
+        message: 'Asset added successfully! (Stored locally - will sync when backend supports CRUD)',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
@@ -550,44 +579,27 @@ export default function HomePage() {
         modifiedBy: "Current User",
       };
 
-      // Make API call to update asset in backend
-      console.log("Updating asset:", updatedAsset);
-      
-      const response = await fetch(`/api/proxy?endpoint=assets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "update",
-          asset: updatedAsset
-        }),
-      });
+      console.log("Updating asset locally:", updatedAsset);
 
-      console.log("Update response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Update error response:", errorText);
-        throw new Error(`Failed to update asset: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log("Update result:", result);
-      
-      if (!result.success) {
-        throw new Error(result.error || "Failed to update asset");
-      }
+      // Note: Backend API only supports GET operations
+      // For now, we'll store locally and sync when backend supports CRUD
 
       // Create audit log entry using only user-modified fields for comparison
       if (selectedAsset) {
         createAuditLogEntry(userModifiedAsset as Asset, "UPDATE", selectedAsset);
       }
 
-      // Update local state only after successful API call
+      // Update local state
       setAssets(prev => prev.map(asset => 
         asset.id === selectedAsset?.id ? updatedAsset : asset
       ));
+      
+      // Update localStorage
+      const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
+      const updatedLocalAssets = existingAssets.map((asset: Asset) => 
+        asset.id === selectedAsset?.id ? updatedAsset : asset
+      );
+      localStorage.setItem('localAssets', JSON.stringify(updatedLocalAssets));
       
       closeEditModal();
       setSelectedAsset(null);
@@ -595,7 +607,7 @@ export default function HomePage() {
       
       notifications.show({
         title: "Success",
-        message: "Asset updated successfully and saved to database!",
+        message: "Asset updated successfully! (Stored locally - will sync when backend supports CRUD)",
         color: "green",
         icon: <IconCheck size={16} />,
       });
@@ -622,40 +634,25 @@ export default function HomePage() {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          console.log("Deleting asset:", asset);
+          console.log("Deleting asset locally:", asset);
 
-          // Make API call to delete asset from backend
-          const response = await fetch(`/api/proxy?endpoint=assets/${asset.id}`, {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          });
-
-          console.log("Delete response status:", response.status);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Delete error response:", errorText);
-            throw new Error(`Failed to delete asset: ${response.status} - ${errorText}`);
-          }
-
-          const result = await response.json();
-          console.log("Delete result:", result);
-          
-          if (!result.success) {
-            throw new Error(result.error || "Failed to delete asset");
-          }
+          // Note: Backend API only supports GET operations
+          // For now, we'll store locally and sync when backend supports CRUD
 
           // Create audit log entry for asset deletion
           createAuditLogEntry(asset, 'DELETE');
           
-          // Update local state only after successful API call
+          // Update local state
           setAssets(prev => prev.filter(a => a.id !== asset.id));
+          
+          // Update localStorage
+          const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
+          const updatedLocalAssets = existingAssets.filter((a: Asset) => a.id !== asset.id);
+          localStorage.setItem('localAssets', JSON.stringify(updatedLocalAssets));
           
           notifications.show({
             title: 'Success',
-            message: 'Asset deleted successfully from database!',
+            message: 'Asset deleted successfully! (Stored locally - will sync when backend supports CRUD)',
             color: 'green',
             icon: <IconCheck size={16} />,
           });
@@ -1522,6 +1519,20 @@ export default function HomePage() {
 
         <AppShell.Main>
           <Container size="xl">
+            {/* Backend API Notice */}
+            <Card shadow="sm" padding="md" radius="md" withBorder mb="md" style={{ backgroundColor: '#fff3cd', borderColor: '#ffeaa7' }}>
+              <Group>
+                <IconInfoCircle size={20} color="#856404" />
+                <div>
+                  <Text size="sm" fw={500} c="#856404">
+                    Development Mode
+                  </Text>
+                  <Text size="xs" c="#856404">
+                    Backend API currently supports read-only operations. Create, update, and delete operations are stored locally and will sync when backend CRUD support is added.
+                  </Text>
+                </div>
+              </Group>
+            </Card>
             {hideTabContainer && (
               <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">
                 <Group>
