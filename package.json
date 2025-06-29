@@ -1,36 +1,49 @@
 {
-  "name": "water-tap-asset-management",
-  "version": "3.0.0",
-  "description": "Water Tap Asset Management System - Comprehensive 22-field tracking of water outlets, taps, and filters with enhanced location and maintenance management",
-  "main": "index.js",
+  "name": "water-tap-management",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "build": "echo 'Build completed'",
-    "test": "jest"
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Ingredients-STG/LP-Management-20250625.git"
-  },
-  "keywords": ["asset-management", "water-taps", "outlet-management", "filter-tracking", "22-field-schema", "location-tracking", "maintenance-management", "aws", "amplify", "dynamodb"],
-  "author": "Ingredients-STG",
-  "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "aws-sdk": "^2.1490.0",
-    "uuid": "^9.0.1",
-    "joi": "^17.11.0",
-    "moment": "^2.29.4"
+    "@heroicons/react": "^2.2.0",
+    "@mantine/charts": "^8.1.2",
+    "@mantine/core": "^8.1.2",
+    "@mantine/dates": "^8.1.2",
+    "@mantine/dropzone": "^8.1.2",
+    "@mantine/form": "^8.1.2",
+    "@mantine/hooks": "^8.1.2",
+    "@mantine/modals": "^8.1.2",
+    "@mantine/notifications": "^8.1.2",
+    "@mantine/spotlight": "^8.1.2",
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@tabler/icons-react": "^3.34.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "framer-motion": "^12.19.2",
+    "lucide-react": "^0.525.0",
+    "next": "15.3.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
+    "recharts": "^3.0.2",
+    "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "jest": "^29.7.0"
-  },
-  "bugs": {
-    "url": "https://github.com/Ingredients-STG/LP-Management-20250625/issues"
-  },
-  "homepage": "https://github.com/Ingredients-STG/LP-Management-20250625#readme"
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
 }
