@@ -509,45 +509,22 @@ export default function HomePage() {
       const userModifiedAsset = {
         ...selectedAsset,
         ...values,
-        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : (selectedAsset?.filterExpiryDate || ""),
-        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : (selectedAsset?.filterInstalledOn || ""),
+        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : (selectedAsset?.filterExpiryDate || ''),
+        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : (selectedAsset?.filterInstalledOn || ''),
       };
 
       // Create the full updated asset with system fields
       const updatedAsset = {
         ...userModifiedAsset,
         modified: new Date().toISOString(),
-        modifiedBy: "Current User",
+        modifiedBy: 'Current User',
       };
-
-      // Make API call to update asset in backend
-      const response = await fetch(`/api/proxy?endpoint=assets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "update",
-          asset: updatedAsset
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update asset: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || "Failed to update asset");
-      }
 
       // Create audit log entry using only user-modified fields for comparison
       if (selectedAsset) {
-        createAuditLogEntry(userModifiedAsset as Asset, "UPDATE", selectedAsset);
+        createAuditLogEntry(userModifiedAsset as Asset, 'UPDATE', selectedAsset);
       }
 
-      // Update local state only after successful API call
       setAssets(prev => prev.map(asset => 
         asset.id === selectedAsset?.id ? updatedAsset : asset
       ));
@@ -557,21 +534,21 @@ export default function HomePage() {
       form.reset();
       
       notifications.show({
-        title: "Success",
-        message: "Asset updated successfully and saved to database!",
-        color: "green",
+        title: 'Success',
+        message: 'Asset updated successfully!',
+        color: 'green',
         icon: <IconCheck size={16} />,
       });
     } catch (error) {
-      console.error("Error updating asset:", error);
       notifications.show({
-        title: "Error",
-        message: `Failed to update asset: ${error instanceof Error ? error.message : "Unknown error"}`,
-        color: "red",
+        title: 'Error',
+        message: 'Failed to update asset.',
+        color: 'red',
         icon: <IconX size={16} />,
       });
     }
   };
+
   const handleDeleteAsset = (asset: Asset) => {
     modals.openConfirmModal({
       title: 'Delete Asset',
