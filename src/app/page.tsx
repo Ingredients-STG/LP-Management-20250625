@@ -477,7 +477,7 @@ export default function HomePage() {
         filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : '',
       };
 
-      console.log("Creating asset in DynamoDB:", assetData);
+
 
       const response = await fetch('/api/assets', {
         method: 'POST',
@@ -536,7 +536,7 @@ export default function HomePage() {
         filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : (selectedAsset?.filterInstalledOn || ""),
       };
 
-      console.log("Updating asset in DynamoDB:", selectedAsset.id, updateData);
+
 
       const response = await fetch(`/api/assets/${selectedAsset.id}`, {
         method: 'PUT',
@@ -604,7 +604,7 @@ export default function HomePage() {
             throw new Error('Asset ID is required for deletion');
           }
 
-          console.log("Deleting asset from DynamoDB:", asset.id);
+    
 
           const response = await fetch(`/api/assets/${asset.id}`, {
             method: 'DELETE',
@@ -1499,20 +1499,7 @@ export default function HomePage() {
 
         <AppShell.Main>
           <Container size="xl">
-            {/* DynamoDB Integration Notice */}
-            <Card shadow="sm" padding="md" radius="md" withBorder mb="md" style={{ backgroundColor: '#d4edda', borderColor: '#c3e6cb' }}>
-              <Group>
-                <IconInfoCircle size={20} color="#155724" />
-                <div>
-                  <Text size="sm" fw={500} c="#155724">
-                    DynamoDB Integration Active
-                  </Text>
-                  <Text size="xs" c="#155724">
-                    All operations (CREATE, READ, UPDATE, DELETE) are now connected directly to AWS DynamoDB. Data is persisted in real-time.
-                  </Text>
-                </div>
-              </Group>
-            </Card>
+
             {hideTabContainer && (
               <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">
                 <Group>
@@ -1912,21 +1899,50 @@ export default function HomePage() {
                     {auditLog.filter(entry => entry.assetBarcode === selectedAssetAudit).length} entries
                   </Badge>
                 </Group>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  color="red"
-                  onClick={() => {
-                    setAuditLog(prev => prev.filter(entry => entry.assetBarcode !== selectedAssetAudit));
-                    notifications.show({
-                      title: 'Cleared',
-                      message: 'Audit log cleared for this asset',
-                      color: 'blue',
-                    });
-                  }}
-                >
-                  Clear Log
-                </Button>
+                <Group gap="xs">
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    color="red"
+                    onClick={() => {
+                      setAuditLog(prev => prev.filter(entry => entry.assetBarcode !== selectedAssetAudit));
+                      notifications.show({
+                        title: 'Cleared',
+                        message: 'Audit log cleared for this asset',
+                        color: 'blue',
+                      });
+                    }}
+                  >
+                    Clear Asset Log
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    color="red"
+                    onClick={() => {
+                      modals.openConfirmModal({
+                        title: 'Clear All Audit Logs',
+                        children: (
+                          <Text size="sm">
+                            Are you sure you want to clear all audit logs? This action cannot be undone.
+                          </Text>
+                        ),
+                        labels: { confirm: 'Clear All', cancel: 'Cancel' },
+                        confirmProps: { color: 'red' },
+                        onConfirm: () => {
+                          setAuditLog([]);
+                          notifications.show({
+                            title: 'Cleared',
+                            message: 'All audit logs have been cleared',
+                            color: 'blue',
+                          });
+                        },
+                      });
+                    }}
+                  >
+                    Clear All Logs
+                  </Button>
+                </Group>
               </Group>
               
               <ScrollArea h={500}>
