@@ -397,89 +397,45 @@ export default function HomePage() {
     try {
       setLoading(true);
       const [assetsResponse, dashboardResponse] = await Promise.all([
-        fetch('/api/proxy?endpoint=assets'),
-        fetch('/api/proxy?endpoint=dashboard')
+        fetch('/api/assets'),
+        fetch('/api/dashboard')
       ]);
-      
-      let backendAssets: Asset[] = [];
-      let backendStats: any = {};
       
       // Handle assets response
       if (assetsResponse.ok) {
         const assetsData = await assetsResponse.json();
         if (assetsData.success && assetsData.data) {
-          backendAssets = assetsData.data.items || assetsData.data.assets || [];
+          const assets = assetsData.data.items || assetsData.data.assets || [];
+          setAssets(assets);
         }
+      } else {
+        throw new Error('Failed to fetch assets');
       }
       
       // Handle dashboard response
       if (dashboardResponse.ok) {
         const dashboardData = await dashboardResponse.json();
         if (dashboardData.success && dashboardData.data) {
-          backendStats = dashboardData.data;
+          setStats(dashboardData.data);
         }
+      } else {
+        throw new Error('Failed to fetch dashboard stats');
       }
-
-      // Get local assets from localStorage
-      const localAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
-      
-      // Merge backend and local assets (local assets take precedence for same IDs)
-      const backendAssetIds = new Set(backendAssets.map((asset: Asset) => asset.id));
-      const localOnlyAssets = localAssets.filter((asset: Asset) => !backendAssetIds.has(asset.id));
-      
-      // Combine backend assets with local-only assets
-      const allAssets = [...backendAssets, ...localOnlyAssets];
-      setAssets(allAssets);
-
-      // Update dashboard stats to include local assets
-      const updatedStats = {
-        ...backendStats,
-        totalAssets: allAssets.length,
-        activeAssets: allAssets.filter(a => a.status === 'ACTIVE').length,
-        maintenanceAssets: allAssets.filter(a => a.status === 'MAINTENANCE').length,
-        filtersNeeded: allAssets.filter(a => a.filterNeeded === true || a.filterNeeded === 'true').length,
-      };
-      setStats(updatedStats);
-
-      const message = localAssets.length > 0 
-        ? `Data loaded successfully! (${backendAssets.length} from server, ${localOnlyAssets.length} local changes)`
-        : `Data loaded successfully! (${backendAssets.length} assets)`;
 
       notifications.show({
         title: 'Success',
-        message: message,
+        message: 'Data loaded successfully from DynamoDB!',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
     } catch (error) {
       console.error('Error fetching data:', error);
-      
-      // Fallback to local data only
-      const localAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
-      if (localAssets.length > 0) {
-        setAssets(localAssets);
-        const localStats = {
-          totalAssets: localAssets.length,
-          activeAssets: localAssets.filter((a: Asset) => a.status === 'ACTIVE').length,
-          maintenanceAssets: localAssets.filter((a: Asset) => a.status === 'MAINTENANCE').length,
-          filtersNeeded: localAssets.filter((a: Asset) => a.filterNeeded === true || a.filterNeeded === 'true').length,
-        };
-        setStats(localStats);
-        
-        notifications.show({
-          title: 'Offline Mode',
-          message: `Using locally stored data (${localAssets.length} assets). Server connection failed.`,
-          color: 'yellow',
-          icon: <IconX size={16} />,
-        });
-      } else {
-        notifications.show({
-          title: 'Error',
-          message: 'Failed to load data from server and no local data available.',
-          color: 'red',
-          icon: <IconX size={16} />,
-        });
-      }
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to load data from DynamoDB. Please try again.',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
     } finally {
       setLoading(false);
     }
@@ -514,40 +470,46 @@ export default function HomePage() {
 
   const handleAddAsset = async (values: any) => {
     try {
-      const newAsset: Asset = {
+      const assetData = {
         ...values,
-        id: Date.now().toString(),
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
         filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : '',
         filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : '',
-        created: new Date().toISOString(),
-        createdBy: 'Current User',
-        modified: new Date().toISOString(),
-        modifiedBy: 'Current User',
       };
 
-      console.log("Creating asset locally:", newAsset);
+      console.log("Creating asset in DynamoDB:", assetData);
 
-      // Note: Backend API only supports GET operations
-      // For now, we'll store locally and sync when backend supports CRUD
+      const response = await fetch('/api/assets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(assetData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create asset');
+      }
+
+      const result = await response.json();
       
-      // Update local state
-      setAssets(prev => [...prev, newAsset]);
-      
-      // Store in localStorage for persistence
-      const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
-      existingAssets.push(newAsset);
-      localStorage.setItem('localAssets', JSON.stringify(existingAssets));
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create asset');
+      }
+
+      // Update local state with the new asset from DynamoDB
+      setAssets(prev => [...prev, result.data]);
       
       // Create audit log entry for asset creation
-      createAuditLogEntry(newAsset, 'CREATE');
+      createAuditLogEntry(result.data, 'CREATE');
       
       form.reset();
       closeModal();
       
       notifications.show({
         title: 'Success',
-        message: 'Asset added successfully! (Stored locally - will sync when backend supports CRUD)',
+        message: 'Asset added successfully to DynamoDB!',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
@@ -564,42 +526,46 @@ export default function HomePage() {
 
   const handleEditAsset = async (values: any) => {
     try {
-      // Create a clean copy of just the user-modified fields for audit comparison
-      const userModifiedAsset = {
-        ...selectedAsset,
+      if (!selectedAsset?.id) {
+        throw new Error('No asset selected for update');
+      }
+
+      const updateData = {
         ...values,
         filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : (selectedAsset?.filterExpiryDate || ""),
         filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : (selectedAsset?.filterInstalledOn || ""),
       };
 
-      // Create the full updated asset with system fields
-      const updatedAsset = {
-        ...userModifiedAsset,
-        modified: new Date().toISOString(),
-        modifiedBy: "Current User",
-      };
+      console.log("Updating asset in DynamoDB:", selectedAsset.id, updateData);
 
-      console.log("Updating asset locally:", updatedAsset);
+      const response = await fetch(`/api/assets/${selectedAsset.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
 
-      // Note: Backend API only supports GET operations
-      // For now, we'll store locally and sync when backend supports CRUD
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update asset');
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update asset');
+      }
 
       // Create audit log entry using only user-modified fields for comparison
       if (selectedAsset) {
-        createAuditLogEntry(userModifiedAsset as Asset, "UPDATE", selectedAsset);
+        createAuditLogEntry(result.data as Asset, "UPDATE", selectedAsset);
       }
 
-      // Update local state
+      // Update local state with the updated asset from DynamoDB
       setAssets(prev => prev.map(asset => 
-        asset.id === selectedAsset?.id ? updatedAsset : asset
+        asset.id === selectedAsset?.id ? result.data : asset
       ));
-      
-      // Update localStorage
-      const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
-      const updatedLocalAssets = existingAssets.map((asset: Asset) => 
-        asset.id === selectedAsset?.id ? updatedAsset : asset
-      );
-      localStorage.setItem('localAssets', JSON.stringify(updatedLocalAssets));
       
       closeEditModal();
       setSelectedAsset(null);
@@ -607,7 +573,7 @@ export default function HomePage() {
       
       notifications.show({
         title: "Success",
-        message: "Asset updated successfully! (Stored locally - will sync when backend supports CRUD)",
+        message: "Asset updated successfully in DynamoDB!",
         color: "green",
         icon: <IconCheck size={16} />,
       });
@@ -634,10 +600,29 @@ export default function HomePage() {
       confirmProps: { color: 'red' },
       onConfirm: async () => {
         try {
-          console.log("Deleting asset locally:", asset);
+          if (!asset.id) {
+            throw new Error('Asset ID is required for deletion');
+          }
 
-          // Note: Backend API only supports GET operations
-          // For now, we'll store locally and sync when backend supports CRUD
+          console.log("Deleting asset from DynamoDB:", asset.id);
+
+          const response = await fetch(`/api/assets/${asset.id}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to delete asset');
+          }
+
+          const result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to delete asset');
+          }
 
           // Create audit log entry for asset deletion
           createAuditLogEntry(asset, 'DELETE');
@@ -645,14 +630,9 @@ export default function HomePage() {
           // Update local state
           setAssets(prev => prev.filter(a => a.id !== asset.id));
           
-          // Update localStorage
-          const existingAssets = JSON.parse(localStorage.getItem('localAssets') || '[]');
-          const updatedLocalAssets = existingAssets.filter((a: Asset) => a.id !== asset.id);
-          localStorage.setItem('localAssets', JSON.stringify(updatedLocalAssets));
-          
           notifications.show({
             title: 'Success',
-            message: 'Asset deleted successfully! (Stored locally - will sync when backend supports CRUD)',
+            message: 'Asset deleted successfully from DynamoDB!',
             color: 'green',
             icon: <IconCheck size={16} />,
           });
@@ -1519,16 +1499,16 @@ export default function HomePage() {
 
         <AppShell.Main>
           <Container size="xl">
-            {/* Backend API Notice */}
-            <Card shadow="sm" padding="md" radius="md" withBorder mb="md" style={{ backgroundColor: '#fff3cd', borderColor: '#ffeaa7' }}>
+            {/* DynamoDB Integration Notice */}
+            <Card shadow="sm" padding="md" radius="md" withBorder mb="md" style={{ backgroundColor: '#d4edda', borderColor: '#c3e6cb' }}>
               <Group>
-                <IconInfoCircle size={20} color="#856404" />
+                <IconInfoCircle size={20} color="#155724" />
                 <div>
-                  <Text size="sm" fw={500} c="#856404">
-                    Development Mode
+                  <Text size="sm" fw={500} c="#155724">
+                    DynamoDB Integration Active
                   </Text>
-                  <Text size="xs" c="#856404">
-                    Backend API currently supports read-only operations. Create, update, and delete operations are stored locally and will sync when backend CRUD support is added.
+                  <Text size="xs" c="#155724">
+                    All operations (CREATE, READ, UPDATE, DELETE) are now connected directly to AWS DynamoDB. Data is persisted in real-time.
                   </Text>
                 </div>
               </Group>
