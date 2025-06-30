@@ -1032,7 +1032,7 @@ export default function HomePage() {
                 <Divider />
                 
                 <Grid>
-                  <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Stack gap="xs">
                       <Text size="sm" fw={600} c="dimmed">BASIC INFORMATION</Text>
                       <Group justify="space-between">
@@ -1060,7 +1060,7 @@ export default function HomePage() {
                     </Stack>
                   </Grid.Col>
                   
-                  <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Stack gap="xs">
                       <Text size="sm" fw={600} c="dimmed">LOCATION DETAILS</Text>
                       <Group justify="space-between">
@@ -1094,7 +1094,7 @@ export default function HomePage() {
                     </Stack>
                   </Grid.Col>
                   
-                  <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Stack gap="xs">
                       <Text size="sm" fw={600} c="dimmed">FILTER INFORMATION</Text>
                       <Group justify="space-between">
@@ -1156,7 +1156,7 @@ export default function HomePage() {
                     </Stack>
                   </Grid.Col>
                   
-                  <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Stack gap="xs">
                       <Text size="sm" fw={600} c="dimmed">ADDITIONAL INFO</Text>
                       <Group justify="space-between">
@@ -1643,13 +1643,15 @@ export default function HomePage() {
         </Text>
         
         <Stack gap="md">
-          <Group>
+          <Group wrap="wrap">
             <Button
               leftSection={<IconDownload size={16} />}
               variant="outline"
               onClick={downloadTemplate}
+              size="sm"
             >
-              Download Template
+              <Text visibleFrom="sm">Download Template</Text>
+              <Text hiddenFrom="sm">Template</Text>
             </Button>
           </Group>
           
@@ -1662,14 +1664,16 @@ export default function HomePage() {
             leftSection={<IconUpload size={16} />}
           />
           
-          <Group>
+          <Group wrap="wrap" gap="xs">
             <Button
               leftSection={<IconUpload size={16} />}
               onClick={handleBulkUpload}
               loading={isUploading}
               disabled={!uploadFile}
+              size="sm"
             >
-              Upload Assets
+              <Text visibleFrom="sm">Upload Assets</Text>
+              <Text hiddenFrom="sm">Upload</Text>
             </Button>
             {uploadFile && (
               <Button
@@ -1678,6 +1682,7 @@ export default function HomePage() {
                   setUploadFile(null);
                   setUploadResults(null);
                 }}
+                size="sm"
               >
                 Clear
               </Button>
@@ -1955,14 +1960,14 @@ export default function HomePage() {
             <div>
               <Title order={5} mb="sm">Basic Information</Title>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Asset Barcode"
                     placeholder="Enter barcode"
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Primary Identifier"
                     placeholder="Enter identifier"
@@ -1970,14 +1975,14 @@ export default function HomePage() {
                     {...form.getInputProps('primaryIdentifier')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Secondary Identifier"
                     placeholder="Enter secondary identifier"
                     {...form.getInputProps('secondaryIdentifier')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Stack gap="xs">
                     <Select
                       label="Asset Type"
@@ -2011,7 +2016,7 @@ export default function HomePage() {
                     )}
                   </Stack>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Select
                     label="Status"
                     data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
@@ -2028,49 +2033,49 @@ export default function HomePage() {
             <div>
               <Title order={5} mb="sm">Location Information</Title>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing"
                     placeholder="Enter wing"
                     {...form.getInputProps('wing')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing (Short)"
                     placeholder="Enter wing abbreviation"
                     {...form.getInputProps('wingInShort')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room"
                     placeholder="Enter room"
                     {...form.getInputProps('room')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room Name"
                     placeholder="Enter room name"
                     {...form.getInputProps('roomName')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room Number"
                     placeholder="Enter room number"
                     {...form.getInputProps('roomNo')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Floor"
                     placeholder="Enter floor"
                     {...form.getInputProps('floor')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Floor (In Words)"
                     placeholder="Enter floor in words"
@@ -2109,7 +2114,7 @@ export default function HomePage() {
                 />
               </Group>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
@@ -2130,7 +2135,7 @@ export default function HomePage() {
                     }}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date (Auto-calculated)"
                     placeholder="Auto-calculated as Installed + 90 days"
@@ -2167,21 +2172,33 @@ export default function HomePage() {
       </Modal>
 
       {/* Edit Asset Modal */}
-      <Modal opened={editModalOpened} onClose={closeEditModal} title="Edit Asset" size="xl">
+      <Modal 
+        opened={editModalOpened} 
+        onClose={closeEditModal} 
+        title="Edit Asset" 
+        size="xl"
+        fullScreen
+        scrollAreaComponent={ScrollArea.Autosize}
+        style={{
+          '@media (min-width: 768px)': {
+            fullScreen: false
+          }
+        }}
+      >
         <form onSubmit={form.onSubmit(handleEditAsset)}>
           <Stack gap="lg">
             {/* Basic Information */}
             <div>
               <Title order={5} mb="sm">Basic Information</Title>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Asset Barcode"
                     placeholder="Enter barcode"
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Primary Identifier"
                     placeholder="Enter identifier"
@@ -2189,14 +2206,14 @@ export default function HomePage() {
                     {...form.getInputProps('primaryIdentifier')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Secondary Identifier"
                     placeholder="Enter secondary identifier"
                     {...form.getInputProps('secondaryIdentifier')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Stack gap="xs">
                     <Select
                       label="Asset Type"
@@ -2230,7 +2247,7 @@ export default function HomePage() {
                     )}
                   </Stack>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Select
                     label="Status"
                     data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
@@ -2247,49 +2264,49 @@ export default function HomePage() {
             <div>
               <Title order={5} mb="sm">Location Information</Title>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing"
                     placeholder="Enter wing"
                     {...form.getInputProps('wing')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing (Short)"
                     placeholder="Enter wing abbreviation"
                     {...form.getInputProps('wingInShort')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room"
                     placeholder="Enter room"
                     {...form.getInputProps('room')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room Name"
                     placeholder="Enter room name"
                     {...form.getInputProps('roomName')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Room Number"
                     placeholder="Enter room number"
                     {...form.getInputProps('roomNo')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Floor"
                     placeholder="Enter floor"
                     {...form.getInputProps('floor')}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Floor (In Words)"
                     placeholder="Enter floor in words"
@@ -2328,7 +2345,7 @@ export default function HomePage() {
                 />
               </Group>
               <Grid>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
@@ -2349,7 +2366,7 @@ export default function HomePage() {
                     }}
                   />
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date (Auto-calculated)"
                     placeholder="Auto-calculated as Installed + 90 days"
@@ -2391,6 +2408,13 @@ export default function HomePage() {
         onClose={closeAuditModal} 
         title="Asset Audit Log" 
         size="xl"
+        fullScreen
+        scrollAreaComponent={ScrollArea.Autosize}
+        style={{
+          '@media (min-width: 768px)': {
+            fullScreen: false
+          }
+        }}
       >
         <Stack gap="md">
           {selectedAssetAudit && (
