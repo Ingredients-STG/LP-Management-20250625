@@ -79,6 +79,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconInfoCircle,
+  IconPaperclip,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -101,6 +102,12 @@ interface Asset {
   filterInstalledOn: string;
   notes: string;
   augmentedCare: boolean | string;
+  attachments?: Array<{
+    fileName: string;
+    fileType: string;
+    s3Url: string;
+    uploadedAt: string;
+  }>;
   created: string;
   createdBy: string;
   modified: string;
@@ -159,12 +166,15 @@ export default function HomePage() {
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
+  const [showViewModal, { open: openViewModal, close: closeViewModal }] = useDisclosure(false);
   const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
   const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
   const [newAssetType, setNewAssetType] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [assetFiles, setAssetFiles] = useState<File[]>([]);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -380,6 +390,129 @@ export default function HomePage() {
           icon: <IconX size={16} />,
         });
       }
+    }
+  };
+
+  // Handle deleting asset type
+  const handleDeleteAssetType = (typeLabel: string) => {
+    modals.openConfirmModal({
+      title: 'Delete Asset Type',
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete asset type <strong>{typeLabel}</strong>? 
+          This action cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          const response = await fetch('/api/asset-types', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ label: typeLabel }),
+          });
+
+          if (response.ok) {
+            await fetchAssetTypes(); // Refresh the list
+            notifications.show({
+              title: 'Success',
+              message: `Asset type "${typeLabel}" deleted successfully!`,
+              color: 'green',
+              icon: <IconCheck size={16} />,
+            });
+          } else {
+            throw new Error('Failed to delete asset type');
+          }
+        } catch (error) {
+          console.error('Error deleting asset type:', error);
+          notifications.show({
+            title: 'Error',
+            message: 'Failed to delete asset type',
+            color: 'red',
+            icon: <IconX size={16} />,
+          });
+        }
+      },
+    });
+  };
+
+  // Handle file upload for assets
+  const handleFileUpload = async (file: File, assetId: string) => {
+    try {
+      setIsUploadingFile(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('assetId', assetId);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        notifications.show({
+          title: 'Success',
+          message: `File "${file.name}" uploaded successfully!`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+        return result.data;
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+      return null;
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  // Handle file deletion
+  const handleFileDelete = async (s3Url: string, fileName: string) => {
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ s3Url }),
+      });
+
+      if (response.ok) {
+        notifications.show({
+          title: 'Success',
+          message: `File "${fileName}" deleted successfully!`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+        return true;
+      } else {
+        throw new Error('Failed to delete file');
+      }
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+      return false;
     }
   };
 
@@ -1517,7 +1650,18 @@ export default function HomePage() {
               <Stack gap="md">
                 {paginatedAssets.length > 0 ? (
                   paginatedAssets.map((asset) => (
-                    <Card key={asset.assetBarcode} shadow="sm" padding="md" radius="md" withBorder>
+                    <Card 
+                      key={asset.assetBarcode} 
+                      shadow="sm" 
+                      padding="md" 
+                      radius="md" 
+                      withBorder
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        openViewModal();
+                      }}
+                    >
                       <Stack gap="sm">
                         <Group justify="space-between" align="flex-start">
                           <div>
@@ -1563,7 +1707,8 @@ export default function HomePage() {
                               variant="light"
                               color="blue"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedAssetAudit(asset.assetBarcode);
                                 openAuditModal();
                               }}
@@ -1574,7 +1719,8 @@ export default function HomePage() {
                               variant="light"
                               color="yellow"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSelectedAsset(asset);
                                 form.setValues({
                                   assetBarcode: asset.assetBarcode,
@@ -1605,7 +1751,10 @@ export default function HomePage() {
                               variant="light"
                               color="red"
                               size="sm"
-                              onClick={() => handleDeleteAsset(asset)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAsset(asset);
+                              }}
                             >
                               <IconTrash size={14} />
                             </ActionIcon>
@@ -1776,9 +1925,20 @@ export default function HomePage() {
             <Text size="sm" fw={500} mb="xs">Current Asset Types:</Text>
             <Group gap="xs">
               {assetTypes.map((type, index) => (
-                <Badge key={index} variant="light" color="blue">
-                  {type}
-                </Badge>
+                <Group key={index} gap={4}>
+                  <Badge variant="light" color="blue">
+                    {type}
+                  </Badge>
+                  <ActionIcon
+                    size="sm"
+                    color="red"
+                    variant="subtle"
+                    onClick={() => handleDeleteAssetType(type)}
+                    title={`Delete ${type}`}
+                  >
+                    <IconTrash size={12} />
+                  </ActionIcon>
+                </Group>
               ))}
             </Group>
           </div>
@@ -2505,6 +2665,141 @@ export default function HomePage() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      {/* View Asset Modal */}
+      <Modal 
+        opened={showViewModal} 
+        onClose={closeViewModal} 
+        title="Asset Details" 
+        size="lg"
+        scrollAreaComponent={ScrollArea.Autosize}
+      >
+        {selectedAsset && (
+          <Stack gap="md">
+            <Grid>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Asset Barcode</Text>
+                <Text fw={500}>{selectedAsset.assetBarcode}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Status</Text>
+                <Badge color={getStatusColor(selectedAsset.status)} variant="light">
+                  {selectedAsset.status}
+                </Badge>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Primary Identifier</Text>
+                <Text fw={500}>{selectedAsset.primaryIdentifier}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Asset Type</Text>
+                <Text>{selectedAsset.assetType}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Wing</Text>
+                <Text>{selectedAsset.wing}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Room</Text>
+                <Text>{selectedAsset.room}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Floor</Text>
+                <Text>{selectedAsset.floor}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Filter Needed</Text>
+                <Text c={
+                  (typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') 
+                    ? 'orange' : 'green'
+                }>
+                  {(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'Yes' : 'No'}
+                </Text>
+              </Grid.Col>
+            </Grid>
+            
+            {selectedAsset.notes && (
+              <div>
+                <Text size="sm" c="dimmed" mb="xs">Notes</Text>
+                <Text>{selectedAsset.notes}</Text>
+              </div>
+            )}
+
+            {selectedAsset.attachments && selectedAsset.attachments.length > 0 && (
+              <div>
+                <Text size="sm" fw={500} mb="xs">Attachments</Text>
+                <Stack gap="xs">
+                  {selectedAsset.attachments.map((attachment, index) => (
+                    <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
+                      <Group gap="xs">
+                        <IconPaperclip size={16} />
+                        <Text size="sm">{attachment.fileName}</Text>
+                      </Group>
+                      <Group gap="xs">
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="blue"
+                          onClick={() => window.open(attachment.s3Url, '_blank')}
+                        >
+                          <IconEye size={12} />
+                        </ActionIcon>
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="green"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = attachment.s3Url;
+                            link.download = attachment.fileName;
+                            link.click();
+                          }}
+                        >
+                          <IconDownload size={12} />
+                        </ActionIcon>
+                      </Group>
+                    </Group>
+                  ))}
+                </Stack>
+              </div>
+            )}
+
+            <Group justify="flex-end" mt="lg">
+              <Button variant="outline" onClick={closeViewModal}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  closeViewModal();
+                  form.setValues({
+                    assetBarcode: selectedAsset.assetBarcode,
+                    primaryIdentifier: selectedAsset.primaryIdentifier,
+                    secondaryIdentifier: selectedAsset.secondaryIdentifier,
+                    assetType: selectedAsset.assetType,
+                    status: selectedAsset.status,
+                    wing: selectedAsset.wing,
+                    wingInShort: selectedAsset.wingInShort,
+                    room: selectedAsset.room,
+                    floor: selectedAsset.floor,
+                    floorInWords: selectedAsset.floorInWords,
+                    roomNo: selectedAsset.roomNo,
+                    roomName: selectedAsset.roomName,
+                    filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true',
+                    filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
+                    filterExpiryDate: selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate) : null,
+                    filterInstalledOn: selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn) : null,
+                    notes: selectedAsset.notes,
+                    augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
+                  });
+                  openEditModal();
+                }}
+              >
+                Edit Asset
+              </Button>
+            </Group>
+          </Stack>
+        )}
       </Modal>
 
       {/* Audit Log Modal */}

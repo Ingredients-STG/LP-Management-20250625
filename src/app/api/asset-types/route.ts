@@ -85,17 +85,27 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete asset type
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const typeId = searchParams.get('typeId');
+    const { label } = await request.json();
     
-    if (!typeId) {
+    if (!label) {
       return NextResponse.json(
-        { success: false, error: 'Type ID is required' },
+        { success: false, error: 'Label is required' },
         { status: 400 }
       );
     }
 
-    await DynamoDBService.deleteAssetType(typeId);
+    // Find the asset type by label to get its typeId
+    const assetTypes = await DynamoDBService.getAllAssetTypes();
+    const assetType = assetTypes.find(type => type.label === label);
+    
+    if (!assetType) {
+      return NextResponse.json(
+        { success: false, error: 'Asset type not found' },
+        { status: 404 }
+      );
+    }
+
+    await DynamoDBService.deleteAssetType(assetType.typeId);
     
     return NextResponse.json({
       success: true,
