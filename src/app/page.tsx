@@ -1341,36 +1341,43 @@ export default function HomePage() {
     <Stack gap="lg">
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
-        <Group justify="space-between" mb="md">
-          <Title order={3}>Asset Management</Title>
-          <Group>
-            <Button
-              leftSection={<IconRefresh size={16} />}
-              variant="light"
-              onClick={fetchData}
-              loading={loading}
-            >
-              Refresh
-            </Button>
-            <Button
-              leftSection={<IconDownload size={16} />}
-              variant="outline"
-              onClick={exportData}
-            >
-              Export
-            </Button>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              gradient={{ from: 'blue', to: 'cyan' }}
-              variant="gradient"
-              onClick={openModal}
-            >
-              Add Asset
-            </Button>
+        <Stack gap="md">
+          <Group justify="space-between" wrap="wrap">
+            <Title order={3}>Asset Management</Title>
+            <Group gap="xs" wrap="wrap">
+              <Button
+                leftSection={<IconRefresh size={16} />}
+                variant="light"
+                onClick={fetchData}
+                loading={loading}
+                size="sm"
+              >
+                <Text visibleFrom="sm">Refresh</Text>
+                <Text hiddenFrom="sm">Refresh</Text>
+              </Button>
+              <Button
+                leftSection={<IconDownload size={16} />}
+                variant="outline"
+                onClick={exportData}
+                size="sm"
+              >
+                <Text visibleFrom="sm">Export</Text>
+                <Text hiddenFrom="sm">Export</Text>
+              </Button>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                gradient={{ from: 'blue', to: 'cyan' }}
+                variant="gradient"
+                onClick={openModal}
+                size="sm"
+              >
+                <Text visibleFrom="sm">Add Asset</Text>
+                <Text hiddenFrom="sm">Add</Text>
+              </Button>
+                        </Group>
           </Group>
-        </Group>
-
-        <Grid>
+          
+          <Grid>
           <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <TextInput
               placeholder="Search assets..."
@@ -1407,6 +1414,7 @@ export default function HomePage() {
             />
           </Grid.Col>
         </Grid>
+        </Stack>
       </Card>
 
       {/* Assets Table */}
@@ -1429,35 +1437,153 @@ export default function HomePage() {
             <Text>Loading assets...</Text>
           </Group>
         ) : (
-          <ScrollArea>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>View</Table.Th>
-                  <Table.Th>Asset</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Location</Table.Th>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Filter Status</Table.Th>
-                  <Table.Th>Last Updated</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.length > 0 ? rows : (
-                  <Table.Tr>
-                    <Table.Td colSpan={7}>
-                      <Group justify="center" py="xl">
-                        <Stack align="center" gap="xs">
-                          <IconDroplet size={48} color="gray" />
-                          <Text c="dimmed">No assets found matching your criteria.</Text>
-                        </Stack>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
+          <>
+            {/* Desktop Table View */}
+            <Box visibleFrom="md">
+              <ScrollArea>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>View</Table.Th>
+                      <Table.Th>Asset</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Location</Table.Th>
+                      <Table.Th>Type</Table.Th>
+                      <Table.Th>Filter Status</Table.Th>
+                      <Table.Th>Last Updated</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {rows.length > 0 ? rows : (
+                      <Table.Tr>
+                        <Table.Td colSpan={7}>
+                          <Group justify="center" py="xl">
+                            <Stack align="center" gap="xs">
+                              <IconDroplet size={48} color="gray" />
+                              <Text c="dimmed">No assets found matching your criteria.</Text>
+                            </Stack>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
+            </Box>
+
+            {/* Mobile Card View */}
+            <Box hiddenFrom="md">
+              <Stack gap="md">
+                {paginatedAssets.length > 0 ? (
+                  paginatedAssets.map((asset) => (
+                    <Card key={asset.assetBarcode} shadow="sm" padding="md" radius="md" withBorder>
+                      <Stack gap="sm">
+                        <Group justify="space-between" align="flex-start">
+                          <div>
+                            <Text fw={600} size="sm">{asset.assetBarcode}</Text>
+                            <Text size="xs" c="dimmed">{asset.room}</Text>
+                          </div>
+                          <Badge color={getStatusColor(asset.status)} variant="light" size="sm">
+                            {asset.status}
+                          </Badge>
+                        </Group>
+                        
+                        <Group justify="space-between">
+                          <div>
+                            <Text size="xs" c="dimmed">Type</Text>
+                            <Text size="sm">{asset.assetType}</Text>
+                          </div>
+                          <div>
+                            <Text size="xs" c="dimmed">Filter Status</Text>
+                            {(() => {
+                              if (typeof asset.filterNeeded === 'boolean') {
+                                return asset.filterNeeded ? (
+                                  <Text size="sm" c="orange">Needed</Text>
+                                ) : (
+                                  <Text size="sm" c="green">Good</Text>
+                                );
+                              }
+                              const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
+                              return filterNeededStr === 'yes' || filterNeededStr === 'true' ? (
+                                <Text size="sm" c="orange">Needed</Text>
+                              ) : (
+                                <Text size="sm" c="green">Good</Text>
+                              );
+                            })()}
+                          </div>
+                        </Group>
+                        
+                        <Group justify="space-between" align="center">
+                          <Text size="xs" c="dimmed">
+                            Updated: {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
+                          </Text>
+                          <Group gap="xs">
+                            <ActionIcon
+                              variant="light"
+                              color="blue"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAssetAudit(asset.assetBarcode);
+                                openAuditModal();
+                              }}
+                            >
+                              <IconHistory size={14} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="yellow"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAsset(asset);
+                                form.setValues({
+                                  assetBarcode: asset.assetBarcode,
+                                  primaryIdentifier: asset.primaryIdentifier,
+                                  secondaryIdentifier: asset.secondaryIdentifier,
+                                  assetType: asset.assetType,
+                                  status: asset.status,
+                                  wing: asset.wing,
+                                  wingInShort: asset.wingInShort,
+                                  room: asset.room,
+                                  floor: asset.floor,
+                                  floorInWords: asset.floorInWords,
+                                  roomNo: asset.roomNo,
+                                  roomName: asset.roomName,
+                                  filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
+                                  filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
+                                  filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
+                                  filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                  notes: asset.notes,
+                                  augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
+                                });
+                                openEditModal();
+                              }}
+                            >
+                              <IconEdit size={14} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="light"
+                              color="red"
+                              size="sm"
+                              onClick={() => handleDeleteAsset(asset)}
+                            >
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Group>
+                        </Group>
+                      </Stack>
+                    </Card>
+                  ))
+                ) : (
+                  <Group justify="center" py="xl">
+                    <Stack align="center" gap="xs">
+                      <IconDroplet size={48} color="gray" />
+                      <Text c="dimmed">No assets found matching your criteria.</Text>
+                    </Stack>
+                  </Group>
                 )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
+              </Stack>
+            </Box>
+          </>
         )}
 
         {totalPages > 1 && (
@@ -1618,8 +1744,15 @@ export default function HomePage() {
         padding="md"
       >
         <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between">
-            <Group>
+          <Group h="100%" px="md" justify="space-between" style={{ 
+            paddingLeft: 'var(--mantine-spacing-xs)', 
+            paddingRight: 'var(--mantine-spacing-xs)',
+            '@media (min-width: 768px)': {
+              paddingLeft: 'var(--mantine-spacing-md)',
+              paddingRight: 'var(--mantine-spacing-md)'
+            }
+          }}>
+            <Group gap="xs">
               <ActionIcon
                 onClick={toggle}
                 hiddenFrom="sm"
@@ -1628,31 +1761,29 @@ export default function HomePage() {
               >
                 <IconHome size={18} />
               </ActionIcon>
-              <Group gap="sm">
+              <Group gap="xs">
                 <ThemeIcon color="blue" size={40} radius="md">
                   <IconDroplet size={24} />
                 </ThemeIcon>
                 <div>
-                  <Title order={3} c="blue">St Georges Water Safety Team</Title>
-                  <Text size="xs" c="dimmed">Water Asset Management</Text>
-        </div>
+                  <Title order={3} c="blue" style={{ fontSize: '1.1rem', lineHeight: 1.2 }}>
+                    <Text component="span" visibleFrom="sm">St Georges Water Safety Team</Text>
+                    <Text component="span" hiddenFrom="sm">SGWST</Text>
+                  </Title>
+                  <Text size="xs" c="dimmed">
+                    <Text component="span" visibleFrom="sm">Water Asset Management</Text>
+                    <Text component="span" hiddenFrom="sm">Asset Mgmt</Text>
+                  </Text>
+                </div>
               </Group>
             </Group>
 
-            <Group>
-              <Tooltip label={hideTabContainer ? "Show Navigation" : "Hide Navigation"}>
-                <ActionIcon
-                  variant="subtle"
-                  size="lg"
-                  onClick={() => setHideTabContainer(!hideTabContainer)}
-                >
-                  {hideTabContainer ? <IconChevronRight size={18} /> : <IconChevronDown size={18} />}
-                </ActionIcon>
-              </Tooltip>
+            <Group gap="xs">
               <ActionIcon
                 variant="subtle"
                 size="lg"
                 onClick={() => spotlight.open()}
+                visibleFrom="sm"
               >
                 <IconSearch size={18} />
               </ActionIcon>
@@ -1665,7 +1796,7 @@ export default function HomePage() {
                 <Menu.Target>
                   <ActionIcon variant="subtle" size="lg">
                     <Avatar size={32} color="blue">
-                      <IconUser size={18} />
+                      <IconUser size={16} />
                     </Avatar>
                   </ActionIcon>
                 </Menu.Target>
@@ -1682,6 +1813,16 @@ export default function HomePage() {
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
+              <Tooltip label={hideTabContainer ? "Show Navigation" : "Hide Navigation"}>
+                <ActionIcon
+                  variant="subtle"
+                  size="lg"
+                  onClick={() => setHideTabContainer(!hideTabContainer)}
+                  hiddenFrom="sm"
+                >
+                  {hideTabContainer ? <IconChevronRight size={16} /> : <IconChevronDown size={16} />}
+                </ActionIcon>
+              </Tooltip>
             </Group>
           </Group>
         </AppShell.Header>
@@ -1742,40 +1883,47 @@ export default function HomePage() {
 
             {hideTabContainer && (
               <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">
-                <Group>
-                  <Button
-                    variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                    leftSection={<IconDashboard size={16} />}
-                    onClick={() => setActiveTab('dashboard')}
-                    size="sm"
-                  >
-                    Dashboard
-                  </Button>
-                  <Button
-                    variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                    leftSection={<IconDroplet size={16} />}
-                    onClick={() => setActiveTab('assets')}
-                    size="sm"
-                  >
-                    Assets
-                  </Button>
-                  <Button
-                    variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                    leftSection={<IconReport size={16} />}
-                    onClick={() => setActiveTab('reports')}
-                    size="sm"
-                  >
-                    Reports
-                  </Button>
-                  <Button
-                    variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                    leftSection={<IconSettings size={16} />}
-                    onClick={() => setActiveTab('settings')}
-                    size="sm"
-                  >
-                    Settings
-                  </Button>
-                </Group>
+                <ScrollArea>
+                  <Group wrap="nowrap" gap="xs">
+                    <Button
+                      variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+                      leftSection={<IconDashboard size={16} />}
+                      onClick={() => setActiveTab('dashboard')}
+                      size="sm"
+                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
+                    >
+                      <Text visibleFrom="sm">Dashboard</Text>
+                      <Text hiddenFrom="sm">Dash</Text>
+                    </Button>
+                    <Button
+                      variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+                      leftSection={<IconDroplet size={16} />}
+                      onClick={() => setActiveTab('assets')}
+                      size="sm"
+                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
+                    >
+                      Assets
+                    </Button>
+                    <Button
+                      variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+                      leftSection={<IconReport size={16} />}
+                      onClick={() => setActiveTab('reports')}
+                      size="sm"
+                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
+                    >
+                      Reports
+                    </Button>
+                    <Button
+                      variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+                      leftSection={<IconSettings size={16} />}
+                      onClick={() => setActiveTab('settings')}
+                      size="sm"
+                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
+                    >
+                      Settings
+                    </Button>
+                  </Group>
+                </ScrollArea>
               </Card>
             )}
             
@@ -1788,7 +1936,19 @@ export default function HomePage() {
       </AppShell>
 
       {/* Add Asset Modal */}
-      <Modal opened={modalOpened} onClose={closeModal} title="Add New Asset" size="xl">
+      <Modal 
+        opened={modalOpened} 
+        onClose={closeModal} 
+        title="Add New Asset" 
+        size="xl"
+        fullScreen
+        scrollAreaComponent={ScrollArea.Autosize}
+        style={{
+          '@media (min-width: 768px)': {
+            fullScreen: false
+          }
+        }}
+      >
         <form onSubmit={form.onSubmit(handleAddAsset)}>
           <Stack gap="lg">
             {/* Basic Information */}
