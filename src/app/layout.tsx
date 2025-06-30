@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "St Georges Water Team - Water Asset Management",
+  title: "St Georges Water Safety Team - Water Asset Management",
   description: "Professional water asset management system with real-time monitoring, maintenance tracking, and comprehensive reporting",
   keywords: ["water asset management", "asset tracking", "facility management", "maintenance", "filters"],
 };

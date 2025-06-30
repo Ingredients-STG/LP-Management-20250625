@@ -158,6 +158,9 @@ export default function HomePage() {
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
+  const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
+  const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
+  const [newAssetType, setNewAssetType] = useState('');
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -320,6 +323,35 @@ export default function HomePage() {
     }
   };
 
+  // Handle adding new asset type
+  const handleAddNewAssetType = () => {
+    if (newAssetType.trim() && !assetTypes.includes(newAssetType.trim())) {
+      const updatedTypes = [...assetTypes, newAssetType.trim()];
+      setAssetTypes(updatedTypes);
+      form.setFieldValue('assetType', newAssetType.trim());
+      setNewAssetType('');
+      setShowNewAssetTypeInput(false);
+      
+      notifications.show({
+        title: 'Success',
+        message: `Asset type "${newAssetType.trim()}" added successfully!`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    }
+  };
+
+  // Handle asset type selection
+  const handleAssetTypeSelect = (value: string | null) => {
+    if (value === 'ADD_NEW') {
+      setShowNewAssetTypeInput(true);
+      setNewAssetType('');
+    } else if (value) {
+      form.setFieldValue('assetType', value);
+      setShowNewAssetTypeInput(false);
+    }
+  };
+
   const getFieldDisplayName = (field: string): string => {
     const fieldNames: { [key: string]: string } = {
       assetBarcode: 'Asset Barcode',
@@ -458,7 +490,7 @@ export default function HomePage() {
 
       notifications.show({
         title: 'Success',
-        message: 'Data loaded successfully from DynamoDB!',
+        message: 'Asset data loaded successfully!',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
@@ -777,7 +809,7 @@ export default function HomePage() {
               {asset.assetBarcode}
             </Text>
             <Text fz="xs" c="dimmed">
-              {asset.wing} - {asset.roomName}
+              {asset.room}
             </Text>
           </div>
         </Table.Td>
@@ -1422,7 +1454,7 @@ export default function HomePage() {
                   <IconDroplet size={24} />
                 </ThemeIcon>
                 <div>
-                  <Title order={3} c="blue">St Georges Water Team</Title>
+                  <Title order={3} c="blue">St Georges Water Safety Team</Title>
                   <Text size="xs" c="dimmed">Water Asset Management</Text>
         </div>
               </Group>
@@ -1607,13 +1639,38 @@ export default function HomePage() {
                   />
                 </Grid.Col>
                 <Grid.Col span={6}>
-                  <Select
-                    label="Asset Type"
-                    placeholder="Select type"
-                    data={['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']}
-                    required
-                    {...form.getInputProps('assetType')}
-                  />
+                  <Stack gap="xs">
+                    <Select
+                      label="Asset Type"
+                      placeholder="Select type"
+                      data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      required
+                      value={form.values.assetType}
+                      onChange={handleAssetTypeSelect}
+                    />
+                    {showNewAssetTypeInput && (
+                      <Group gap="xs">
+                        <TextInput
+                          placeholder="Enter new asset type"
+                          value={newAssetType}
+                          onChange={(e) => setNewAssetType(e.currentTarget.value)}
+                          style={{ flex: 1 }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewAssetType();
+                            }
+                          }}
+                        />
+                        <Button size="xs" onClick={handleAddNewAssetType}>
+                          Add
+                        </Button>
+                        <Button size="xs" variant="outline" onClick={() => setShowNewAssetTypeInput(false)}>
+                          Cancel
+                        </Button>
+                      </Group>
+                    )}
+                  </Stack>
                 </Grid.Col>
                 <Grid.Col span={6}>
                   <Select
@@ -1777,13 +1834,38 @@ export default function HomePage() {
                   />
                 </Grid.Col>
                 <Grid.Col span={6}>
-                  <Select
-                    label="Asset Type"
-                    placeholder="Select type"
-                    data={['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']}
-                    required
-                    {...form.getInputProps('assetType')}
-                  />
+                  <Stack gap="xs">
+                    <Select
+                      label="Asset Type"
+                      placeholder="Select type"
+                      data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      required
+                      value={form.values.assetType}
+                      onChange={handleAssetTypeSelect}
+                    />
+                    {showNewAssetTypeInput && (
+                      <Group gap="xs">
+                        <TextInput
+                          placeholder="Enter new asset type"
+                          value={newAssetType}
+                          onChange={(e) => setNewAssetType(e.currentTarget.value)}
+                          style={{ flex: 1 }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewAssetType();
+                            }
+                          }}
+                        />
+                        <Button size="xs" onClick={handleAddNewAssetType}>
+                          Add
+                        </Button>
+                        <Button size="xs" variant="outline" onClick={() => setShowNewAssetTypeInput(false)}>
+                          Cancel
+                        </Button>
+                      </Group>
+                    )}
+                  </Stack>
                 </Grid.Col>
                 <Grid.Col span={6}>
                   <Select
@@ -1891,7 +1973,7 @@ export default function HomePage() {
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
                       form.setFieldValue('filterInstalledOn', value);
-                      if (value) {
+                      if (value instanceof Date) {
                         // Auto-check Filters On
                         form.setFieldValue('filtersOn', true);
                         // Auto-calculate expiry date (90 days from installation)
