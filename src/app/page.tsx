@@ -394,10 +394,8 @@ export default function HomePage() {
 
   // Transform asset types for Select component
   const getAssetTypeSelectData = () => {
-    return [
-      ...assetTypes.map(type => ({ value: type.label, label: type.label })),
-      { value: 'ADD_NEW', label: '+ Add New...' }
-    ];
+    const transformedTypes = assetTypes.map(type => ({ value: type.label, label: type.label }));
+    return [...transformedTypes, { value: 'ADD_NEW', label: '+ Add New...' }];
   };
 
   // Handle asset type selection
