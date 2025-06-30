@@ -522,8 +522,10 @@ export default function HomePage() {
 
   // Barcode scanner functions
   const startBarcodeScanner = () => {
-    setShowBarcodeScanner(true);
-    setIsScannerActive(true);
+    if (!showBarcodeScanner) { // Prevent multiple modals
+      setShowBarcodeScanner(true);
+      setIsScannerActive(true);
+    }
   };
 
   const stopBarcodeScanner = () => {
@@ -540,6 +542,14 @@ export default function HomePage() {
       color: 'green',
       icon: <IconCheck size={16} />,
     });
+  };
+
+  const handleScannerError = (error: string) => {
+    // Only show error notification once, don't repeat
+    if (!showBarcodeScanner) return;
+    
+    console.error('Barcode scanner error:', error);
+    // Don't show notification for camera errors - the component handles it
   };
 
   // Handle asset type selection
@@ -591,7 +601,7 @@ export default function HomePage() {
       } else {
         notifications.show({
           title: 'Upload Failed',
-          message: result.error || 'Failed to upload file',
+          message: 'Upload failed. Please check the file and try again.',
           color: 'red',
           icon: <IconX size={16} />,
         });
@@ -2844,96 +2854,205 @@ export default function HomePage() {
         onClose={closeViewModal} 
         title="Asset Details" 
         size="lg"
+        fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
+        style={{
+          '@media (min-width: 768px)': {
+            fullScreen: false
+          }
+        }}
       >
         {selectedAsset && (
-          <Stack gap="md">
-            <Grid>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Asset Barcode</Text>
-                <Text fw={500}>{selectedAsset.assetBarcode}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Status</Text>
-                <Badge color={getStatusColor(selectedAsset.status)} variant="light">
-                  {selectedAsset.status}
-                </Badge>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Primary Identifier</Text>
-                <Text fw={500}>{selectedAsset.primaryIdentifier}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Asset Type</Text>
-                <Text>{selectedAsset.assetType}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Wing</Text>
-                <Text>{selectedAsset.wing}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Room</Text>
-                <Text>{selectedAsset.room}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Floor</Text>
-                <Text>{selectedAsset.floor}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Filter Needed</Text>
-                <Text c={
-                  (typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') 
-                    ? 'orange' : 'green'
-                }>
-                  {(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'Yes' : 'No'}
-                </Text>
-              </Grid.Col>
-            </Grid>
-            
+          <Stack gap="lg">
+            {/* Basic Information */}
+            <div>
+              <Text fw={600} mb="sm" c="blue">Basic Information</Text>
+              <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Asset Barcode</Text>
+                  <Text fw={500} size="sm">{selectedAsset.assetBarcode || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Status</Text>
+                  <Badge color={getStatusColor(selectedAsset.status)} variant="light" size="sm">
+                    {selectedAsset.status}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Primary Identifier</Text>
+                  <Text fw={500} size="sm">{selectedAsset.primaryIdentifier}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Secondary Identifier</Text>
+                  <Text size="sm">{selectedAsset.secondaryIdentifier || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Asset Type</Text>
+                  <Text size="sm">{selectedAsset.assetType}</Text>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            <Divider />
+
+            {/* Location Information */}
+            <div>
+              <Text fw={600} mb="sm" c="blue">Location Information</Text>
+              <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Wing</Text>
+                  <Text size="sm">{selectedAsset.wing || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Wing (Short)</Text>
+                  <Text size="sm">{selectedAsset.wingInShort || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Room</Text>
+                  <Text size="sm">{selectedAsset.room || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Room Name</Text>
+                  <Text size="sm">{selectedAsset.roomName || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Room Number</Text>
+                  <Text size="sm">{selectedAsset.roomNo || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Floor</Text>
+                  <Text size="sm">{selectedAsset.floor || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Floor (In Words)</Text>
+                  <Text size="sm">{selectedAsset.floorInWords || 'N/A'}</Text>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            <Divider />
+
+            {/* Filter Information */}
+            <div>
+              <Text fw={600} mb="sm" c="blue">Filter Information</Text>
+              <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Filter Needed</Text>
+                  <Badge 
+                    color={(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'orange' : 'green'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Filters On</Text>
+                  <Badge 
+                    color={(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true') ? 'green' : 'red'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Filter Installed On</Text>
+                  <Text size="sm">{selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Filter Expiry Date</Text>
+                  <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Augmented Care</Text>
+                  <Badge 
+                    color={(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+              </Grid>
+            </div>
+
             {selectedAsset.notes && (
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">Notes</Text>
-                <Text>{selectedAsset.notes}</Text>
-              </div>
+              <>
+                <Divider />
+                <div>
+                  <Text fw={600} mb="sm" c="blue">Notes</Text>
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAsset.notes}</Text>
+                </div>
+              </>
             )}
 
+            {/* Metadata */}
+            <Divider />
+            <div>
+              <Text fw={600} mb="sm" c="blue">Metadata</Text>
+              <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Created</Text>
+                  <Text size="sm">{selectedAsset.created ? new Date(selectedAsset.created).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Created By</Text>
+                  <Text size="sm">{selectedAsset.createdBy || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Modified</Text>
+                  <Text size="sm">{selectedAsset.modified ? new Date(selectedAsset.modified).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Modified By</Text>
+                  <Text size="sm">{selectedAsset.modifiedBy || 'N/A'}</Text>
+                </Grid.Col>
+              </Grid>
+                         </div>
+
             {selectedAsset.attachments && selectedAsset.attachments.length > 0 && (
-              <div>
-                <Text size="sm" fw={500} mb="xs">Attachments</Text>
-                <Stack gap="xs">
-                  {selectedAsset.attachments.map((attachment, index) => (
-                    <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
-                      <Group gap="xs">
-                        <IconPaperclip size={16} />
-                        <Text size="sm">{attachment.fileName}</Text>
+              <>
+                <Divider />
+                <div>
+                  <Text fw={600} mb="sm" c="blue">Attachments</Text>
+                  <Stack gap="xs">
+                    {selectedAsset.attachments.map((attachment, index) => (
+                      <Group key={index} justify="space-between" p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
+                        <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                          <IconPaperclip size={16} />
+                          <Text size="sm" truncate style={{ flex: 1 }}>{attachment.fileName}</Text>
+                        </Group>
+                        <Group gap="xs" style={{ flexShrink: 0 }}>
+                          <ActionIcon
+                            size="sm"
+                            variant="light"
+                            color="blue"
+                            onClick={() => window.open(attachment.s3Url, '_blank')}
+                            title="View file"
+                          >
+                            <IconEye size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="light"
+                            color="green"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = attachment.s3Url;
+                              link.download = attachment.fileName;
+                              link.click();
+                            }}
+                            title="Download file"
+                          >
+                            <IconDownload size={12} />
+                          </ActionIcon>
+                        </Group>
                       </Group>
-                      <Group gap="xs">
-                        <ActionIcon
-                          size="sm"
-                          variant="light"
-                          color="blue"
-                          onClick={() => window.open(attachment.s3Url, '_blank')}
-                        >
-                          <IconEye size={12} />
-                        </ActionIcon>
-                        <ActionIcon
-                          size="sm"
-                          variant="light"
-                          color="green"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = attachment.s3Url;
-                            link.download = attachment.fileName;
-                            link.click();
-                          }}
-                        >
-                          <IconDownload size={12} />
-                        </ActionIcon>
-                      </Group>
-                    </Group>
-                  ))}
-                </Stack>
-              </div>
+                    ))}
+                  </Stack>
+                </div>
+              </>
             )}
 
             <Group justify="flex-end" mt="lg">
@@ -3085,37 +3204,21 @@ export default function HomePage() {
         opened={showBarcodeScanner}
         onClose={stopBarcodeScanner}
         title="Scan Barcode"
-        size="sm"
+        size="md"
         centered
       >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed" ta="center">
-            Position the barcode within the camera view
-          </Text>
-          
-          <div style={{ width: '100%', height: '300px', backgroundColor: '#f0f0f0', borderRadius: '8px' }}>
-            {isScannerActive && (
-              <BarcodeScanner
-                onScan={handleBarcodeScan}
-                onError={(error: any) => {
-                  console.error('Barcode scanner error:', error);
-                  notifications.show({
-                    title: 'Scanner Error',
-                    message: 'Unable to access camera. Please check permissions.',
-                    color: 'red',
-                    icon: <IconX size={16} />,
-                  });
-                }}
-              />
-            )}
-          </div>
-          
-          <Group justify="center">
-            <Button variant="outline" onClick={stopBarcodeScanner}>
-              Cancel
-            </Button>
-          </Group>
-        </Stack>
+        {isScannerActive && (
+          <BarcodeScanner
+            onScan={handleBarcodeScan}
+            onError={handleScannerError}
+          />
+        )}
+        
+        <Group justify="center" mt="md">
+          <Button variant="outline" onClick={stopBarcodeScanner}>
+            Cancel
+          </Button>
+        </Group>
       </Modal>
 
       {/* Spotlight Search */}

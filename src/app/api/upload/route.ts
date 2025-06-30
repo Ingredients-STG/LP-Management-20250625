@@ -13,11 +13,36 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = `asset-files-${process.env.NODE_ENV || 'dev'}`;
 
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
+    console.log('Upload request received');
+    
+    // Check environment variables
+    if (!process.env.AMPLIFY_ACCESS_KEY_ID || !process.env.AMPLIFY_SECRET_ACCESS_KEY) {
+      console.error('Missing AWS credentials');
+      return NextResponse.json(
+        { success: false, error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const assetId = formData.get('assetId') as string;
+    
+    console.log('File:', file?.name, 'Asset ID:', assetId);
     
     if (!file) {
       return NextResponse.json(
@@ -59,6 +84,8 @@ export async function POST(request: NextRequest) {
     const buffer = await file.arrayBuffer();
 
     // Upload to S3
+    console.log('Uploading to S3:', BUCKET_NAME, uniqueFileName);
+    
     const uploadCommand = new PutObjectCommand({
       Bucket: BUCKET_NAME,
       Key: uniqueFileName,
@@ -71,12 +98,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await s3Client.send(uploadCommand);
+    const uploadResult = await s3Client.send(uploadCommand);
+    console.log('S3 upload successful:', uploadResult);
 
     // Generate S3 URL
     const s3Url = `https://${BUCKET_NAME}.s3.${process.env.AMPLIFY_AWS_REGION || 'eu-west-2'}.amazonaws.com/${uniqueFileName}`;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
         fileName: file.name,
@@ -85,6 +113,13 @@ export async function POST(request: NextRequest) {
         uploadedAt: new Date().toISOString(),
       }
     });
+
+    // Add CORS headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    return response;
 
   } catch (error) {
     console.error('Error uploading file:', error);
