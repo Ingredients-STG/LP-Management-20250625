@@ -25,6 +25,7 @@ const client = new DynamoDBClient({
 const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = 'water-tap-assets';
+const AUDIT_TABLE_NAME = 'AssetAuditLogs';
 
 export interface Asset {
   id: string;
@@ -50,6 +51,14 @@ export interface Asset {
   createdBy: string;
   modified: string;
   modifiedBy: string;
+}
+
+export interface AuditLogEntry {
+  assetId: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  details?: any;
 }
 
 export class DynamoDBService {
@@ -243,6 +252,103 @@ export class DynamoDBService {
       console.log(`Table ${TABLE_NAME} created successfully`);
     } catch (error) {
       console.error('Error creating table:', error);
+      throw error;
+    }
+  }
+
+  // Create audit table if it doesn't exist
+  static async createAuditTableIfNotExists(): Promise<void> {
+    try {
+      // Check if table exists
+      const describeCommand = new DescribeTableCommand({
+        TableName: AUDIT_TABLE_NAME,
+      });
+      
+      await client.send(describeCommand);
+      console.log(`Audit table ${AUDIT_TABLE_NAME} already exists`);
+    } catch (error: any) {
+      if (error.name === 'ResourceNotFoundException') {
+        console.log(`Creating audit table ${AUDIT_TABLE_NAME}...`);
+        
+        const createCommand = new CreateTableCommand({
+          TableName: AUDIT_TABLE_NAME,
+          KeySchema: [
+            {
+              AttributeName: 'assetId',
+              KeyType: 'HASH', // Partition key
+            },
+            {
+              AttributeName: 'timestamp',
+              KeyType: 'RANGE', // Sort key
+            },
+          ],
+          AttributeDefinitions: [
+            {
+              AttributeName: 'assetId',
+              AttributeType: 'S',
+            },
+            {
+              AttributeName: 'timestamp',
+              AttributeType: 'S',
+            },
+          ],
+          BillingMode: 'PAY_PER_REQUEST',
+        });
+
+        await client.send(createCommand);
+        
+        // Wait for table to be created
+        await waitUntilTableExists(
+          { client, maxWaitTime: 60 },
+          { TableName: AUDIT_TABLE_NAME }
+        );
+        
+        console.log(`Audit table ${AUDIT_TABLE_NAME} created successfully`);
+      } else {
+        console.error('Error checking/creating audit table:', error);
+        throw error;
+      }
+    }
+  }
+
+  // Create audit log entry
+  static async logAssetAuditEntry(auditEntry: AuditLogEntry): Promise<void> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      const command = new PutCommand({
+        TableName: AUDIT_TABLE_NAME,
+        Item: auditEntry,
+      });
+
+      await dynamodb.send(command);
+      console.log('Audit entry logged successfully');
+    } catch (error) {
+      console.error('Error logging audit entry:', error);
+      throw error;
+    }
+  }
+
+  // Get audit entries for an asset
+  static async getAssetAuditEntries(assetId: string): Promise<AuditLogEntry[]> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      const command = new ScanCommand({
+        TableName: AUDIT_TABLE_NAME,
+        FilterExpression: 'assetId = :assetId',
+        ExpressionAttributeValues: {
+          ':assetId': assetId,
+        },
+      });
+
+      const result = await dynamodb.send(command);
+      const entries = (result.Items as AuditLogEntry[]) || [];
+      
+      // Sort by timestamp descending (newest first)
+      return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (error) {
+      console.error('Error getting audit entries:', error);
       throw error;
     }
   }

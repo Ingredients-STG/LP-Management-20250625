@@ -117,20 +117,19 @@ interface DashboardStats {
 }
 
 interface AuditLogEntry {
-  id: string;
   assetId: string;
-  assetBarcode: string;
-  assetName: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE';
-  changes: {
-    field: string;
-    oldValue: any;
-    newValue: any;
-  }[];
-  user: string;
   timestamp: string;
-  date: string;
-  time: string;
+  user: string;
+  action: string;
+  details: {
+    assetBarcode: string;
+    assetName: string;
+    changes: {
+      field: string;
+      oldValue: any;
+      newValue: any;
+    }[];
+  };
 }
 
 export default function HomePage() {
@@ -156,7 +155,7 @@ export default function HomePage() {
   const [wingFilter, setWingFilter] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [hideTabContainer, setHideTabContainer] = useLocalStorage({ key: 'hideTabContainer', defaultValue: false });
-  const [auditLog, setAuditLog] = useLocalStorage<AuditLogEntry[]>({ key: 'assetAuditLog', defaultValue: [] });
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
 
@@ -172,7 +171,7 @@ export default function HomePage() {
   };
 
   // Audit log helper functions
-  const createAuditLogEntry = (
+  const createAuditLogEntry = async (
     asset: Asset,
     action: 'CREATE' | 'UPDATE' | 'DELETE',
     oldAsset?: Asset
@@ -279,21 +278,46 @@ export default function HomePage() {
       });
     }
 
-    const auditEntry: AuditLogEntry = {
-      id: Date.now().toString(),
-      assetId: asset.id || '',
-      assetBarcode: asset.assetBarcode,
-      assetName: asset.primaryIdentifier,
-      action,
-      changes,
-      user: 'Current User', // In a real app, this would come from authentication
-      timestamp: now.toISOString(),
-      date: now.toLocaleDateString('en-GB'), // dd/mm/yyyy format
-      time: now.toLocaleTimeString('en-GB', { hour12: false }), // 24-hour format
-    };
+    // Send audit entry to API
+    try {
+      const response = await fetch('/api/log-audit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assetId: asset.id || '',
+          user: 'Current User', // In a real app, this would come from authentication
+          action,
+          details: {
+            assetBarcode: asset.assetBarcode,
+            assetName: asset.primaryIdentifier,
+            changes,
+          },
+        }),
+      });
 
-    setAuditLog(prev => [auditEntry, ...prev]);
-    return auditEntry;
+      if (!response.ok) {
+        console.error('Failed to log audit entry');
+      }
+    } catch (error) {
+      console.error('Error creating audit log entry:', error);
+    }
+  };
+
+  // Fetch audit logs for a specific asset
+  const fetchAuditLogs = async (assetId: string) => {
+    try {
+      const response = await fetch(`/api/audit-entries?assetId=${assetId}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setAuditLog(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+    }
   };
 
   const getFieldDisplayName = (field: string): string => {
@@ -392,6 +416,16 @@ export default function HomePage() {
   useEffect(() => {
     filterAssets();
   }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
+
+  // Fetch audit logs when audit modal opens
+  useEffect(() => {
+    if (showAuditModal && selectedAssetAudit) {
+      const asset = assets.find(a => a.assetBarcode === selectedAssetAudit);
+      if (asset?.id) {
+        fetchAuditLogs(asset.id);
+      }
+    }
+  }, [showAuditModal, selectedAssetAudit, assets]);
 
   const fetchData = async () => {
     try {
@@ -502,7 +536,7 @@ export default function HomePage() {
       setAssets(prev => [...prev, result.data]);
       
       // Create audit log entry for asset creation
-      createAuditLogEntry(result.data, 'CREATE');
+      await createAuditLogEntry(result.data, 'CREATE');
       
       form.reset();
       closeModal();
@@ -559,7 +593,7 @@ export default function HomePage() {
 
       // Create audit log entry using only user-modified fields for comparison
       if (selectedAsset) {
-        createAuditLogEntry(result.data as Asset, "UPDATE", selectedAsset);
+        await createAuditLogEntry(result.data as Asset, "UPDATE", selectedAsset);
       }
 
       // Update local state with the updated asset from DynamoDB
@@ -625,7 +659,7 @@ export default function HomePage() {
           }
 
           // Create audit log entry for asset deletion
-          createAuditLogEntry(asset, 'DELETE');
+          await createAuditLogEntry(asset, 'DELETE');
           
           // Update local state
           setAssets(prev => prev.filter(a => a.id !== asset.id));
@@ -1888,7 +1922,12 @@ export default function HomePage() {
       </Modal>
 
       {/* Audit Log Modal */}
-      <Modal opened={showAuditModal} onClose={closeAuditModal} title="Asset Audit Log" size="xl">
+      <Modal 
+        opened={showAuditModal} 
+        onClose={closeAuditModal} 
+        title="Asset Audit Log" 
+        size="xl"
+      >
         <Stack gap="md">
           {selectedAssetAudit && (
             <>
@@ -1896,124 +1935,78 @@ export default function HomePage() {
                 <Group>
                   <Text fw={500}>Asset: {selectedAssetAudit}</Text>
                   <Badge color="blue" variant="light">
-                    {auditLog.filter(entry => entry.assetBarcode === selectedAssetAudit).length} entries
+                    {auditLog.length} entries
                   </Badge>
-                </Group>
-                <Group gap="xs">
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    color="red"
-                    onClick={() => {
-                      setAuditLog(prev => prev.filter(entry => entry.assetBarcode !== selectedAssetAudit));
-                      notifications.show({
-                        title: 'Cleared',
-                        message: 'Audit log cleared for this asset',
-                        color: 'blue',
-                      });
-                    }}
-                  >
-                    Clear Asset Log
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    color="red"
-                    onClick={() => {
-                      modals.openConfirmModal({
-                        title: 'Clear All Audit Logs',
-                        children: (
-                          <Text size="sm">
-                            Are you sure you want to clear all audit logs? This action cannot be undone.
-                          </Text>
-                        ),
-                        labels: { confirm: 'Clear All', cancel: 'Cancel' },
-                        confirmProps: { color: 'red' },
-                        onConfirm: () => {
-                          setAuditLog([]);
-                          notifications.show({
-                            title: 'Cleared',
-                            message: 'All audit logs have been cleared',
-                            color: 'blue',
-                          });
-                        },
-                      });
-                    }}
-                  >
-                    Clear All Logs
-                  </Button>
                 </Group>
               </Group>
               
               <ScrollArea h={500}>
                 <Stack gap="sm">
-                  {auditLog
-                    .filter(entry => entry.assetBarcode === selectedAssetAudit)
-                    .map((entry) => (
-                      <Card key={entry.id} shadow="sm" padding="md" radius="md" withBorder>
-                        <Stack gap="xs">
-                          <Group justify="space-between">
-                            <Group gap="xs">
-                              <Badge 
-                                color={
-                                  entry.action === 'CREATE' ? 'green' : 
-                                  entry.action === 'UPDATE' ? 'blue' : 'red'
-                                }
-                                variant="light"
-                              >
-                                {entry.action}
-                              </Badge>
-                              <Text size="sm" fw={500}>
-                                {entry.action === 'CREATE' ? 'Asset Created' :
-                                 entry.action === 'UPDATE' ? 'Asset Updated' : 'Asset Deleted'}
-                              </Text>
-                            </Group>
-                            <Group gap="xs">
-                              <Text size="xs" c="dimmed">
-                                {entry.date} at {entry.time}
-                              </Text>
-                              <Text size="xs" c="dimmed">
-                                by {entry.user}
-                              </Text>
-                            </Group>
+                  {auditLog.map((entry, index) => (
+                    <Card key={`${entry.assetId}-${entry.timestamp}-${index}`} shadow="sm" padding="md" radius="md" withBorder>
+                      <Stack gap="xs">
+                        <Group justify="space-between">
+                          <Group gap="xs">
+                            <Badge 
+                              color={
+                                entry.action === 'CREATE' ? 'green' : 
+                                entry.action === 'UPDATE' ? 'blue' : 'red'
+                              }
+                              variant="light"
+                            >
+                              {entry.action}
+                            </Badge>
+                            <Text size="sm" fw={500}>
+                              {entry.action === 'CREATE' ? 'Asset Created' :
+                               entry.action === 'UPDATE' ? 'Asset Updated' : 'Asset Deleted'}
+                            </Text>
                           </Group>
-                          
-                          {entry.changes.length > 0 && (
-                            <div>
-                              <Text size="sm" fw={500} mb="xs">Changes:</Text>
-                              <Stack gap="xs">
-                                {entry.changes.map((change, index) => (
-                                  <Paper key={index} p="xs" bg="gray.0" radius="sm">
-                                    <Grid>
-                                      <Grid.Col span={3}>
-                                        <Text size="xs" fw={500}>
-                                          {getFieldDisplayName(change.field)}
-                                        </Text>
-                                      </Grid.Col>
-                                      <Grid.Col span={4}>
-                                        <Text size="xs" c="red">
-                                          {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
-                                        </Text>
-                                      </Grid.Col>
-                                      <Grid.Col span={1}>
-                                        <Text size="xs" ta="center">→</Text>
-                                      </Grid.Col>
-                                      <Grid.Col span={4}>
-                                        <Text size="xs" c="green">
-                                          {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
-                                        </Text>
-                                      </Grid.Col>
-                                    </Grid>
-                                  </Paper>
-                                ))}
-                              </Stack>
-                            </div>
-                          )}
-                        </Stack>
-                      </Card>
-                    ))}
+                          <Group gap="xs">
+                            <Text size="xs" c="dimmed">
+                              {new Date(entry.timestamp).toLocaleDateString('en-GB')} at {new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false })}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              by {entry.user}
+                            </Text>
+                          </Group>
+                        </Group>
+                        
+                        {entry.details?.changes && entry.details.changes.length > 0 && (
+                          <div>
+                            <Text size="sm" fw={500} mb="xs">Changes:</Text>
+                            <Stack gap="xs">
+                              {entry.details.changes.map((change: any, changeIndex: number) => (
+                                <Paper key={changeIndex} p="xs" bg="gray.0" radius="sm">
+                                  <Grid>
+                                    <Grid.Col span={3}>
+                                      <Text size="xs" fw={500}>
+                                        {getFieldDisplayName(change.field)}
+                                      </Text>
+                                    </Grid.Col>
+                                    <Grid.Col span={4}>
+                                      <Text size="xs" c="red">
+                                        {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
+                                      </Text>
+                                    </Grid.Col>
+                                    <Grid.Col span={1}>
+                                      <Text size="xs" ta="center">→</Text>
+                                    </Grid.Col>
+                                    <Grid.Col span={4}>
+                                      <Text size="xs" c="green">
+                                        {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
+                                      </Text>
+                                    </Grid.Col>
+                                  </Grid>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          </div>
+                        )}
+                      </Stack>
+                    </Card>
+                  ))}
                   
-                  {auditLog.filter(entry => entry.assetBarcode === selectedAssetAudit).length === 0 && (
+                  {auditLog.length === 0 && (
                     <Group justify="center" py="xl">
                       <Stack align="center" gap="xs">
                         <IconHistory size={48} color="gray" />
