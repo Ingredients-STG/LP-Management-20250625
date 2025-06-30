@@ -42,6 +42,7 @@ import { notifications } from '@mantine/notifications';
 import { modals } from '@mantine/modals';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
+import BarcodeScanner from '@/components/BarcodeScanner';
 import {
   IconDroplet,
   IconFilter,
@@ -80,6 +81,7 @@ import {
   IconChevronRight,
   IconInfoCircle,
   IconPaperclip,
+  IconScan,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -175,6 +177,8 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [isScannerActive, setIsScannerActive] = useState(false);
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -514,6 +518,28 @@ export default function HomePage() {
       });
       return false;
     }
+  };
+
+  // Barcode scanner functions
+  const startBarcodeScanner = () => {
+    setShowBarcodeScanner(true);
+    setIsScannerActive(true);
+  };
+
+  const stopBarcodeScanner = () => {
+    setShowBarcodeScanner(false);
+    setIsScannerActive(false);
+  };
+
+  const handleBarcodeScan = (result: string) => {
+    setSearchTerm(result);
+    stopBarcodeScanner();
+    notifications.show({
+      title: 'Barcode Scanned',
+      message: `Found barcode: ${result}`,
+      color: 'green',
+      icon: <IconCheck size={16} />,
+    });
   };
 
   // Handle asset type selection
@@ -870,6 +896,7 @@ export default function HomePage() {
         ...values,
         filterExpiryDate: values.filterExpiryDate ? new Date(values.filterExpiryDate).toISOString() : (selectedAsset?.filterExpiryDate || ""),
         filterInstalledOn: values.filterInstalledOn ? new Date(values.filterInstalledOn).toISOString() : (selectedAsset?.filterInstalledOn || ""),
+        attachments: selectedAsset?.attachments || [], // Include current attachments
       };
 
 
@@ -1553,12 +1580,25 @@ export default function HomePage() {
           
           <Grid>
           <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-            <TextInput
-              placeholder="Search assets..."
-              leftSection={<IconSearch size={16} />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <Group gap="xs">
+              <TextInput
+                placeholder="Search assets..."
+                leftSection={<IconSearch size={16} />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <ActionIcon
+                variant="light"
+                color="blue"
+                size="lg"
+                onClick={startBarcodeScanner}
+                hiddenFrom="md"
+                title="Scan barcode"
+              >
+                <IconScan size={18} />
+              </ActionIcon>
+            </Group>
           </Grid.Col>
           <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <Select
@@ -2655,6 +2695,137 @@ export default function HomePage() {
               />
             </div>
 
+            <Divider />
+
+            {/* Attachments */}
+            <div>
+              <Title order={5} mb="sm">Attachments</Title>
+              
+              {/* Show existing attachments */}
+              {selectedAsset?.attachments && selectedAsset.attachments.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <Text size="sm" c="dimmed" mb="xs">Current Files:</Text>
+                  <Stack gap="xs">
+                    {selectedAsset.attachments.map((attachment, index) => (
+                      <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
+                        <Group gap="xs">
+                          <IconPaperclip size={16} />
+                          <Text size="sm">{attachment.fileName}</Text>
+                        </Group>
+                        <Group gap="xs">
+                          <ActionIcon
+                            size="sm"
+                            variant="light"
+                            color="blue"
+                            onClick={() => window.open(attachment.s3Url, '_blank')}
+                            title="View file"
+                          >
+                            <IconEye size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="light"
+                            color="green"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = attachment.s3Url;
+                              link.download = attachment.fileName;
+                              link.click();
+                            }}
+                            title="Download file"
+                          >
+                            <IconDownload size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="light"
+                            color="red"
+                            onClick={async () => {
+                              modals.openConfirmModal({
+                                title: 'Delete File',
+                                children: (
+                                  <Text size="sm">
+                                    Are you sure you want to delete <strong>{attachment.fileName}</strong>?
+                                    This action cannot be undone.
+                                  </Text>
+                                ),
+                                labels: { confirm: 'Delete', cancel: 'Cancel' },
+                                confirmProps: { color: 'red' },
+                                onConfirm: async () => {
+                                  const success = await handleFileDelete(attachment.s3Url, attachment.fileName);
+                                  if (success && selectedAsset) {
+                                    // Update the selected asset to remove the deleted attachment
+                                    const updatedAttachments = selectedAsset.attachments?.filter((_, i) => i !== index) || [];
+                                    setSelectedAsset({
+                                      ...selectedAsset,
+                                      attachments: updatedAttachments
+                                    });
+                                  }
+                                },
+                              });
+                            }}
+                            title="Delete file"
+                          >
+                            <IconTrash size={12} />
+                          </ActionIcon>
+                        </Group>
+                      </Group>
+                    ))}
+                  </Stack>
+                </div>
+              )}
+
+              {/* File upload input */}
+              <FileInput
+                label="Add New Files"
+                placeholder="Select files to upload (PDF, DOCX, JPG, PNG, etc.)"
+                multiple
+                accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.gif,.txt"
+                value={assetFiles}
+                onChange={setAssetFiles}
+                leftSection={<IconUpload size={16} />}
+              />
+
+              {assetFiles.length > 0 && (
+                <Group mt="sm" gap="xs">
+                  <Button
+                    size="sm"
+                    variant="light"
+                    loading={isUploadingFile}
+                    onClick={async () => {
+                      if (!selectedAsset?.id) return;
+                      
+                      const uploadPromises = assetFiles.map(file => handleFileUpload(file, selectedAsset.id!));
+                      const results = await Promise.all(uploadPromises);
+                      const successfulUploads = results.filter(result => result !== null);
+                      
+                      if (successfulUploads.length > 0) {
+                        // Update the selected asset with new attachments
+                        const updatedAttachments = [
+                          ...(selectedAsset.attachments || []),
+                          ...successfulUploads
+                        ];
+                        setSelectedAsset({
+                          ...selectedAsset,
+                          attachments: updatedAttachments
+                        });
+                        setAssetFiles([]); // Clear the file input
+                      }
+                    }}
+                  >
+                    Upload Files ({assetFiles.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAssetFiles([])}
+                  >
+                    Clear
+                  </Button>
+                </Group>
+              )}
+            </div>
+
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeEditModal}>
                 Cancel
@@ -2906,6 +3077,44 @@ export default function HomePage() {
               </ScrollArea>
             </>
           )}
+        </Stack>
+      </Modal>
+
+      {/* Barcode Scanner Modal */}
+      <Modal
+        opened={showBarcodeScanner}
+        onClose={stopBarcodeScanner}
+        title="Scan Barcode"
+        size="sm"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed" ta="center">
+            Position the barcode within the camera view
+          </Text>
+          
+          <div style={{ width: '100%', height: '300px', backgroundColor: '#f0f0f0', borderRadius: '8px' }}>
+            {isScannerActive && (
+              <BarcodeScanner
+                onScan={handleBarcodeScan}
+                onError={(error: any) => {
+                  console.error('Barcode scanner error:', error);
+                  notifications.show({
+                    title: 'Scanner Error',
+                    message: 'Unable to access camera. Please check permissions.',
+                    color: 'red',
+                    icon: <IconX size={16} />,
+                  });
+                }}
+              />
+            )}
+          </div>
+          
+          <Group justify="center">
+            <Button variant="outline" onClick={stopBarcodeScanner}>
+              Cancel
+            </Button>
+          </Group>
         </Stack>
       </Modal>
 
