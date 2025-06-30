@@ -32,6 +32,7 @@ import {
   Collapse,
   Divider,
   Box,
+  FileInput,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { BarChart, PieChart } from '@mantine/charts';
@@ -161,6 +162,9 @@ export default function HomePage() {
   const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
   const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
   const [newAssetType, setNewAssetType] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadResults, setUploadResults] = useState<any>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -349,6 +353,98 @@ export default function HomePage() {
     } else if (value) {
       form.setFieldValue('assetType', value);
       setShowNewAssetTypeInput(false);
+    }
+  };
+
+  // Handle bulk upload
+  const handleBulkUpload = async () => {
+    if (!uploadFile) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select a file to upload',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+
+      const response = await fetch('/api/bulk-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUploadResults(result.results);
+        notifications.show({
+          title: 'Upload Complete',
+          message: `Successfully uploaded ${result.results.success} assets`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+        
+        // Refresh data
+        await fetchData();
+      } else {
+        notifications.show({
+          title: 'Upload Failed',
+          message: result.error || 'Failed to upload file',
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      notifications.show({
+        title: 'Upload Error',
+        message: 'An error occurred during upload',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Download template
+  const downloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/bulk-upload', {
+        method: 'GET',
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'asset_template.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        notifications.show({
+          title: 'Template Downloaded',
+          message: 'Asset template has been downloaded successfully',
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      notifications.show({
+        title: 'Download Error',
+        message: 'Failed to download template',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
     }
   };
 
@@ -1415,6 +1511,89 @@ export default function HomePage() {
       <Text c="dimmed">Configure your water asset management system.</Text>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">Bulk Upload Assets</Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Upload multiple assets at once using a CSV or Excel file. Download the template to get started.
+        </Text>
+        
+        <Stack gap="md">
+          <Group>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              onClick={downloadTemplate}
+            >
+              Download Template
+            </Button>
+          </Group>
+          
+          <FileInput
+            label="Select CSV/Excel file"
+            placeholder="Choose file to upload"
+            value={uploadFile}
+            onChange={setUploadFile}
+            accept=".csv,.xlsx,.xls"
+            leftSection={<IconUpload size={16} />}
+          />
+          
+          <Group>
+            <Button
+              leftSection={<IconUpload size={16} />}
+              onClick={handleBulkUpload}
+              loading={isUploading}
+              disabled={!uploadFile}
+            >
+              Upload Assets
+            </Button>
+            {uploadFile && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadFile(null);
+                  setUploadResults(null);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+          </Group>
+          
+          {uploadResults && (
+            <Card withBorder p="md" bg="gray.0">
+              <Title order={5} mb="sm">Upload Results</Title>
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text size="sm">Total Records:</Text>
+                  <Badge color="blue">{uploadResults.total}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Successfully Uploaded:</Text>
+                  <Badge color="green">{uploadResults.success}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Failed:</Text>
+                  <Badge color="red">{uploadResults.failed}</Badge>
+                </Group>
+                
+                {uploadResults.errors && uploadResults.errors.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs">Errors:</Text>
+                    <Stack gap="xs">
+                      {uploadResults.errors.map((error: string, index: number) => (
+                        <Text key={index} size="xs" c="red" bg="red.0" p="xs" style={{ borderRadius: 4 }}>
+                          {error}
+                        </Text>
+                      ))}
+                    </Stack>
+                  </div>
+                )}
+              </Stack>
+            </Card>
+          )}
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">System Configuration</Title>
         <Stack gap="md">
           <Checkbox label="Enable automatic notifications" defaultChecked />
@@ -1746,26 +1925,19 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <DateInput
-                    label="Filter Expiry Date"
-                    placeholder="Select expiry date"
-                    {...form.getInputProps('filterExpiryDate')}
-                  />
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <DateInput
-                    label="Filter Installed On"
-                    placeholder="Select installation date"
-                    {...form.getInputProps('filterInstalledOn')}
-                  />
-                </Grid.Col>
-              </Grid>
-              <Group mt="md">
+              <Group mt="md" mb="md">
                 <Checkbox
                   label="Filter Needed"
                   {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                  onChange={(event) => {
+                    form.setFieldValue('filterNeeded', event.currentTarget.checked);
+                    if (!event.currentTarget.checked) {
+                      // Clear filter fields when Filter Needed is unchecked
+                      form.setFieldValue('filterInstalledOn', null);
+                      form.setFieldValue('filterExpiryDate', null);
+                      form.setFieldValue('filtersOn', false);
+                    }
+                  }}
                 />
                 <Checkbox
                   label="Filters On"
@@ -1776,6 +1948,37 @@ export default function HomePage() {
                   {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                 />
               </Group>
+              <Grid>
+                <Grid.Col span={6}>
+                  <DateInput
+                    label="Filter Installed On"
+                    placeholder="Select installation date"
+                    disabled={!Boolean(form.values.filterNeeded)}
+                    {...form.getInputProps('filterInstalledOn')}
+                    onChange={(value) => {
+                      form.setFieldValue('filterInstalledOn', value);
+                      if (value) {
+                        // Auto-check Filters On
+                        form.setFieldValue('filtersOn', true);
+                        // Auto-calculate expiry date (90 days from installation)
+                        const expiryDate = new Date(value);
+                        expiryDate.setDate(expiryDate.getDate() + 90);
+                        form.setFieldValue('filterExpiryDate', expiryDate);
+                      } else {
+                        form.setFieldValue('filterExpiryDate', null);
+                      }
+                    }}
+                  />
+                </Grid.Col>
+                <Grid.Col span={6}>
+                  <DateInput
+                    label="Filter Expiry Date (Auto-calculated)"
+                    placeholder="Auto-calculated as Installed + 90 days"
+                    disabled={true}
+                    {...form.getInputProps('filterExpiryDate')}
+                  />
+                </Grid.Col>
+              </Grid>
             </div>
 
             <Divider />
@@ -1973,7 +2176,7 @@ export default function HomePage() {
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
                       form.setFieldValue('filterInstalledOn', value);
-                      if (value instanceof Date) {
+                      if (value) {
                         // Auto-check Filters On
                         form.setFieldValue('filtersOn', true);
                         // Auto-calculate expiry date (90 days from installation)
