@@ -23,9 +23,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AquaTrack Pro - Water Tap Management",
-  description: "Professional water tap asset management system with real-time monitoring, maintenance tracking, and comprehensive reporting",
-  keywords: ["water tap management", "asset tracking", "facility management", "maintenance", "filters"],
+  title: "St Georges Water Team - Water Asset Management",
+  description: "Professional water asset management system with real-time monitoring, maintenance tracking, and comprehensive reporting",
+  keywords: ["water asset management", "asset tracking", "facility management", "maintenance", "filters"],
 };
 
 export default function RootLayout({

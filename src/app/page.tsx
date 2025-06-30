@@ -772,19 +772,14 @@ export default function HomePage() {
           </Tooltip>
         </Table.Td>
         <Table.Td>
-          <Group gap="sm">
-            <ThemeIcon color="blue" size={30} radius="md">
-              <IconDroplet size={16} />
-            </ThemeIcon>
-            <div>
-              <Text fz="sm" fw={500}>
-                {asset.primaryIdentifier}
-              </Text>
-              <Text fz="xs" c="dimmed">
-                {asset.assetBarcode}
-              </Text>
-            </div>
-          </Group>
+          <div>
+            <Text fz="sm" fw={500}>
+              {asset.assetBarcode}
+            </Text>
+            <Text fz="xs" c="dimmed">
+              {asset.wing} - {asset.roomName}
+            </Text>
+          </div>
         </Table.Td>
         <Table.Td>
           <Badge color={getStatusColor(asset.status)} variant="light">
@@ -1385,7 +1380,7 @@ export default function HomePage() {
   const renderSettings = () => (
     <Stack gap="lg">
       <Title order={2}>Settings</Title>
-      <Text c="dimmed">Configure your water tap management system.</Text>
+      <Text c="dimmed">Configure your water asset management system.</Text>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">System Configuration</Title>
@@ -1427,8 +1422,8 @@ export default function HomePage() {
                   <IconDroplet size={24} />
                 </ThemeIcon>
                 <div>
-                  <Title order={3} c="blue">AquaTrack Pro</Title>
-                  <Text size="xs" c="dimmed">Water Tap Management</Text>
+                  <Title order={3} c="blue">St Georges Water Team</Title>
+                  <Text size="xs" c="dimmed">Water Asset Management</Text>
         </div>
               </Group>
             </Group>
