@@ -26,6 +26,7 @@ const dynamodb = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = 'water-tap-assets';
 const AUDIT_TABLE_NAME = 'AssetAuditLogs';
+const ASSET_TYPES_TABLE_NAME = 'AssetTypes';
 
 export interface Asset {
   id: string;
@@ -59,6 +60,13 @@ export interface AuditLogEntry {
   user: string;
   action: string;
   details?: any;
+}
+
+export interface AssetType {
+  typeId: string;
+  label: string;
+  createdBy?: string;
+  createdAt: string;
 }
 
 export class DynamoDBService {
@@ -349,6 +357,174 @@ export class DynamoDBService {
       return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     } catch (error) {
       console.error('Error getting audit entries:', error);
+      throw error;
+    }
+  }
+
+  // Asset Types Management
+  
+  // Create asset types table if it doesn't exist
+  static async createAssetTypesTableIfNotExists(): Promise<void> {
+    try {
+      // Check if table exists
+      const describeCommand = new DescribeTableCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
+      });
+      
+      await client.send(describeCommand);
+      console.log(`Asset types table ${ASSET_TYPES_TABLE_NAME} already exists`);
+    } catch (error: any) {
+      if (error.name === 'ResourceNotFoundException') {
+        console.log(`Creating asset types table ${ASSET_TYPES_TABLE_NAME}...`);
+        
+        const createCommand = new CreateTableCommand({
+          TableName: ASSET_TYPES_TABLE_NAME,
+          KeySchema: [
+            {
+              AttributeName: 'typeId',
+              KeyType: 'HASH', // Partition key
+            },
+          ],
+          AttributeDefinitions: [
+            {
+              AttributeName: 'typeId',
+              AttributeType: 'S',
+            },
+          ],
+          BillingMode: 'PAY_PER_REQUEST',
+        });
+
+        await client.send(createCommand);
+        
+        // Wait for table to be created
+        await waitUntilTableExists(
+          { client, maxWaitTime: 60 },
+          { TableName: ASSET_TYPES_TABLE_NAME }
+        );
+        
+        console.log(`Asset types table ${ASSET_TYPES_TABLE_NAME} created successfully`);
+        
+        // Add default asset types
+        await this.seedDefaultAssetTypes();
+      } else {
+        console.error('Error checking/creating asset types table:', error);
+        throw error;
+      }
+    }
+  }
+
+  // Seed default asset types
+  static async seedDefaultAssetTypes(): Promise<void> {
+    const defaultTypes = [
+      'Water Tap',
+      'Water Cooler', 
+      'LNS Outlet - TMT',
+      'LNS Shower - TMT'
+    ];
+
+    for (const label of defaultTypes) {
+      await this.createAssetType(label, 'system');
+    }
+  }
+
+  // Get all asset types
+  static async getAllAssetTypes(): Promise<AssetType[]> {
+    try {
+      await this.createAssetTypesTableIfNotExists();
+      
+      const command = new ScanCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
+      });
+      
+      const result = await dynamodb.send(command);
+      const assetTypes = (result.Items as AssetType[]) || [];
+      
+      // Sort by label alphabetically
+      return assetTypes.sort((a, b) => a.label.localeCompare(b.label));
+    } catch (error) {
+      console.error('Error getting asset types:', error);
+      throw error;
+    }
+  }
+
+  // Create new asset type
+  static async createAssetType(label: string, createdBy: string = 'user'): Promise<AssetType> {
+    try {
+      await this.createAssetTypesTableIfNotExists();
+      
+      // Check if asset type already exists
+      const existingTypes = await this.getAllAssetTypes();
+      const existing = existingTypes.find(type => type.label.toLowerCase() === label.toLowerCase());
+      
+      if (existing) {
+        throw new Error('Asset type already exists');
+      }
+      
+      const newAssetType: AssetType = {
+        typeId: `type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        label: label.trim(),
+        createdBy,
+        createdAt: new Date().toISOString(),
+      };
+
+      const command = new PutCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
+        Item: newAssetType,
+      });
+
+      await dynamodb.send(command);
+      return newAssetType;
+    } catch (error) {
+      console.error('Error creating asset type:', error);
+      throw error;
+    }
+  }
+
+  // Update asset type
+  static async updateAssetType(typeId: string, label: string): Promise<AssetType> {
+    try {
+      // Check if new label already exists (excluding current type)
+      const existingTypes = await this.getAllAssetTypes();
+      const existing = existingTypes.find(type => 
+        type.label.toLowerCase() === label.toLowerCase() && type.typeId !== typeId
+      );
+      
+      if (existing) {
+        throw new Error('Asset type with this label already exists');
+      }
+
+      const command = new UpdateCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
+        Key: { typeId },
+        UpdateExpression: 'SET #label = :label',
+        ExpressionAttributeNames: {
+          '#label': 'label',
+        },
+        ExpressionAttributeValues: {
+          ':label': label.trim(),
+        },
+        ReturnValues: 'ALL_NEW',
+      });
+
+      const result = await dynamodb.send(command);
+      return result.Attributes as AssetType;
+    } catch (error) {
+      console.error('Error updating asset type:', error);
+      throw error;
+    }
+  }
+
+  // Delete asset type
+  static async deleteAssetType(typeId: string): Promise<void> {
+    try {
+      const command = new DeleteCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
+        Key: { typeId },
+      });
+
+      await dynamodb.send(command);
+    } catch (error) {
+      console.error('Error deleting asset type:', error);
       throw error;
     }
   }

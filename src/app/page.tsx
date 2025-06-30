@@ -133,6 +133,13 @@ interface AuditLogEntry {
   };
 }
 
+interface AssetType {
+  typeId: string;
+  label: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export default function HomePage() {
   const [opened, { toggle }] = useDisclosure();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -159,7 +166,7 @@ export default function HomePage() {
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
-  const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
+  const [assetTypes, setAssetTypes] = useState<AssetType[]>([]);
   const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
   const [newAssetType, setNewAssetType] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -327,22 +334,70 @@ export default function HomePage() {
     }
   };
 
-  // Handle adding new asset type
-  const handleAddNewAssetType = () => {
-    if (newAssetType.trim() && !assetTypes.includes(newAssetType.trim())) {
-      const updatedTypes = [...assetTypes, newAssetType.trim()];
-      setAssetTypes(updatedTypes);
-      form.setFieldValue('assetType', newAssetType.trim());
-      setNewAssetType('');
-      setShowNewAssetTypeInput(false);
-      
-      notifications.show({
-        title: 'Success',
-        message: `Asset type "${newAssetType.trim()}" added successfully!`,
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
+  // Fetch asset types from database
+  const fetchAssetTypes = async () => {
+    try {
+      const response = await fetch('/api/asset-types');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setAssetTypes(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching asset types:', error);
     }
+  };
+
+  // Handle adding new asset type
+  const handleAddNewAssetType = async () => {
+    if (newAssetType.trim() && !assetTypes.some(type => type.label.toLowerCase() === newAssetType.trim().toLowerCase())) {
+      try {
+        const response = await fetch('/api/asset-types', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            label: newAssetType.trim(),
+            createdBy: 'user',
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            await fetchAssetTypes(); // Refresh the list
+            form.setFieldValue('assetType', result.data.label);
+            setNewAssetType('');
+            setShowNewAssetTypeInput(false);
+            
+            notifications.show({
+              title: 'Success',
+              message: `Asset type "${result.data.label}" added successfully!`,
+              color: 'green',
+              icon: <IconCheck size={16} />,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error adding asset type:', error);
+        notifications.show({
+          title: 'Error',
+          message: 'Failed to add asset type',
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+      }
+    }
+  };
+
+  // Transform asset types for Select component
+  const getAssetTypeSelectData = () => {
+    return [
+      ...assetTypes.map(type => ({ value: type.label, label: type.label })),
+      { value: 'ADD_NEW', label: '+ Add New...' }
+    ];
   };
 
   // Handle asset type selection
@@ -583,6 +638,9 @@ export default function HomePage() {
       } else {
         throw new Error('Failed to fetch dashboard stats');
       }
+
+      // Fetch asset types
+      await fetchAssetTypes();
 
       notifications.show({
         title: 'Success',
@@ -1725,6 +1783,146 @@ export default function HomePage() {
       </Card>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">Manage Asset Types</Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Add, edit, or delete asset types used throughout the system.
+        </Text>
+        
+        <Stack gap="md">
+          <Group justify="space-between" align="center">
+            <Text fw={500}>Current Asset Types</Text>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              size="sm"
+              onClick={() => {
+                // Add new asset type functionality
+                setShowNewAssetTypeInput(true);
+                setNewAssetType('');
+              }}
+            >
+              Add Type
+            </Button>
+          </Group>
+          
+          {showNewAssetTypeInput && (
+            <Group gap="xs">
+              <TextInput
+                placeholder="Enter new asset type"
+                value={newAssetType}
+                onChange={(e) => setNewAssetType(e.currentTarget.value)}
+                style={{ flex: 1 }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewAssetType();
+                  }
+                }}
+              />
+              <Button size="xs" onClick={handleAddNewAssetType}>
+                Add
+              </Button>
+              <Button size="xs" variant="outline" onClick={() => setShowNewAssetTypeInput(false)}>
+                Cancel
+              </Button>
+            </Group>
+          )}
+          
+          <Stack gap="xs">
+            {assetTypes.map((type) => (
+              <Group key={type.typeId} justify="space-between" align="center" p="xs" bg="gray.0" style={{ borderRadius: 4 }}>
+                <div>
+                  <Text size="sm" fw={500}>{type.label}</Text>
+                  <Text size="xs" c="dimmed">
+                    Created: {new Date(type.createdAt).toLocaleDateString()}
+                    {type.createdBy && ` by ${type.createdBy}`}
+                  </Text>
+                </div>
+                <Group gap="xs">
+                  <ActionIcon
+                    size="sm"
+                    variant="outline"
+                    color="blue"
+                    onClick={() => {
+                      // Edit functionality can be added here
+                      const newLabel = prompt('Enter new label:', type.label);
+                      if (newLabel && newLabel.trim() !== type.label) {
+                        // Update asset type
+                        fetch('/api/asset-types', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ typeId: type.typeId, label: newLabel.trim() })
+                        }).then(response => {
+                          if (response.ok) {
+                            fetchAssetTypes();
+                            notifications.show({
+                              title: 'Success',
+                              message: 'Asset type updated successfully!',
+                              color: 'green',
+                              icon: <IconCheck size={16} />,
+                            });
+                          }
+                        });
+                      }
+                    }}
+                  >
+                    <IconEdit size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    size="sm"
+                    variant="outline"
+                    color="red"
+                    onClick={() => {
+                      modals.openConfirmModal({
+                        title: 'Delete Asset Type',
+                        children: (
+                          <Text size="sm">
+                            Are you sure you want to delete "{type.label}"? This action cannot be undone.
+                          </Text>
+                        ),
+                        labels: { confirm: 'Delete', cancel: 'Cancel' },
+                        confirmProps: { color: 'red' },
+                        onConfirm: async () => {
+                          try {
+                            const response = await fetch(`/api/asset-types?typeId=${type.typeId}`, {
+                              method: 'DELETE',
+                            });
+                            if (response.ok) {
+                              await fetchAssetTypes();
+                              notifications.show({
+                                title: 'Success',
+                                message: 'Asset type deleted successfully!',
+                                color: 'green',
+                                icon: <IconCheck size={16} />,
+                              });
+                            }
+                          } catch (error) {
+                            notifications.show({
+                              title: 'Error',
+                              message: 'Failed to delete asset type',
+                              color: 'red',
+                              icon: <IconX size={16} />,
+                            });
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+              </Group>
+            ))}
+            
+            {assetTypes.length === 0 && (
+              <Text size="sm" c="dimmed" ta="center" py="md">
+                No asset types found. Add your first asset type above.
+              </Text>
+            )}
+          </Stack>
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder">
         <Title order={4} mb="md">System Configuration</Title>
         <Stack gap="md">
           <Checkbox label="Enable automatic notifications" defaultChecked />
