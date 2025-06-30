@@ -507,8 +507,8 @@ export default function HomePage() {
       const assetData = {
         ...values,
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
-        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : '',
-        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : '',
+        filterExpiryDate: values.filterExpiryDate ? new Date(values.filterExpiryDate).toISOString() : '',
+        filterInstalledOn: values.filterInstalledOn ? new Date(values.filterInstalledOn).toISOString() : '',
       };
 
 
@@ -566,8 +566,8 @@ export default function HomePage() {
 
       const updateData = {
         ...values,
-        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString() : (selectedAsset?.filterExpiryDate || ""),
-        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString() : (selectedAsset?.filterInstalledOn || ""),
+        filterExpiryDate: values.filterExpiryDate ? new Date(values.filterExpiryDate).toISOString() : (selectedAsset?.filterExpiryDate || ""),
+        filterInstalledOn: values.filterInstalledOn ? new Date(values.filterInstalledOn).toISOString() : (selectedAsset?.filterInstalledOn || ""),
       };
 
 
@@ -1864,26 +1864,19 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Grid>
-                <Grid.Col span={6}>
-                  <DateInput
-                    label="Filter Expiry Date"
-                    placeholder="Select expiry date"
-                    {...form.getInputProps('filterExpiryDate')}
-                  />
-                </Grid.Col>
-                <Grid.Col span={6}>
-                  <DateInput
-                    label="Filter Installed On"
-                    placeholder="Select installation date"
-                    {...form.getInputProps('filterInstalledOn')}
-                  />
-                </Grid.Col>
-              </Grid>
-              <Group mt="md">
+              <Group mt="md" mb="md">
                 <Checkbox
                   label="Filter Needed"
                   {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                  onChange={(event) => {
+                    form.setFieldValue('filterNeeded', event.currentTarget.checked);
+                    if (!event.currentTarget.checked) {
+                      // Clear filter fields when Filter Needed is unchecked
+                      form.setFieldValue('filterInstalledOn', null);
+                      form.setFieldValue('filterExpiryDate', null);
+                      form.setFieldValue('filtersOn', false);
+                    }
+                  }}
                 />
                 <Checkbox
                   label="Filters On"
@@ -1894,6 +1887,37 @@ export default function HomePage() {
                   {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                 />
               </Group>
+              <Grid>
+                <Grid.Col span={6}>
+                  <DateInput
+                    label="Filter Installed On"
+                    placeholder="Select installation date"
+                    disabled={!Boolean(form.values.filterNeeded)}
+                    {...form.getInputProps('filterInstalledOn')}
+                    onChange={(value) => {
+                      form.setFieldValue('filterInstalledOn', value);
+                      if (value) {
+                        // Auto-check Filters On
+                        form.setFieldValue('filtersOn', true);
+                        // Auto-calculate expiry date (90 days from installation)
+                        const expiryDate = new Date(value);
+                        expiryDate.setDate(expiryDate.getDate() + 90);
+                        form.setFieldValue('filterExpiryDate', expiryDate);
+                      } else {
+                        form.setFieldValue('filterExpiryDate', null);
+                      }
+                    }}
+                  />
+                </Grid.Col>
+                <Grid.Col span={6}>
+                  <DateInput
+                    label="Filter Expiry Date (Auto-calculated)"
+                    placeholder="Auto-calculated as Installed + 90 days"
+                    disabled={true}
+                    {...form.getInputProps('filterExpiryDate')}
+                  />
+                </Grid.Col>
+              </Grid>
             </div>
 
             <Divider />
