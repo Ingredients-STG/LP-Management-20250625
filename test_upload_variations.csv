@@ -1,0 +1,4 @@
+Asset Barcode*,Room*,Filter Needed*,Filter Installed On,Asset Type,Primary_Identifier,Status,Wing,Notes
+B30677,Room 201,YES,2024-10-15,Water Tap,TAP201,ACTIVE,North Wing,Test with spaces
+B30678,Room 202,NO,,Water Cooler,COOL202,ACTIVE,South Wing,Test without filter
+B30679,Room 203,YES,2024-09-20,New Equipment Type,EQ203,MAINTENANCE,East Wing,Test auto-create type 

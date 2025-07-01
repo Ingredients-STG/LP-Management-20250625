@@ -11,6 +11,55 @@ interface BulkUploadResult {
   newAssetTypes: string[];
 }
 
+// Header normalization function
+function normalizeHeader(header: string): string {
+  return String(header || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[*\s_-]+/g, '') // Remove asterisks, spaces, underscores, hyphens
+    .replace(/[^\w]/g, ''); // Remove any remaining non-word characters
+}
+
+// Create header mapping for field identification
+function createHeaderMapping(headers: string[]): { [key: string]: number } {
+  const mapping: { [key: string]: number } = {};
+  
+  headers.forEach((header, index) => {
+    const normalized = normalizeHeader(header);
+    
+    // Map various header formats to standard field names
+    const fieldMappings: { [key: string]: string[] } = {
+      'assetBarcode': ['assetbarcode', 'asset_barcode', 'assetbarcode*', 'barcode', 'assetcode'],
+      'room': ['room', 'room*', 'roomlocation', 'location'],
+      'filterNeeded': ['filterneeded', 'filterneeded*', 'filter_needed', 'filterrequired', 'needsfilter'],
+      'filterInstalledOn': ['filterinstalledon', 'filter_installed_on', 'filterinstalldate', 'installdate'],
+      'assetType': ['assettype', 'asset_type', 'type', 'category', 'equipmenttype'],
+      'primaryIdentifier': ['primaryidentifier', 'primary_identifier', 'primaryid', 'mainid'],
+      'secondaryIdentifier': ['secondaryidentifier', 'secondary_identifier', 'secondaryid', 'altid'],
+      'status': ['status', 'state', 'condition'],
+      'wing': ['wing', 'building', 'block'],
+      'wingInShort': ['winginshort', 'wing_in_short', 'wingshort', 'buildingshort'],
+      'floor': ['floor', 'level', 'storey'],
+      'floorInWords': ['floorinwords', 'floor_in_words', 'floorwords', 'levelwords'],
+      'roomNo': ['roomno', 'room_no', 'roomnumber', 'room_number'],
+      'roomName': ['roomname', 'room_name', 'roomtitle', 'room_title'],
+      'filtersOn': ['filtersonn', 'filters_on', 'filtersactive', 'filtersstatus'],
+      'notes': ['notes', 'comments', 'remarks', 'description'],
+      'augmentedCare': ['augmentedcare', 'augmented_care', 'specialcare', 'enhanced']
+    };
+
+    // Find matching field for this header
+    for (const [fieldName, variations] of Object.entries(fieldMappings)) {
+      if (variations.includes(normalized)) {
+        mapping[fieldName] = index;
+        break;
+      }
+    }
+  });
+
+  return mapping;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -56,29 +105,24 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get headers and normalize them
-    const headers = rows[0].map((h: any) => String(h || '').trim().toLowerCase());
+    // Normalize headers and create field mapping
+    const rawHeaders = rows[0].map((h: any) => String(h || '').trim());
+    const headerMapping = createHeaderMapping(rawHeaders);
     
-    // Find required field indices
-    const assetBarcodeIndex = headers.findIndex(h => 
-      ['assetbarcode', 'asset_barcode', 'barcode'].includes(h)
-    );
-    const roomIndex = headers.findIndex(h => 
-      ['room'].includes(h)
-    );
-    const filterNeededIndex = headers.findIndex(h => 
-      ['filterneeded', 'filter_needed', 'filter needed'].includes(h)
-    );
-    const filterInstalledOnIndex = headers.findIndex(h => 
-      ['filterinstalledon', 'filter_installed_on', 'filter installed on'].includes(h)
-    );
-    const assetTypeIndex = headers.findIndex(h => 
-      ['assettype', 'asset_type', 'asset type', 'type'].includes(h)
-    );
+    // Check for required field presence
+    const requiredFields = ['assetBarcode', 'room', 'filterNeeded'];
+    const missingFields = requiredFields.filter(field => !(field in headerMapping));
+    
+    if (missingFields.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: `Missing required columns: ${missingFields.join(', ')}. Please ensure your file has columns for Asset Barcode, Room, and Filter Needed.`
+      }, { status: 400 });
+    }
 
     // Get existing assets to check for duplicates
     const existingAssets = await DynamoDBService.getAllAssets();
-    const existingBarcodes = new Set(existingAssets.map(asset => asset.assetBarcode));
+    const existingBarcodes = new Set(existingAssets.map(asset => asset.assetBarcode?.trim()).filter(Boolean));
 
     // Get existing asset types
     const existingAssetTypes = await DynamoDBService.getAllAssetTypes();
@@ -99,23 +143,34 @@ export async function POST(request: NextRequest) {
       const values = rows[i];
       
       try {
-        // Extract required fields
-        const assetBarcode = String(values[assetBarcodeIndex] || '').trim();
-        const room = String(values[roomIndex] || '').trim();
-        const filterNeededValue = String(values[filterNeededIndex] || '').trim().toLowerCase();
-        const filterInstalledOnValue = String(values[filterInstalledOnIndex] || '').trim();
-        const assetTypeValue = String(values[assetTypeIndex] || '').trim();
+        // Extract and validate required fields
+        const assetBarcodeRaw = values[headerMapping.assetBarcode] || '';
+        const assetBarcode = String(assetBarcodeRaw).trim();
+        
+        const roomRaw = values[headerMapping.room] || '';
+        const room = String(roomRaw).trim();
+        
+        const filterNeededRaw = values[headerMapping.filterNeeded] || '';
+        const filterNeededValue = String(filterNeededRaw).trim().toLowerCase();
 
-        // Validate required fields
-        if (!assetBarcode) {
+        // Validate Asset Barcode
+        if (!assetBarcode || assetBarcode === 'null' || assetBarcode === 'undefined') {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Asset Barcode is required`);
           continue;
         }
 
-        if (!room) {
+        // Validate Room
+        if (!room || room === 'null' || room === 'undefined') {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Room is required`);
+          continue;
+        }
+
+        // Validate Filter Needed
+        if (!filterNeededValue) {
+          results.failed++;
+          results.errors.push(`Row ${rowNumber}: Filter Needed is required (use YES/NO)`);
           continue;
         }
 
@@ -123,19 +178,30 @@ export async function POST(request: NextRequest) {
         const filterNeeded = ['true', 'yes', '1', 'y'].includes(filterNeededValue);
         
         // Validate filterInstalledOn if filterNeeded is true
+        const filterInstalledOnRaw = values[headerMapping.filterInstalledOn] || '';
+        const filterInstalledOnValue = String(filterInstalledOnRaw).trim();
+        
         if (filterNeeded && !filterInstalledOnValue) {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Filter Installed On date is required when Filter Needed is YES`);
           continue;
         }
 
-        // Check for duplicate barcode
-        if (existingBarcodes.has(assetBarcode)) {
+        // Check for duplicate barcode (case-insensitive)
+        const duplicateFound = Array.from(existingBarcodes).some(existing => 
+          existing.toLowerCase() === assetBarcode.toLowerCase()
+        );
+        
+        if (duplicateFound) {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Duplicate barcode ${assetBarcode}`);
           results.duplicateBarcodes.push(assetBarcode);
           continue;
         }
+
+        // Get asset type for auto-creation
+        const assetTypeRaw = values[headerMapping.assetType] || '';
+        const assetTypeValue = String(assetTypeRaw).trim();
 
         // Auto-create asset type if provided and doesn't exist
         if (assetTypeValue && !existingTypeLabels.has(assetTypeValue)) {
@@ -148,7 +214,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Build asset object with only provided fields
+        // Build asset object with validated required fields
         const asset: any = {
           assetBarcode,
           room,
@@ -157,106 +223,55 @@ export async function POST(request: NextRequest) {
           modifiedBy: 'bulk-upload'
         };
 
-        // Add optional fields if provided
-        headers.forEach((header, index) => {
-          const value = String(values[index] || '').trim();
-          if (!value || index === assetBarcodeIndex || index === roomIndex || index === filterNeededIndex) {
-            return; // Skip empty values and already processed required fields
-          }
+        // Add optional fields using header mapping
+        const optionalFields = [
+          'primaryIdentifier', 'secondaryIdentifier', 'assetType', 'status',
+          'wing', 'wingInShort', 'floor', 'floorInWords', 'roomNo', 'roomName',
+          'filtersOn', 'notes', 'augmentedCare'
+        ];
 
-          switch (header) {
-            case 'primaryidentifier':
-            case 'primary_identifier':
-            case 'primary identifier':
-              asset.primaryIdentifier = value;
-              break;
-            case 'secondaryidentifier':
-            case 'secondary_identifier':
-            case 'secondary identifier':
-              asset.secondaryIdentifier = value;
-              break;
-            case 'assettype':
-            case 'asset_type':
-            case 'asset type':
-            case 'type':
-              asset.assetType = value;
-              break;
-            case 'status':
-              asset.status = value;
-              break;
-            case 'wing':
-              asset.wing = value;
-              break;
-            case 'winginshort':
-            case 'wing_in_short':
-            case 'wing in short':
-              asset.wingInShort = value;
-              break;
-            case 'floor':
-              asset.floor = value;
-              break;
-            case 'floorinwords':
-            case 'floor_in_words':
-            case 'floor in words':
-              asset.floorInWords = value;
-              break;
-            case 'roomno':
-            case 'room_no':
-            case 'room no':
-            case 'room number':
-              asset.roomNo = value;
-              break;
-            case 'roomname':
-            case 'room_name':
-            case 'room name':
-              asset.roomName = value;
-              break;
-            case 'filtersonn':
-            case 'filters_on':
-            case 'filters on':
-              asset.filtersOn = ['true', 'yes', '1', 'y'].includes(value.toLowerCase());
-              break;
-            case 'filterinstalledon':
-            case 'filter_installed_on':
-            case 'filter installed on':
-              // Parse and validate date
-              if (value) {
-                try {
-                  const date = new Date(value);
-                  if (!isNaN(date.getTime())) {
-                    asset.filterInstalledOn = date.toISOString();
-                    
-                    // Auto-calculate filterExpiryDate (90 days after installation)
-                    const expiryDate = new Date(date);
-                    expiryDate.setDate(expiryDate.getDate() + 90);
-                    asset.filterExpiryDate = expiryDate.toISOString();
-                  }
-                } catch (error) {
-                  console.warn(`Invalid date format for filterInstalledOn in row ${rowNumber}:`, value);
-                }
+        optionalFields.forEach(fieldName => {
+          if (fieldName in headerMapping) {
+            const value = String(values[headerMapping[fieldName]] || '').trim();
+            if (value && value !== 'null' && value !== 'undefined') {
+              
+              // Handle special field types
+              if (fieldName === 'filtersOn' || fieldName === 'augmentedCare') {
+                asset[fieldName] = ['true', 'yes', '1', 'y'].includes(value.toLowerCase());
+              } else {
+                asset[fieldName] = value;
               }
-              break;
-            case 'notes':
-              asset.notes = value;
-              break;
-            case 'augmentedcare':
-            case 'augmented_care':
-            case 'augmented care':
-              asset.augmentedCare = ['true', 'yes', '1', 'y'].includes(value.toLowerCase());
-              break;
-            default:
-              // Handle any other custom fields
-              if (value) {
-                asset[header] = value;
-              }
-              break;
+            }
           }
         });
+
+        // Handle filterInstalledOn with date parsing and expiry calculation
+        if (filterInstalledOnValue) {
+          try {
+            const date = new Date(filterInstalledOnValue);
+            if (!isNaN(date.getTime())) {
+              asset.filterInstalledOn = date.toISOString();
+              
+              // Auto-calculate filterExpiryDate (90 days after installation)
+              const expiryDate = new Date(date);
+              expiryDate.setDate(expiryDate.getDate() + 90);
+              asset.filterExpiryDate = expiryDate.toISOString();
+            } else {
+              results.failed++;
+              results.errors.push(`Row ${rowNumber}: Invalid date format for Filter Installed On: ${filterInstalledOnValue}`);
+              continue;
+            }
+          } catch (error) {
+            results.failed++;
+            results.errors.push(`Row ${rowNumber}: Invalid date format for Filter Installed On: ${filterInstalledOnValue}`);
+            continue;
+          }
+        }
 
         // Set default values for optional fields if not provided
         if (!asset.status) asset.status = 'ACTIVE';
         if (!asset.primaryIdentifier) asset.primaryIdentifier = assetBarcode;
-        if (asset.filterNeeded && !asset.filtersOn) asset.filtersOn = false;
+        if (asset.filterNeeded && !asset.hasOwnProperty('filtersOn')) asset.filtersOn = false;
 
         // Save to DynamoDB
         const newAsset = await DynamoDBService.createAsset(asset);
