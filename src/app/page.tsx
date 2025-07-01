@@ -43,6 +43,7 @@ import { modals } from '@mantine/modals';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import { applyFilterLogic, formatFilterAge } from '@/lib/filterLogic';
 import {
   IconDroplet,
   IconFilter,
@@ -842,11 +843,31 @@ export default function HomePage() {
 
   const handleAddAsset = async (values: any) => {
     try {
+      // Apply filter logic before saving
+      const filterResult = applyFilterLogic({
+        filterInstalledOn: values.filterInstalledOn,
+        filterNeeded: values.filterNeeded,
+        filtersOn: values.filtersOn
+      });
+
+      // Check for validation errors
+      if (filterResult.errors.length > 0) {
+        notifications.show({
+          title: 'Validation Error',
+          message: filterResult.errors[0],
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+        return;
+      }
+
       const assetData = {
         ...values,
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
-        filterExpiryDate: values.filterExpiryDate ? new Date(values.filterExpiryDate).toISOString() : '',
-        filterInstalledOn: values.filterInstalledOn ? new Date(values.filterInstalledOn).toISOString() : '',
+        filterNeeded: filterResult.filterNeeded,
+        filtersOn: filterResult.filtersOn,
+        filterExpiryDate: filterResult.filterExpiryDate || '',
+        filterInstalledOn: filterResult.filterInstalledOn || '',
       };
 
 
@@ -902,10 +923,30 @@ export default function HomePage() {
         throw new Error('No asset selected for update');
       }
 
+      // Apply filter logic before saving
+      const filterResult = applyFilterLogic({
+        filterInstalledOn: values.filterInstalledOn,
+        filterNeeded: values.filterNeeded,
+        filtersOn: values.filtersOn
+      });
+
+      // Check for validation errors
+      if (filterResult.errors.length > 0) {
+        notifications.show({
+          title: 'Validation Error',
+          message: filterResult.errors[0],
+          color: 'red',
+          icon: <IconX size={16} />,
+        });
+        return;
+      }
+
       const updateData = {
         ...values,
-        filterExpiryDate: values.filterExpiryDate ? new Date(values.filterExpiryDate).toISOString() : (selectedAsset?.filterExpiryDate || ""),
-        filterInstalledOn: values.filterInstalledOn ? new Date(values.filterInstalledOn).toISOString() : (selectedAsset?.filterInstalledOn || ""),
+        filterNeeded: filterResult.filterNeeded,
+        filtersOn: filterResult.filtersOn,
+        filterExpiryDate: filterResult.filterExpiryDate || '',
+        filterInstalledOn: filterResult.filterInstalledOn || '',
         attachments: selectedAsset?.attachments || [], // Include current attachments
       };
 
