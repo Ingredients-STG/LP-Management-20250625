@@ -55,16 +55,35 @@ Accepts multiple date formats:
 ## 📊 File Format Support
 
 ### CSV Files (.csv)
+The system supports flexible header formats:
 ```csv
 assetBarcode*,room*,filterNeeded*,filterInstalledOn,assetType
 B30674,Room 101,YES,2024-10-01,Water Tap
 B30675,Room 102,NO,,Water Cooler
 ```
 
+**Alternative header formats supported:**
+```csv
+Asset Barcode*,Room*,Filter Needed*,Filter Installed On,Asset Type
+B30674,Room 101,YES,2024-10-01,Water Tap
+```
+
 ### Excel Files (.xlsx, .xls)
 - Use the first worksheet
 - Headers in the first row
 - Data starting from row 2
+- Same flexible header format support as CSV
+
+### 🔧 Header Normalization
+The system automatically normalizes headers by:
+- Removing spaces, asterisks (*), underscores (_), hyphens (-)
+- Converting to lowercase
+- Mapping common variations to standard field names
+
+**Supported header variations:**
+- Asset Barcode: `assetBarcode*`, `asset_barcode`, `Asset Barcode*`, `barcode`
+- Room: `room*`, `Room*`, `room location`, `location`
+- Filter Needed: `filterNeeded*`, `filter_needed`, `Filter Needed*`, `filter required`
 
 ## 📥 Upload Process
 
