@@ -17,11 +17,16 @@ const ddbClient = DynamoDBDocumentClient.from(client);
 const ASSETS_TABLE = 'water-tap-assets';
 const ASSET_TYPES_TABLE = 'AssetTypes';
 
-function excelSerialToDate(serial: number): string {
-  const utcDays = Math.floor(serial - 25569);
-  const utcValue = utcDays * 86400;
-  const dateInfo = new Date(utcValue * 1000);
-  return dateInfo.toISOString().split('T')[0]; // YYYY-MM-DD
+function parseExcelDate(value: any): string | undefined {
+  if (typeof value === 'number') {
+    const epoch = new Date(Date.UTC(1899, 11, 30)); // Excel base date
+    epoch.setDate(epoch.getDate() + value);
+    return epoch.toISOString().split('T')[0]; // YYYY-MM-DD
+  } else if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? undefined : parsed.toISOString().split('T')[0];
+  }
+  return undefined;
 }
 
 export async function POST(req: NextRequest) {
@@ -121,7 +126,7 @@ export async function POST(req: NextRequest) {
           row['Filter Required']
         )?.toString().toUpperCase();
 
-        let filterInstalled = 
+        const rawInstalled = 
           row['Filter Installed'] || 
           row['filterInstalledOn'] || 
           row['filter_installed_on'] ||
@@ -156,6 +161,9 @@ export async function POST(req: NextRequest) {
 
         const filterNeeded = ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw);
 
+        // Use the new parseExcelDate function for parsing
+        const filterInstalled = parseExcelDate(rawInstalled);
+
         // Validate filter installed date if filter is needed
         if (filterNeeded && !filterInstalled) {
           results.failed++;
@@ -170,28 +178,12 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Convert Excel date serial if needed
-        if (typeof filterInstalled === 'number') {
-          filterInstalled = excelSerialToDate(filterInstalled);
-        }
-
         // Calculate filter expiry (3 months from installation)
-        let filterExpiry: string | undefined;
+        let filterExpiry: string | undefined = undefined;
         if (filterInstalled && filterNeeded) {
-          try {
-            const installedDate = new Date(filterInstalled);
-            if (isNaN(installedDate.getTime())) {
-              results.failed++;
-              results.errors.push(`Row ${rowNum}: Invalid Filter Installed date format`);
-              continue;
-            }
-            installedDate.setMonth(installedDate.getMonth() + 3);
-            filterExpiry = installedDate.toISOString().split('T')[0];
-          } catch (error) {
-            results.failed++;
-            results.errors.push(`Row ${rowNum}: Error processing Filter Installed date`);
-            continue;
-          }
+          const installedDate = new Date(filterInstalled);
+          installedDate.setMonth(installedDate.getMonth() + 3);
+          filterExpiry = installedDate.toISOString().split('T')[0];
         }
 
         // Auto-create asset type if provided and doesn't exist
