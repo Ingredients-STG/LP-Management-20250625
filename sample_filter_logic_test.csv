@@ -1,0 +1,7 @@
+Asset Barcode,Location,Filter Needed,Filter Installed,Filters On,Asset Type
+F001,Room 301,YES,2024-10-01,,Water Tap
+F002,Room 302,NO,,,Water Cooler
+F003,Room 303,,2024-09-15,,LNS Outlet - TMT
+F004,Kitchen Area,YES,,NO,Coffee Machine Filter
+F005,Lab 101,YES,2024-10-10,YES,Equipment Stand
+F006,Lab 102,NO,,NO,Basic Tap 

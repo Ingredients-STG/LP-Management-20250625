@@ -126,6 +126,13 @@ export async function POST(req: NextRequest) {
           row['Filter Required']
         )?.toString().toUpperCase();
 
+        const filtersOnRaw = (
+          row['Filters On'] || 
+          row['filtersOn'] || 
+          row['filters_on'] ||
+          row['Filter Status']
+        )?.toString().toUpperCase();
+
         const rawInstalled = 
           row['Filter Installed'] || 
           row['filterInstalledOn'] || 
@@ -153,24 +160,6 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        if (!filterNeededRaw) {
-          results.failed++;
-          results.errors.push(`Row ${rowNum}: Filter Needed is required`);
-          continue;
-        }
-
-        const filterNeeded = ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw);
-
-        // Use the new parseExcelDate function for parsing
-        const filterInstalled = parseExcelDate(rawInstalled);
-
-        // Validate filter installed date if filter is needed
-        if (filterNeeded && !filterInstalled) {
-          results.failed++;
-          results.errors.push(`Row ${rowNum}: Filter Installed date is required when Filter Needed is YES`);
-          continue;
-        }
-
         // Check for duplicate barcode (case-insensitive)
         if (existingBarcodes.has(assetBarcode.toLowerCase())) {
           results.failed++;
@@ -178,12 +167,46 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Calculate filter expiry (3 months from installation)
-        let filterExpiry: string | undefined = undefined;
-        if (filterInstalled && filterNeeded) {
-          const installedDate = new Date(filterInstalled);
+        // ✅ IMPLEMENT BULK UPLOAD FILTER RULES
+        let filterNeeded: boolean;
+        let filtersOn: boolean;
+        let filterInstalledOn: string | undefined = undefined;
+        let filterExpiryDate: string | undefined = undefined;
+
+        // Parse filter installed date using parseExcelDate
+        const parsedInstalled = parseExcelDate(rawInstalled);
+
+        // Rule 3: If filtersOn = 'NO' explicitly provided, override all logic
+        if (filtersOnRaw && ['NO', 'FALSE', '0', 'N'].includes(filtersOnRaw)) {
+          filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
+          filtersOn = false;
+          filterInstalledOn = undefined;
+          filterExpiryDate = undefined;
+        }
+        // Rule 1: If filterInstalledOn is present and valid
+        else if (parsedInstalled) {
+          filterNeeded = true;
+          filtersOn = true;
+          filterInstalledOn = parsedInstalled;
+          
+          // Calculate filter expiry (3 months from installation)
+          const installedDate = new Date(parsedInstalled);
           installedDate.setMonth(installedDate.getMonth() + 3);
-          filterExpiry = installedDate.toISOString().split('T')[0];
+          filterExpiryDate = installedDate.toISOString().split('T')[0];
+        }
+        // Rule 2: If filterInstalledOn is missing or invalid
+        else {
+          filterNeeded = false;
+          filtersOn = false;
+          filterInstalledOn = undefined;
+          filterExpiryDate = undefined;
+        }
+
+        // Rule 4: Validation Check
+        if (filterNeededRaw && ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) && !parsedInstalled) {
+          results.failed++;
+          results.errors.push(`Row ${rowNum}: Filter Installed Date is required if Filter Needed is YES`);
+          continue;
         }
 
         // Auto-create asset type if provided and doesn't exist
@@ -217,9 +240,9 @@ export async function POST(req: NextRequest) {
           room: location, // Using 'room' field as per existing schema
           assetType: assetType || '',
           filterNeeded,
-          filterInstalledOn: filterInstalled || '',
-          filterExpiryDate: filterExpiry || '',
-          filtersOn: false,
+          filterInstalledOn: filterInstalledOn || '',
+          filterExpiryDate: filterExpiryDate || '',
+          filtersOn,
           status: 'ACTIVE',
           primaryIdentifier: assetBarcode, // Default to barcode
           secondaryIdentifier: '',
