@@ -1,0 +1,6 @@
+Asset Barcode,Location,Filter Needed,Filter Installed,Asset Type
+B30680,Room 301,YES,2024-10-01,Water Tap
+B30681,Room 302,NO,,Water Cooler
+B30682,Room 303,YES,2024-09-15,LNS Outlet - TMT
+B30683,Kitchen Area,YES,2024-10-10,Coffee Machine Filter
+B30684,Lab 101,NO,,Equipment Stand 
