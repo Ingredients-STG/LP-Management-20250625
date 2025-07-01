@@ -3031,6 +3031,18 @@ export default function HomePage() {
                   <Text size="sm" c="dimmed">Filter Expiry Date</Text>
                   <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
                 </Grid.Col>
+                {(() => {
+                  const filterAge = formatFilterAge(
+                    selectedAsset.filterInstalledOn,
+                    typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true'
+                  );
+                  return filterAge ? (
+                    <Grid.Col span={{ base: 12, sm: 6 }}>
+                      <Text size="sm" c="dimmed">Filter Age</Text>
+                      <Text size="sm" c="blue" fw={500}>{filterAge}</Text>
+                    </Grid.Col>
+                  ) : null;
+                })()}
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Augmented Care</Text>
                   <Badge 
