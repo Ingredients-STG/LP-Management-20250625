@@ -17,16 +17,65 @@ const ddbClient = DynamoDBDocumentClient.from(client);
 const ASSETS_TABLE = 'water-tap-assets';
 const ASSET_TYPES_TABLE = 'AssetTypes';
 
+/**
+ * Enhanced date parsing supporting multiple formats
+ * Supports: Excel serial numbers, yyyy-mm-dd, dd/mm/yyyy
+ */
 function parseExcelDate(value: any): string | undefined {
-  if (typeof value === 'number') {
-    const epoch = new Date(Date.UTC(1899, 11, 30)); // Excel base date
-    epoch.setDate(epoch.getDate() + value);
-    return epoch.toISOString().split('T')[0]; // YYYY-MM-DD
-  } else if (typeof value === 'string') {
-    const parsed = new Date(value);
-    return isNaN(parsed.getTime()) ? undefined : parsed.toISOString().split('T')[0];
+  if (!value) return undefined;
+
+  try {
+    // Handle Excel serial numbers
+    if (typeof value === 'number') {
+      const epoch = new Date(Date.UTC(1899, 11, 30)); // Excel base date
+      epoch.setDate(epoch.getDate() + value);
+      return epoch.toISOString().split('T')[0]; // YYYY-MM-DD
+    } 
+    // Handle string dates
+    else if (typeof value === 'string') {
+      const trimmed = value.trim();
+      
+      // Handle dd/mm/yyyy format
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+        const [day, month, year] = trimmed.split('/');
+        const date = new Date(`${year}-${month}-${day}`);
+        return isNaN(date.getTime()) ? undefined : date.toISOString().split('T')[0];
+      }
+      // Handle yyyy-mm-dd and other ISO formats
+      else {
+        const parsed = new Date(trimmed);
+        return isNaN(parsed.getTime()) ? undefined : parsed.toISOString().split('T')[0];
+      }
+    }
+  } catch {
+    return undefined;
   }
+  
   return undefined;
+}
+
+/**
+ * Calculate filter expiry date exactly 3 months from installation date
+ * Handles month overflow by adjusting to the last valid day of the target month
+ */
+function getFilterExpiryFromInstalledDate(installed: Date): Date {
+  // Work with UTC to avoid timezone issues
+  const year = installed.getUTCFullYear();
+  const month = installed.getUTCMonth();
+  const day = installed.getUTCDate();
+  
+  // Calculate target month and year
+  const targetMonth = (month + 3) % 12;
+  const targetYear = year + Math.floor((month + 3) / 12);
+  
+  // Get the last day of the target month
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  
+  // Set to the original day or the last valid day of the target month
+  const targetDay = Math.min(day, lastDayOfTargetMonth);
+  
+  // Create the result date in UTC
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay));
 }
 
 export async function POST(req: NextRequest) {
@@ -167,39 +216,33 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // ✅ IMPLEMENT BULK UPLOAD FILTER RULES
+        // ✅ REVISED BULK UPLOAD FILTER RULES - Preserve legacy data, only auto-calculate expiry
         let filterNeeded: boolean;
         let filtersOn: boolean;
         let filterInstalledOn: string | undefined = undefined;
         let filterExpiryDate: string | undefined = undefined;
 
-        // Parse filter installed date using parseExcelDate
+        // Parse filter installed date using enhanced parseExcelDate
         const parsedInstalled = parseExcelDate(rawInstalled);
 
-        // Rule 3: If filtersOn = 'NO' explicitly provided, override all logic
+        // Parse user-provided values (preserve legacy data)
+        filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
+        filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
+
+        // Special override: If filtersOn = 'NO' explicitly provided, force clear dates
         if (filtersOnRaw && ['NO', 'FALSE', '0', 'N'].includes(filtersOnRaw)) {
-          filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
           filtersOn = false;
           filterInstalledOn = undefined;
           filterExpiryDate = undefined;
         }
-        // Rule 1: If filterInstalledOn is present and valid
+        // If filterInstalledOn is valid, calculate expiry regardless of other fields
         else if (parsedInstalled) {
-          filterNeeded = true;
-          filtersOn = true;
           filterInstalledOn = parsedInstalled;
           
-          // Calculate filter expiry (3 months from installation)
+          // Calculate filter expiry using enhanced function
           const installedDate = new Date(parsedInstalled);
-          installedDate.setMonth(installedDate.getMonth() + 3);
-          filterExpiryDate = installedDate.toISOString().split('T')[0];
-        }
-        // Rule 2: If filterInstalledOn is missing or invalid
-        else {
-          filterNeeded = false;
-          filtersOn = false;
-          filterInstalledOn = undefined;
-          filterExpiryDate = undefined;
+          const expiryDate = getFilterExpiryFromInstalledDate(installedDate);
+          filterExpiryDate = expiryDate.toISOString().split('T')[0];
         }
 
         // Rule 4: Validation Check

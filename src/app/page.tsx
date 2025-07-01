@@ -2149,7 +2149,7 @@ export default function HomePage() {
       <AppShell
         header={{ height: 70 }}
         navbar={hideTabContainer ? undefined : { width: 280, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-        padding="md"
+        padding={{ base: 'xs', sm: 'md', lg: 'xl' }}
       >
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between" style={{ 
@@ -2287,7 +2287,7 @@ export default function HomePage() {
         )}
 
         <AppShell.Main>
-          <Container size="xl">
+          <Container size="xl" className="main-container">
 
             {hideTabContainer && (
               <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">

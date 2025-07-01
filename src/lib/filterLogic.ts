@@ -59,10 +59,10 @@ export function applyFilterLogic(input: FilterLogicInput): FilterLogicResult {
     filtersOn = true;
     filterInstalledOn = parsedInstalled;
     
-    // Calculate filter expiry (3 months from installation)
+    // Calculate filter expiry using the enhanced function
     const installedDate = new Date(parsedInstalled);
-    installedDate.setMonth(installedDate.getMonth() + 3);
-    filterExpiryDate = installedDate.toISOString().split('T')[0];
+    const expiryDate = getFilterExpiryFromInstalledDate(installedDate);
+    filterExpiryDate = expiryDate.toISOString().split('T')[0];
   }
   // Rule 2: If filterInstalledOn is missing or invalid
   else {
@@ -87,7 +87,31 @@ export function applyFilterLogic(input: FilterLogicInput): FilterLogicResult {
 }
 
 /**
- * Parse filter date from various input formats
+ * Calculate filter expiry date exactly 3 months from installation date
+ * Handles month overflow by adjusting to the last valid day of the target month
+ */
+function getFilterExpiryFromInstalledDate(installed: Date): Date {
+  // Work with UTC to avoid timezone issues
+  const year = installed.getUTCFullYear();
+  const month = installed.getUTCMonth();
+  const day = installed.getUTCDate();
+  
+  // Calculate target month and year
+  const targetMonth = (month + 3) % 12;
+  const targetYear = year + Math.floor((month + 3) / 12);
+  
+  // Get the last day of the target month
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  
+  // Set to the original day or the last valid day of the target month
+  const targetDay = Math.min(day, lastDayOfTargetMonth);
+  
+  // Create the result date in UTC
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay));
+}
+
+/**
+ * Parse filter date from various input formats including dd/mm/yyyy
  * Returns ISO date string (YYYY-MM-DD) or null if invalid
  */
 function parseFilterDate(value: any): string | null {
@@ -99,7 +123,15 @@ function parseFilterDate(value: any): string | null {
     if (value instanceof Date) {
       date = value;
     } else if (typeof value === 'string') {
-      date = new Date(value);
+      const trimmed = value.trim();
+      
+      // Check for dd/mm/yyyy format
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+        const [day, month, year] = trimmed.split('/');
+        date = new Date(`${year}-${month}-${day}`);
+      } else {
+        date = new Date(trimmed);
+      }
     } else {
       return null;
     }
