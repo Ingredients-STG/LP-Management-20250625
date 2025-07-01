@@ -132,13 +132,13 @@ interface AuditLogEntry {
   user: string;
   action: string;
   details: {
-    assetBarcode: string;
-    assetName: string;
-    changes: {
-      field: string;
-      oldValue: any;
-      newValue: any;
-    }[];
+  assetBarcode: string;
+  assetName: string;
+  changes: {
+    field: string;
+    oldValue: any;
+    newValue: any;
+  }[];
   };
 }
 
@@ -307,13 +307,13 @@ export default function HomePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          assetId: asset.id || '',
+      assetId: asset.id || '',
           user: 'Current User', // In a real app, this would come from authentication
           action,
           details: {
-            assetBarcode: asset.assetBarcode,
-            assetName: asset.primaryIdentifier,
-            changes,
+      assetBarcode: asset.assetBarcode,
+      assetName: asset.primaryIdentifier,
+      changes,
           },
         }),
       });
@@ -773,19 +773,19 @@ export default function HomePage() {
       // Handle assets response
       if (assetsResponse.ok) {
         const assetsData = await assetsResponse.json();
-        if (assetsData.success && assetsData.data) {
+      if (assetsData.success && assetsData.data) {
           const assets = assetsData.data.items || assetsData.data.assets || [];
           setAssets(assets);
         }
       } else {
         throw new Error('Failed to fetch assets');
       }
-      
+
       // Handle dashboard response
       if (dashboardResponse.ok) {
         const dashboardData = await dashboardResponse.json();
-        if (dashboardData.success && dashboardData.data) {
-          setStats(dashboardData.data);
+      if (dashboardData.success && dashboardData.data) {
+        setStats(dashboardData.data);
         }
       } else {
         throw new Error('Failed to fetch dashboard stats');
@@ -997,18 +997,18 @@ export default function HomePage() {
             throw new Error(result.error || 'Failed to delete asset');
           }
 
-          // Create audit log entry for asset deletion
+        // Create audit log entry for asset deletion
           await createAuditLogEntry(asset, 'DELETE');
-          
+        
           // Update local state
-          setAssets(prev => prev.filter(a => a.id !== asset.id));
+        setAssets(prev => prev.filter(a => a.id !== asset.id));
           
-          notifications.show({
-            title: 'Success',
+        notifications.show({
+          title: 'Success',
             message: 'Asset deleted successfully from DynamoDB!',
-            color: 'green',
-            icon: <IconCheck size={16} />,
-          });
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
         } catch (error) {
           console.error("Error deleting asset:", error);
           notifications.show({
@@ -1111,14 +1111,14 @@ export default function HomePage() {
           </Tooltip>
         </Table.Td>
         <Table.Td>
-          <div>
-            <Text fz="sm" fw={500}>
+            <div>
+              <Text fz="sm" fw={500}>
               {asset.assetBarcode}
-            </Text>
-            <Text fz="xs" c="dimmed">
+              </Text>
+              <Text fz="xs" c="dimmed">
               {asset.room}
-            </Text>
-          </div>
+              </Text>
+            </div>
         </Table.Td>
         <Table.Td>
           <Badge color={getStatusColor(asset.status)} variant="light">
@@ -1554,48 +1554,48 @@ export default function HomePage() {
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
           <Group justify="space-between" wrap="wrap">
-            <Title order={3}>Asset Management</Title>
+          <Title order={3}>Asset Management</Title>
             <Group gap="xs" wrap="wrap">
-              <Button
-                leftSection={<IconRefresh size={16} />}
-                variant="light"
-                onClick={fetchData}
-                loading={loading}
+            <Button
+              leftSection={<IconRefresh size={16} />}
+              variant="light"
+              onClick={fetchData}
+              loading={loading}
                 size="sm"
-              >
+            >
                 <Text visibleFrom="sm">Refresh</Text>
                 <Text hiddenFrom="sm">Refresh</Text>
-              </Button>
-              <Button
-                leftSection={<IconDownload size={16} />}
-                variant="outline"
-                onClick={exportData}
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              onClick={exportData}
                 size="sm"
-              >
+            >
                 <Text visibleFrom="sm">Export</Text>
                 <Text hiddenFrom="sm">Export</Text>
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                gradient={{ from: 'blue', to: 'cyan' }}
-                variant="gradient"
-                onClick={openModal}
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              gradient={{ from: 'blue', to: 'cyan' }}
+              variant="gradient"
+              onClick={openModal}
                 size="sm"
-              >
+            >
                 <Text visibleFrom="sm">Add Asset</Text>
                 <Text hiddenFrom="sm">Add</Text>
-              </Button>
-                        </Group>
+            </Button>
           </Group>
-          
-          <Grid>
+        </Group>
+
+        <Grid>
           <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
             <Group gap="xs">
-              <TextInput
-                placeholder="Search assets..."
-                leftSection={<IconSearch size={16} />}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+            <TextInput
+              placeholder="Search assets..."
+              leftSection={<IconSearch size={16} />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ flex: 1 }}
               />
               <ActionIcon
@@ -1664,35 +1664,35 @@ export default function HomePage() {
           <>
             {/* Desktop Table View */}
             <Box visibleFrom="md">
-              <ScrollArea>
-                <Table striped highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>View</Table.Th>
-                      <Table.Th>Asset</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Location</Table.Th>
-                      <Table.Th>Type</Table.Th>
-                      <Table.Th>Filter Status</Table.Th>
-                      <Table.Th>Last Updated</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {rows.length > 0 ? rows : (
-                      <Table.Tr>
-                        <Table.Td colSpan={7}>
-                          <Group justify="center" py="xl">
-                            <Stack align="center" gap="xs">
-                              <IconDroplet size={48} color="gray" />
-                              <Text c="dimmed">No assets found matching your criteria.</Text>
-                            </Stack>
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
+          <ScrollArea>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>View</Table.Th>
+                  <Table.Th>Asset</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Location</Table.Th>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>Filter Status</Table.Th>
+                  <Table.Th>Last Updated</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {rows.length > 0 ? rows : (
+                  <Table.Tr>
+                    <Table.Td colSpan={7}>
+                      <Group justify="center" py="xl">
+                        <Stack align="center" gap="xs">
+                          <IconDroplet size={48} color="gray" />
+                          <Text c="dimmed">No assets found matching your criteria.</Text>
+                        </Stack>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
             </Box>
 
             {/* Mobile Card View */}
@@ -1946,9 +1946,35 @@ export default function HomePage() {
                   <Badge color="red">{uploadResults.failed}</Badge>
                 </Group>
                 
+                {uploadResults.newAssetTypes && uploadResults.newAssetTypes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="green">Auto-Created Asset Types:</Text>
+                    <Group gap="xs">
+                      {uploadResults.newAssetTypes.map((type: string, index: number) => (
+                        <Badge key={index} color="green" variant="light" size="sm">
+                          {type}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
+                {uploadResults.duplicateBarcodes && uploadResults.duplicateBarcodes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="orange">Duplicate Barcodes Found:</Text>
+                    <Group gap="xs">
+                      {uploadResults.duplicateBarcodes.map((barcode: string, index: number) => (
+                        <Badge key={index} color="orange" variant="light" size="sm">
+                          {barcode}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
                 {uploadResults.errors && uploadResults.errors.length > 0 && (
                   <div>
-                    <Text size="sm" fw={500} mt="md" mb="xs">Errors:</Text>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="red">Errors:</Text>
                     <Stack gap="xs">
                       {uploadResults.errors.map((error: string, index: number) => (
                         <Text key={index} size="xs" c="red" bg="red.0" p="xs" style={{ borderRadius: 4 }}>
@@ -2038,7 +2064,7 @@ export default function HomePage() {
           )}
         </Stack>
       </Card>
-
+      
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">System Configuration</Title>
         <Stack gap="md">
@@ -2094,7 +2120,7 @@ export default function HomePage() {
                     <Text component="span" visibleFrom="sm">Water Asset Management</Text>
                     <Text component="span" hiddenFrom="sm">Asset Mgmt</Text>
                   </Text>
-                </div>
+        </div>
               </Group>
             </Group>
 
@@ -2205,44 +2231,44 @@ export default function HomePage() {
               <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">
                 <ScrollArea>
                   <Group wrap="nowrap" gap="xs">
-                    <Button
-                      variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                      leftSection={<IconDashboard size={16} />}
-                      onClick={() => setActiveTab('dashboard')}
-                      size="sm"
+                  <Button
+                    variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+                    leftSection={<IconDashboard size={16} />}
+                    onClick={() => setActiveTab('dashboard')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
+                  >
                       <Text visibleFrom="sm">Dashboard</Text>
                       <Text hiddenFrom="sm">Dash</Text>
-                    </Button>
-                    <Button
-                      variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                      leftSection={<IconDroplet size={16} />}
-                      onClick={() => setActiveTab('assets')}
-                      size="sm"
+                  </Button>
+                  <Button
+                    variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+                    leftSection={<IconDroplet size={16} />}
+                    onClick={() => setActiveTab('assets')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Assets
-                    </Button>
-                    <Button
-                      variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                      leftSection={<IconReport size={16} />}
-                      onClick={() => setActiveTab('reports')}
-                      size="sm"
+                  >
+                    Assets
+                  </Button>
+                  <Button
+                    variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+                    leftSection={<IconReport size={16} />}
+                    onClick={() => setActiveTab('reports')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Reports
-                    </Button>
-                    <Button
-                      variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                      leftSection={<IconSettings size={16} />}
-                      onClick={() => setActiveTab('settings')}
-                      size="sm"
+                  >
+                    Reports
+                  </Button>
+                  <Button
+                    variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+                    leftSection={<IconSettings size={16} />}
+                    onClick={() => setActiveTab('settings')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Settings
-                    </Button>
-                  </Group>
+                  >
+                    Settings
+                  </Button>
+                </Group>
                 </ScrollArea>
               </Card>
             )}
@@ -2299,11 +2325,11 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Stack gap="xs">
-                    <Select
-                      label="Asset Type"
-                      placeholder="Select type"
+                  <Select
+                    label="Asset Type"
+                    placeholder="Select type"
                       data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
-                      required
+                    required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
                     />
@@ -2320,7 +2346,7 @@ export default function HomePage() {
                               handleAddNewAssetType();
                             }
                           }}
-                        />
+                  />
                         <Button size="xs" onClick={handleAddNewAssetType}>
                           Add
                         </Button>
@@ -2437,7 +2463,7 @@ export default function HomePage() {
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
                       form.setFieldValue('filterInstalledOn', value);
-                      if (value) {
+                      if (value instanceof Date) {
                         // Auto-check Filters On
                         form.setFieldValue('filtersOn', true);
                         // Auto-calculate expiry date (90 days from installation)
@@ -2530,11 +2556,11 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Stack gap="xs">
-                    <Select
-                      label="Asset Type"
-                      placeholder="Select type"
+                  <Select
+                    label="Asset Type"
+                    placeholder="Select type"
                       data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
-                      required
+                    required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
                     />
@@ -2551,7 +2577,7 @@ export default function HomePage() {
                               handleAddNewAssetType();
                             }
                           }}
-                        />
+                  />
                         <Button size="xs" onClick={handleAddNewAssetType}>
                           Add
                         </Button>
@@ -2668,7 +2694,7 @@ export default function HomePage() {
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
                       form.setFieldValue('filterInstalledOn', value);
-                      if (value) {
+                      if (value instanceof Date) {
                         // Auto-check Filters On
                         form.setFieldValue('filtersOn', true);
                         // Auto-calculate expiry date (90 days from installation)
@@ -3122,67 +3148,67 @@ export default function HomePage() {
                 <Stack gap="sm">
                   {auditLog.map((entry, index) => (
                     <Card key={`${entry.assetId}-${entry.timestamp}-${index}`} shadow="sm" padding="md" radius="md" withBorder>
-                      <Stack gap="xs">
-                        <Group justify="space-between">
-                          <Group gap="xs">
-                            <Badge 
-                              color={
-                                entry.action === 'CREATE' ? 'green' : 
-                                entry.action === 'UPDATE' ? 'blue' : 'red'
-                              }
-                              variant="light"
-                            >
-                              {entry.action}
-                            </Badge>
-                            <Text size="sm" fw={500}>
-                              {entry.action === 'CREATE' ? 'Asset Created' :
-                               entry.action === 'UPDATE' ? 'Asset Updated' : 'Asset Deleted'}
-                            </Text>
-                          </Group>
-                          <Group gap="xs">
-                            <Text size="xs" c="dimmed">
+                        <Stack gap="xs">
+                          <Group justify="space-between">
+                            <Group gap="xs">
+                              <Badge 
+                                color={
+                                  entry.action === 'CREATE' ? 'green' : 
+                                  entry.action === 'UPDATE' ? 'blue' : 'red'
+                                }
+                                variant="light"
+                              >
+                                {entry.action}
+                              </Badge>
+                              <Text size="sm" fw={500}>
+                                {entry.action === 'CREATE' ? 'Asset Created' :
+                                 entry.action === 'UPDATE' ? 'Asset Updated' : 'Asset Deleted'}
+                              </Text>
+                            </Group>
+                            <Group gap="xs">
+                              <Text size="xs" c="dimmed">
                               {new Date(entry.timestamp).toLocaleDateString('en-GB')} at {new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false })}
-                            </Text>
-                            <Text size="xs" c="dimmed">
-                              by {entry.user}
-                            </Text>
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                by {entry.user}
+                              </Text>
+                            </Group>
                           </Group>
-                        </Group>
-                        
+                          
                         {entry.details?.changes && entry.details.changes.length > 0 && (
-                          <div>
-                            <Text size="sm" fw={500} mb="xs">Changes:</Text>
-                            <Stack gap="xs">
+                            <div>
+                              <Text size="sm" fw={500} mb="xs">Changes:</Text>
+                              <Stack gap="xs">
                               {entry.details.changes.map((change: any, changeIndex: number) => (
                                 <Paper key={changeIndex} p="xs" bg="gray.0" radius="sm">
-                                  <Grid>
-                                    <Grid.Col span={3}>
-                                      <Text size="xs" fw={500}>
-                                        {getFieldDisplayName(change.field)}
-                                      </Text>
-                                    </Grid.Col>
-                                    <Grid.Col span={4}>
-                                      <Text size="xs" c="red">
-                                        {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
-                                      </Text>
-                                    </Grid.Col>
-                                    <Grid.Col span={1}>
-                                      <Text size="xs" ta="center">→</Text>
-                                    </Grid.Col>
-                                    <Grid.Col span={4}>
-                                      <Text size="xs" c="green">
-                                        {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
-                                      </Text>
-                                    </Grid.Col>
-                                  </Grid>
-                                </Paper>
-                              ))}
-                            </Stack>
-                          </div>
-                        )}
-                      </Stack>
-                    </Card>
-                  ))}
+                                    <Grid>
+                                      <Grid.Col span={3}>
+                                        <Text size="xs" fw={500}>
+                                          {getFieldDisplayName(change.field)}
+                                        </Text>
+                                      </Grid.Col>
+                                      <Grid.Col span={4}>
+                                        <Text size="xs" c="red">
+                                          {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
+                                        </Text>
+                                      </Grid.Col>
+                                      <Grid.Col span={1}>
+                                        <Text size="xs" ta="center">→</Text>
+                                      </Grid.Col>
+                                      <Grid.Col span={4}>
+                                        <Text size="xs" c="green">
+                                          {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
+                                        </Text>
+                                      </Grid.Col>
+                                    </Grid>
+                                  </Paper>
+                                ))}
+                              </Stack>
+                            </div>
+                          )}
+                        </Stack>
+                      </Card>
+                    ))}
                   
                   {auditLog.length === 0 && (
                     <Group justify="center" py="xl">
