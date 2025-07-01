@@ -60,6 +60,12 @@ The API supports flexible header naming:
 - `filter_installed_on`
 - `Filter Installed On`
 
+### Filters On
+- `Filters On`
+- `filtersOn`
+- `filters_on`
+- `Filter Status`
+
 ### Asset Type
 - `Asset Type`
 - `assetType`
@@ -69,9 +75,35 @@ The API supports flexible header naming:
 
 ## Business Logic
 
-### Filter Expiry Calculation
-- **Formula**: `Filter Expiry = Filter Installed + 3 months`
-- **Applied**: Only when `Filter Needed = YES` and `Filter Installed` is provided
+### Complete Filter Logic Rules
+
+The API implements comprehensive filter state management with the following priority rules:
+
+#### 1. Filter Installed Present & Valid
+- **Condition**: `filterInstalledOn` has valid date
+- **Result**:
+  - `filterNeeded = TRUE`
+  - `filtersOn = TRUE`
+  - `filterExpiry = filterInstalledOn + 3 months`
+
+#### 2. Filter Installed Missing/Invalid
+- **Condition**: `filterInstalledOn` is empty or invalid date
+- **Result**:
+  - `filterNeeded = FALSE`
+  - `filtersOn = FALSE`
+  - `filterExpiry = undefined`
+  - `filterInstalledOn = undefined`
+
+#### 3. Filters On = 'NO' Override
+- **Condition**: `filtersOn` explicitly set to 'NO'
+- **Result**:
+  - Forces `filtersOn = FALSE`
+  - Clears `filterInstalledOn` and `filterExpiry`
+  - Retains `filterNeeded` value if provided
+
+#### 4. Validation Check
+- **Error**: If `filterNeeded = YES` but `filterInstalledOn` missing
+- **Message**: `"Row X: Filter Installed Date is required if Filter Needed is YES"`
 
 ### Asset Type Auto-Creation
 - If `Asset Type` is provided and doesn't exist in database
@@ -111,11 +143,20 @@ The API supports flexible header naming:
 ## Sample CSV Format
 
 ```csv
-Asset Barcode,Location,Filter Needed,Filter Installed,Asset Type
-B30680,Room 301,YES,2024-10-01,Water Tap
-B30681,Room 302,NO,,Water Cooler
-B30682,Room 303,YES,2024-09-15,LNS Outlet - TMT
+Asset Barcode,Location,Filter Needed,Filter Installed,Filters On,Asset Type
+F001,Room 301,YES,2024-10-01,,Water Tap
+F002,Room 302,NO,,,Water Cooler
+F003,Room 303,,2024-09-15,,LNS Outlet - TMT
+F004,Kitchen Area,YES,,NO,Coffee Machine Filter
+F005,Lab 101,YES,2024-10-10,YES,Equipment Stand
 ```
+
+### Filter Logic Examples
+- **F001**: Has install date → `filterNeeded=TRUE, filtersOn=TRUE, expiry=2025-01-01`
+- **F002**: No install date → `filterNeeded=FALSE, filtersOn=FALSE`  
+- **F003**: Has install date (no filter needed specified) → `filterNeeded=TRUE, filtersOn=TRUE`
+- **F004**: `filtersOn=NO` override → `filterNeeded=TRUE, filtersOn=FALSE, cleared dates`
+- **F005**: All fields consistent → `filterNeeded=TRUE, filtersOn=TRUE, expiry calculated`
 
 ## Error Handling
 
