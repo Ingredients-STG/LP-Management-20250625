@@ -564,6 +564,27 @@ export default function HomePage() {
     }
   };
 
+  // Apply filter logic and update form fields
+  const applyFilterLogicToForm = (
+    filterInstalledOn?: Date | null,
+    filterNeeded?: boolean,
+    filtersOn?: boolean
+  ) => {
+    const filterResult = applyFilterLogic({
+      filterInstalledOn: filterInstalledOn,
+      filterNeeded: filterNeeded,
+      filtersOn: filtersOn
+    });
+
+    // Update form fields with calculated values
+    form.setFieldValue('filterNeeded', filterResult.filterNeeded);
+    form.setFieldValue('filtersOn', filterResult.filtersOn);
+    form.setFieldValue('filterInstalledOn', filterResult.filterInstalledOn ? new Date(filterResult.filterInstalledOn) : null);
+    form.setFieldValue('filterExpiryDate', filterResult.filterExpiryDate ? new Date(filterResult.filterExpiryDate) : null);
+
+    return filterResult;
+  };
+
   // Handle bulk upload
   const handleBulkUpload = async () => {
     if (!uploadFile) {
@@ -2472,24 +2493,39 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Group mt="md" mb="md">
-                <Checkbox
-                  label="Filter Needed"
-                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                  onChange={(event) => {
-                    form.setFieldValue('filterNeeded', event.currentTarget.checked);
-                    if (!event.currentTarget.checked) {
-                      // Clear filter fields when Filter Needed is unchecked
-                      form.setFieldValue('filterInstalledOn', null);
-                      form.setFieldValue('filterExpiryDate', null);
-                      form.setFieldValue('filtersOn', false);
-                    }
-                  }}
-                />
-                <Checkbox
-                  label="Filters On"
-                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                />
+              <Group mt="md" mb="md" wrap="wrap">
+                <Group gap="xs">
+                  <Checkbox
+                    label="Filter Needed"
+                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                    onChange={(event) => {
+                      applyFilterLogicToForm(
+                        form.values.filterInstalledOn,
+                        event.currentTarget.checked,
+                        form.values.filtersOn
+                      );
+                    }}
+                  />
+                  <Tooltip label="💡 If YES, select filter installation date. System will auto-calculate expiry.">
+                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
+                  </Tooltip>
+                </Group>
+                <Group gap="xs">
+                  <Checkbox
+                    label="Filters On"
+                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                    onChange={(event) => {
+                      applyFilterLogicToForm(
+                        form.values.filterInstalledOn,
+                        form.values.filterNeeded,
+                        event.currentTarget.checked
+                      );
+                    }}
+                  />
+                  <Tooltip label="💡 If NO, filter dates will be cleared. Used when filter is physically removed.">
+                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
+                  </Tooltip>
+                </Group>
                 <Checkbox
                   label="Augmented Care"
                   {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
@@ -2500,27 +2536,21 @@ export default function HomePage() {
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
-                    disabled={!Boolean(form.values.filterNeeded)}
+                    disabled={form.values.filtersOn === false}
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
-                      form.setFieldValue('filterInstalledOn', value);
-                      if (value instanceof Date) {
-                        // Auto-check Filters On
-                        form.setFieldValue('filtersOn', true);
-                        // Auto-calculate expiry date (90 days from installation)
-                        const expiryDate = new Date(value);
-                        expiryDate.setDate(expiryDate.getDate() + 90);
-                        form.setFieldValue('filterExpiryDate', expiryDate);
-                      } else {
-                        form.setFieldValue('filterExpiryDate', null);
-                      }
+                      applyFilterLogicToForm(
+                        value,
+                        form.values.filterNeeded,
+                        form.values.filtersOn
+                      );
                     }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date (Auto-calculated)"
-                    placeholder="Auto-calculated as Installed + 90 days"
+                    placeholder="Auto-calculated as Installed + 3 months"
                     disabled={true}
                     {...form.getInputProps('filterExpiryDate')}
                   />
@@ -2703,24 +2733,39 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Group mt="md" mb="md">
-                <Checkbox
-                  label="Filter Needed"
-                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                  onChange={(event) => {
-                    form.setFieldValue('filterNeeded', event.currentTarget.checked);
-                    if (!event.currentTarget.checked) {
-                      // Clear filter fields when Filter Needed is unchecked
-                      form.setFieldValue('filterInstalledOn', null);
-                      form.setFieldValue('filterExpiryDate', null);
-                      form.setFieldValue('filtersOn', false);
-                    }
-                  }}
-                />
-                <Checkbox
-                  label="Filters On"
-                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                />
+              <Group mt="md" mb="md" wrap="wrap">
+                <Group gap="xs">
+                  <Checkbox
+                    label="Filter Needed"
+                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                    onChange={(event) => {
+                      applyFilterLogicToForm(
+                        form.values.filterInstalledOn,
+                        event.currentTarget.checked,
+                        form.values.filtersOn
+                      );
+                    }}
+                  />
+                  <Tooltip label="💡 If YES, select filter installation date. System will auto-calculate expiry.">
+                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
+                  </Tooltip>
+                </Group>
+                <Group gap="xs">
+                  <Checkbox
+                    label="Filters On"
+                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                    onChange={(event) => {
+                      applyFilterLogicToForm(
+                        form.values.filterInstalledOn,
+                        form.values.filterNeeded,
+                        event.currentTarget.checked
+                      );
+                    }}
+                  />
+                  <Tooltip label="💡 If NO, filter dates will be cleared. Used when filter is physically removed.">
+                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
+                  </Tooltip>
+                </Group>
                 <Checkbox
                   label="Augmented Care"
                   {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
@@ -2731,27 +2776,21 @@ export default function HomePage() {
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
-                    disabled={!Boolean(form.values.filterNeeded)}
+                    disabled={form.values.filtersOn === false}
                     {...form.getInputProps('filterInstalledOn')}
                     onChange={(value) => {
-                      form.setFieldValue('filterInstalledOn', value);
-                      if (value instanceof Date) {
-                        // Auto-check Filters On
-                        form.setFieldValue('filtersOn', true);
-                        // Auto-calculate expiry date (90 days from installation)
-                        const expiryDate = new Date(value);
-                        expiryDate.setDate(expiryDate.getDate() + 90);
-                        form.setFieldValue('filterExpiryDate', expiryDate);
-                      } else {
-                        form.setFieldValue('filterExpiryDate', null);
-                      }
+                      applyFilterLogicToForm(
+                        value,
+                        form.values.filterNeeded,
+                        form.values.filtersOn
+                      );
                     }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date (Auto-calculated)"
-                    placeholder="Auto-calculated as Installed + 90 days"
+                    placeholder="Auto-calculated as Installed + 3 months"
                     disabled={true}
                     {...form.getInputProps('filterExpiryDate')}
                   />
