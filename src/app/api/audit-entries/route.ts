@@ -6,14 +6,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const assetId = searchParams.get('assetId');
 
-    if (!assetId) {
-      return NextResponse.json(
-        { error: 'assetId query parameter is required' },
-        { status: 400 }
-      );
+    let auditEntries;
+    
+    if (assetId) {
+      // Get audit entries for specific asset
+      auditEntries = await DynamoDBService.getAssetAuditEntries(assetId);
+    } else {
+      // Get all audit entries (global audit log)
+      auditEntries = await DynamoDBService.getAllAuditEntries();
     }
-
-    const auditEntries = await DynamoDBService.getAssetAuditEntries(assetId);
 
     return NextResponse.json({ 
       success: true, 

@@ -165,6 +165,7 @@ export default function HomePage() {
   const [editModalOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  // Filter UI states (non-functional for now)
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [wingFilter, setWingFilter] = useState<string>('');
@@ -913,8 +914,14 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    filterAssets();
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
+    // Only filter by search term - other filters are disabled
+    setFilteredAssets(assets.filter(asset =>
+      searchTerm ? Object.values(asset).some(value =>
+        value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      ) : true
+    ));
+    setCurrentPage(1);
+  }, [assets, searchTerm]);
 
   // Auto-calculate Filter Expiry Date when Filter Installed On changes (Add/Edit UI only)
   useEffect(() => {
@@ -986,40 +993,42 @@ export default function HomePage() {
     }
   };
 
-  const filterAssets = () => {
-    let filtered = assets;
-
-    if (searchTerm) {
-      filtered = filtered.filter(asset =>
-        Object.values(asset).some(value =>
-          value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }
-
-    if (statusFilter) {
-      filtered = filtered.filter(asset => asset.status === statusFilter);
-    }
-
-    if (typeFilter) {
-      filtered = filtered.filter(asset => asset.assetType === typeFilter);
-    }
-
-    if (wingFilter) {
-      filtered = filtered.filter(asset => asset.wing === wingFilter);
-    }
-
-    setFilteredAssets(filtered);
-    setCurrentPage(1);
-  };
+  // Removed broken filterAssets function - filtering now handled in useEffect
 
   const handleAddAsset = async (values: any) => {
     try {
+      // Helper function to safely convert date to ISO string
+      const formatDateForAPI = (dateValue: any) => {
+        if (!dateValue) return '';
+        
+        // If it's already a Date object, use it directly
+        if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+          return dateValue.toISOString().split('T')[0];
+        }
+        
+        // If it's a string in DD/MM/YYYY format, parse it
+        if (typeof dateValue === 'string' && dateValue.includes('/')) {
+          const [day, month, year] = dateValue.split('/');
+          const parsedDate = new Date(`${year}-${month}-${day}`);
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate.toISOString().split('T')[0];
+          }
+        }
+        
+        // Try to parse as a regular date string
+        const parsedDate = new Date(dateValue);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toISOString().split('T')[0];
+        }
+        
+        return '';
+      };
+
       const assetData = {
         ...values,
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
-        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString().split('T')[0] : '',
-        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString().split('T')[0] : '',
+        filterExpiryDate: formatDateForAPI(values.filterExpiryDate),
+        filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
       };
 
 
@@ -1079,10 +1088,37 @@ export default function HomePage() {
         throw new Error('No asset selected for update');
       }
 
+      // Helper function to safely convert date to ISO string
+      const formatDateForAPI = (dateValue: any) => {
+        if (!dateValue) return '';
+        
+        // If it's already a Date object, use it directly
+        if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+          return dateValue.toISOString().split('T')[0];
+        }
+        
+        // If it's a string in DD/MM/YYYY format, parse it
+        if (typeof dateValue === 'string' && dateValue.includes('/')) {
+          const [day, month, year] = dateValue.split('/');
+          const parsedDate = new Date(`${year}-${month}-${day}`);
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate.toISOString().split('T')[0];
+          }
+        }
+        
+        // Try to parse as a regular date string
+        const parsedDate = new Date(dateValue);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toISOString().split('T')[0];
+        }
+        
+        return '';
+      };
+
       const updateData = {
         ...values,
-        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString().split('T')[0] : '',
-        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString().split('T')[0] : '',
+        filterExpiryDate: formatDateForAPI(values.filterExpiryDate),
+        filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
         attachments: selectedAsset?.attachments || [], // Include current attachments
         modifiedBy: getCurrentUser(),
       };
@@ -1797,11 +1833,12 @@ export default function HomePage() {
             </Group>
             <Group gap="xs" grow>
               <Select
-                placeholder="Status"
+                placeholder="Status (Coming Soon)"
                 data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value || '')}
                 clearable
+                disabled
                 size="sm"
                 styles={{
                   input: {
@@ -1810,11 +1847,12 @@ export default function HomePage() {
                 }}
               />
               <Select
-                placeholder="Type"
+                placeholder="Type (Coming Soon)"
                 data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value || '')}
                 clearable
+                disabled
                 size="sm"
                 styles={{
                   input: {
@@ -1824,11 +1862,12 @@ export default function HomePage() {
               />
             </Group>
             <Select
-              placeholder="Filter by wing"
+              placeholder="Wing (Coming Soon)"
               data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
               value={wingFilter}
               onChange={(value) => setWingFilter(value || '')}
               clearable
+              disabled
               size="sm"
               styles={{
                 input: {
@@ -1863,29 +1902,32 @@ export default function HomePage() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <Select
-                placeholder="Filter by status"
+                placeholder="Status (Coming Soon)"
                 data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value || '')}
                 clearable
+                disabled
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <Select
-                placeholder="Filter by type"
+                placeholder="Type (Coming Soon)"
                 data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value || '')}
                 clearable
+                disabled
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <Select
-                placeholder="Filter by wing"
+                placeholder="Wing (Coming Soon)"
                 data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
                 value={wingFilter}
                 onChange={(value) => setWingFilter(value || '')}
                 clearable
+                disabled
               />
             </Grid.Col>
           </Grid>

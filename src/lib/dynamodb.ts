@@ -361,6 +361,26 @@ export class DynamoDBService {
     }
   }
 
+  // Get all audit entries (global audit log)
+  static async getAllAuditEntries(): Promise<AuditLogEntry[]> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      const command = new ScanCommand({
+        TableName: AUDIT_TABLE_NAME,
+      });
+
+      const result = await dynamodb.send(command);
+      const entries = (result.Items as AuditLogEntry[]) || [];
+      
+      // Sort by timestamp descending (newest first)
+      return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (error) {
+      console.error('Error getting all audit entries:', error);
+      throw error;
+    }
+  }
+
   // Asset Types Management
   
   // Create asset types table if it doesn't exist

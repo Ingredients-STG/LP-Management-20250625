@@ -135,21 +135,22 @@
 
 /* 📱 MOBILE OPTIMIZATIONS (≤480px) */
 @media screen and (max-width: 480px) {
-  /* Remove horizontal padding and enable full-width layouts */
+  /* Minimal padding for edge-to-edge design */
   .main-shell {
     padding: 0 !important;
+    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
   }
   
   .responsive-container {
     width: 100% !important;
     max-width: 100% !important;
-    padding: 0.5rem !important;
+    padding: 0.25rem !important;
     margin: 0 !important;
   }
   
   .header-container {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
   }
   
   /* Full-width asset cards and filters */
@@ -224,6 +225,10 @@
 
 /* 📱 MOBILE EXTENDED (≤768px) */
 @media screen and (max-width: 768px) {
+  .main-shell {
+    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
+  }
+  
   .responsive-container {
     width: 100%;
     max-width: 100%;
@@ -309,16 +314,20 @@
 
 /* 💻 DESKTOP OPTIMIZATIONS (≥769px) */
 @media screen and (min-width: 769px) {
+  .main-shell {
+    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
+  }
+  
   .responsive-container {
     width: 100%;
     max-width: 1200px;
-    padding: 1rem 2rem;
+    padding: 0.5rem 1rem;
     margin: 0 auto;
   }
   
   .header-container {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
   }
 }
 
@@ -326,12 +335,12 @@
 @media screen and (min-width: 1440px) {
   .responsive-container {
     max-width: 1440px !important;
-    padding: 1.5rem 3rem !important;
+    padding: 1rem 2rem !important;
   }
   
   .header-container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
   
   /* Expand layout width and remove dead space */
@@ -360,12 +369,12 @@
 @media screen and (min-width: 1920px) {
   .responsive-container {
     max-width: 1680px !important;
-    padding: 2rem 4rem !important;
+    padding: 1.5rem 3rem !important;
   }
   
   .header-container {
-    padding-left: 2rem;
-    padding-right: 2rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
   }
   
   /* Enhanced layouts for ultra-wide */
@@ -387,12 +396,12 @@
 @media screen and (min-width: 2560px) {
   .responsive-container {
     max-width: 2200px !important;
-    padding: 2.5rem 5rem !important;
+    padding: 2rem 4rem !important;
   }
   
   .header-container {
-    padding-left: 2.5rem;
-    padding-right: 2.5rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
   }
   
   /* Enhanced layouts for 4K */

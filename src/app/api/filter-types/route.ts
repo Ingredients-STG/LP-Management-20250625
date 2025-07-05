@@ -79,15 +79,22 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { label } = await req.json();
+    console.log('DELETE filter type request received');
+    const body = await req.json();
+    console.log('Request body:', body);
+    
+    const { label } = body;
 
     if (!label) {
+      console.log('Label is missing from request');
       return NextResponse.json({ 
         success: false, 
         error: 'Label is required' 
       }, { status: 400 });
     }
 
+    console.log('Searching for filter type with label:', label);
+    
     // First, find the item by label
     const scanResult = await ddbClient.send(new ScanCommand({
       TableName: FILTER_TYPES_TABLE,
@@ -96,7 +103,10 @@ export async function DELETE(req: NextRequest) {
       ExpressionAttributeValues: { ':label': label }
     }));
 
+    console.log('Scan result:', scanResult);
+
     if (!scanResult.Items || scanResult.Items.length === 0) {
+      console.log('Filter type not found');
       return NextResponse.json({ 
         success: false, 
         error: 'Filter type not found' 
@@ -104,6 +114,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const item = scanResult.Items[0];
+    console.log('Found item to delete:', item);
     
     // Delete the item using its primary key
     await ddbClient.send(new DeleteCommand({
@@ -111,15 +122,21 @@ export async function DELETE(req: NextRequest) {
       Key: { typeId: item.typeId }
     }));
 
+    console.log('Filter type deleted successfully');
     return NextResponse.json({ 
       success: true, 
       message: 'Filter type deleted successfully' 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting filter type:', error);
+    console.error('Error details:', {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack
+    });
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to delete filter type' 
+      error: `Failed to delete filter type: ${error?.message || 'Unknown error'}` 
     }, { status: 500 });
   }
 } 
