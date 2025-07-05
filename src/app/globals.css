@@ -20,6 +20,12 @@
   input, select, textarea {
     font-size: 16px;
   }
+  
+  /* CSS Variables for layout spacing */
+  :root {
+    --navbar-height: 70px;
+    --navbar-padding: calc(var(--navbar-height) + 2px);
+  }
 }
 
 /* Custom animations for enhanced UX */
@@ -138,7 +144,7 @@
   /* Minimal padding for edge-to-edge design */
   .main-shell {
     padding: 0 !important;
-    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
+    padding-top: var(--navbar-padding) !important; /* Clear fixed navbar */
   }
   
   .responsive-container {
@@ -226,7 +232,7 @@
 /* 📱 MOBILE EXTENDED (≤768px) */
 @media screen and (max-width: 768px) {
   .main-shell {
-    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
+    padding-top: var(--navbar-padding) !important; /* Clear fixed navbar */
   }
   
   .responsive-container {
@@ -315,7 +321,7 @@
 /* 💻 DESKTOP OPTIMIZATIONS (≥769px) */
 @media screen and (min-width: 769px) {
   .main-shell {
-    padding-top: 1rem !important; /* Add top padding to clear fixed navbar */
+    padding-top: var(--navbar-padding) !important; /* Clear fixed navbar */
   }
   
   .responsive-container {
