@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { getCurrentUser, formatTimestamp } from '@/lib/utils';
 
 // Configure DynamoDB client
 const client = new DynamoDBClient({
@@ -18,40 +19,52 @@ const ASSETS_TABLE = 'water-tap-assets';
 const ASSET_TYPES_TABLE = 'AssetTypes';
 
 /**
- * Enhanced date parsing supporting multiple formats
- * Supports: Excel serial numbers, yyyy-mm-dd, dd/mm/yyyy
+ * Enhanced date parsing supporting STRICT DD/MM/YYYY format only
+ * Rejects YYYY-MM-DD or any other ambiguous formats
  */
-function parseExcelDate(value: any): string | undefined {
-  if (!value) return undefined;
+function parseExcelDate(value: any, rowNum?: number): { date?: string; error?: string } {
+  if (!value) return { date: undefined };
 
   try {
     // Handle Excel serial numbers
     if (typeof value === 'number') {
       const epoch = new Date(Date.UTC(1899, 11, 30)); // Excel base date
       epoch.setDate(epoch.getDate() + value);
-      return epoch.toISOString().split('T')[0]; // YYYY-MM-DD
+      return { date: epoch.toISOString().split('T')[0] }; // YYYY-MM-DD
     } 
-    // Handle string dates
+    // Handle string dates - STRICT DD/MM/YYYY format only
     else if (typeof value === 'string') {
       const trimmed = value.trim();
       
-      // Handle dd/mm/yyyy format
+      // Only accept DD/MM/YYYY format
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
         const [day, month, year] = trimmed.split('/');
         const date = new Date(`${year}-${month}-${day}`);
-        return isNaN(date.getTime()) ? undefined : date.toISOString().split('T')[0];
+        
+        if (isNaN(date.getTime())) {
+          return { 
+            error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+          };
+        }
+        
+        return { date: date.toISOString().split('T')[0] };
       }
-      // Handle yyyy-mm-dd and other ISO formats
+      // Reject any other format including YYYY-MM-DD
       else {
-        const parsed = new Date(trimmed);
-        return isNaN(parsed.getTime()) ? undefined : parsed.toISOString().split('T')[0];
+        return { 
+          error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+        };
       }
     }
   } catch {
-    return undefined;
+    return { 
+      error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+    };
   }
   
-  return undefined;
+  return { 
+    error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+  };
 }
 
 /**
@@ -196,6 +209,25 @@ export async function POST(req: NextRequest) {
           row['type']
         )?.toString().trim();
 
+        // Parse new fields
+        const needFlushingRaw = (
+          row['Need Flushing'] || 
+          row['needFlushing'] || 
+          row['need_flushing']
+        )?.toString().toUpperCase();
+
+        const filterType = (
+          row['Filter Type'] || 
+          row['filterType'] || 
+          row['filter_type']
+        )?.toString().trim();
+
+        const augmentedCareRaw = (
+          row['Augmented Care'] || 
+          row['augmentedCare'] || 
+          row['augmented_care']
+        )?.toString().toUpperCase();
+
         // Validate required fields
         if (!assetBarcode) {
           results.failed++;
@@ -223,11 +255,22 @@ export async function POST(req: NextRequest) {
         let filterExpiryDate: string | undefined = undefined;
 
         // Parse filter installed date using enhanced parseExcelDate
-        const parsedInstalled = parseExcelDate(rawInstalled);
+        const parsedInstalled = parseExcelDate(rawInstalled, rowNum);
+        
+        // Check for date parsing errors
+        if (parsedInstalled.error) {
+          results.failed++;
+          results.errors.push(parsedInstalled.error);
+          continue;
+        }
 
         // Parse user-provided values (preserve legacy data)
         filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
         filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
+
+        // Parse new boolean fields
+        const needFlushing = needFlushingRaw ? ['YES', 'TRUE', '1', 'Y'].includes(needFlushingRaw) : false;
+        const augmentedCare = augmentedCareRaw ? ['YES', 'TRUE', '1', 'Y'].includes(augmentedCareRaw) : false;
 
         // Special override: If filtersOn = 'NO' explicitly provided, force clear dates
         if (filtersOnRaw && ['NO', 'FALSE', '0', 'N'].includes(filtersOnRaw)) {
@@ -236,17 +279,22 @@ export async function POST(req: NextRequest) {
           filterExpiryDate = undefined;
         }
         // If filterInstalledOn is valid, calculate expiry regardless of other fields
-        else if (parsedInstalled) {
-          filterInstalledOn = parsedInstalled;
+        else if (parsedInstalled.date) {
+          filterInstalledOn = parsedInstalled.date;
           
           // Calculate filter expiry using enhanced function
-          const installedDate = new Date(parsedInstalled);
+          const installedDate = new Date(parsedInstalled.date);
           const expiryDate = getFilterExpiryFromInstalledDate(installedDate);
           filterExpiryDate = expiryDate.toISOString().split('T')[0];
+          
+          // If filtersOn was set to YES in CSV, preserve that value
+          if (filtersOnRaw && ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw)) {
+            filtersOn = true;
+          }
         }
 
         // Rule 4: Validation Check
-        if (filterNeededRaw && ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) && !parsedInstalled) {
+        if (filterNeededRaw && ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) && !parsedInstalled.date) {
           results.failed++;
           results.errors.push(`Row ${rowNum}: Filter Installed Date is required if Filter Needed is YES`);
           continue;
@@ -276,6 +324,7 @@ export async function POST(req: NextRequest) {
         // Create asset record
         const assetId = `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const now = new Date().toISOString();
+        const currentUser = getCurrentUser();
 
         const assetData = {
           id: assetId,
@@ -286,6 +335,8 @@ export async function POST(req: NextRequest) {
           filterInstalledOn: filterInstalledOn || '',
           filterExpiryDate: filterExpiryDate || '',
           filtersOn,
+          needFlushing,
+          filterType: filterType || '',
           status: 'ACTIVE',
           primaryIdentifier: assetBarcode, // Default to barcode
           secondaryIdentifier: '',
@@ -296,11 +347,11 @@ export async function POST(req: NextRequest) {
           roomNo: '',
           roomName: '',
           notes: '',
-          augmentedCare: false,
+          augmentedCare,
           created: now,
-          createdBy: 'csv-upload',
+          createdBy: currentUser,
           modified: now,
-          modifiedBy: 'csv-upload'
+          modifiedBy: currentUser
         };
 
         await ddbClient.send(new PutCommand({

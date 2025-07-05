@@ -44,6 +44,7 @@ import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { applyFilterLogic, formatFilterAge } from '@/lib/filterLogic';
+import { getCurrentUser, formatTimestamp } from '@/lib/utils';
 import {
   IconDroplet,
   IconFilter,
@@ -103,6 +104,8 @@ interface Asset {
   filtersOn: boolean | string;
   filterExpiryDate: string;
   filterInstalledOn: string;
+  needFlushing: boolean | string;
+  filterType: string;
   notes: string;
   augmentedCare: boolean | string;
   attachments?: Array<{
@@ -173,6 +176,9 @@ export default function HomePage() {
   const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
   const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
   const [newAssetType, setNewAssetType] = useState('');
+  const [filterTypes, setFilterTypes] = useState<string[]>(['Standard', 'Advanced', 'Premium', 'Basic']);
+  const [showNewFilterTypeInput, setShowNewFilterTypeInput] = useState(false);
+  const [newFilterType, setNewFilterType] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -309,7 +315,7 @@ export default function HomePage() {
         },
         body: JSON.stringify({
       assetId: asset.id || '',
-          user: 'Current User', // In a real app, this would come from authentication
+          user: getCurrentUser(), // Get current user from authentication
           action,
           details: {
       assetBarcode: asset.assetBarcode,
@@ -355,6 +361,20 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error fetching asset types:', error);
+    }
+  };
+
+  const fetchFilterTypes = async () => {
+    try {
+      const response = await fetch('/api/filter-types');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setFilterTypes(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching filter types:', error);
     }
   };
 
@@ -442,6 +462,100 @@ export default function HomePage() {
         }
       },
     });
+  };
+
+  // Filter Type Management Functions
+  const handleAddNewFilterType = async () => {
+    if (!newFilterType.trim()) return;
+
+    try {
+      const response = await fetch('/api/filter-types', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label: newFilterType.trim() }),
+      });
+
+      if (response.ok) {
+        setFilterTypes(prev => [...prev, newFilterType.trim()]);
+        setNewFilterType('');
+        setShowNewFilterTypeInput(false);
+        
+        notifications.show({
+          title: 'Success',
+          message: 'Filter type added successfully!',
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      } else {
+        throw new Error('Failed to create filter type');
+      }
+    } catch (error) {
+      console.error('Error adding filter type:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to add filter type',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleDeleteFilterType = (typeLabel: string) => {
+    modals.openConfirmModal({
+      title: 'Delete Filter Type',
+      children: (
+        <Text size="sm">
+          Are you sure you want to delete filter type <strong>{typeLabel}</strong>? 
+          This action cannot be undone.
+        </Text>
+      ),
+      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          const response = await fetch('/api/filter-types', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ label: typeLabel }),
+          });
+
+          if (response.ok) {
+            setFilterTypes(prev => prev.filter(type => type !== typeLabel));
+            
+            notifications.show({
+              title: 'Success',
+              message: `Filter type "${typeLabel}" deleted successfully!`,
+              color: 'green',
+              icon: <IconCheck size={16} />,
+            });
+          } else {
+            throw new Error('Failed to delete filter type');
+          }
+        } catch (error) {
+          console.error('Error deleting filter type:', error);
+          notifications.show({
+            title: 'Error',
+            message: 'Failed to delete filter type',
+            color: 'red',
+            icon: <IconX size={16} />,
+          });
+        }
+      },
+    });
+  };
+
+  const handleFilterTypeSelect = (value: string | null) => {
+    if (value === 'ADD_NEW') {
+      setShowNewFilterTypeInput(true);
+      setNewFilterType('');
+    } else if (value) {
+      form.setFieldValue('filterType', value);
+      setShowNewFilterTypeInput(false);
+    }
   };
 
   // Handle file upload for assets
@@ -566,7 +680,7 @@ export default function HomePage() {
 
   // Apply filter logic and update form fields
   const applyFilterLogicToForm = (
-    filterInstalledOn?: Date | null,
+    filterInstalledOn?: Date | string | null,
     filterNeeded?: boolean,
     filtersOn?: boolean
   ) => {
@@ -741,6 +855,8 @@ export default function HomePage() {
     filtersOn: boolean;
     filterExpiryDate: Date | null;
     filterInstalledOn: Date | null;
+    needFlushing: boolean;
+    filterType: string;
     notes: string;
     augmentedCare: boolean;
   }>({
@@ -761,6 +877,8 @@ export default function HomePage() {
       filtersOn: false,
       filterExpiryDate: null,
       filterInstalledOn: null,
+      needFlushing: false,
+      filterType: '',
       notes: '',
       augmentedCare: false,
     },
@@ -768,6 +886,8 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchData();
+    fetchAssetTypes();
+    fetchFilterTypes();
   }, []);
 
   useEffect(() => {
@@ -898,7 +1018,11 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(assetData),
+        body: JSON.stringify({
+          ...assetData,
+          createdBy: getCurrentUser(),
+          modifiedBy: getCurrentUser(),
+        }),
       });
 
       if (!response.ok) {
@@ -969,6 +1093,7 @@ export default function HomePage() {
         filterExpiryDate: filterResult.filterExpiryDate || '',
         filterInstalledOn: filterResult.filterInstalledOn || '',
         attachments: selectedAsset?.attachments || [], // Include current attachments
+        modifiedBy: getCurrentUser(),
       };
 
 
@@ -2128,6 +2253,81 @@ export default function HomePage() {
       </Card>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">Filter Types Management</Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Manage available filter types for your water management system.
+        </Text>
+        
+        <Stack gap="md">
+          <div>
+            <Text size="sm" fw={500} mb="xs">Current Filter Types:</Text>
+            <Group gap="xs">
+              {filterTypes.map((type, index) => (
+                <Group key={index} gap={4}>
+                  <Badge variant="light" color="green">
+                    {type}
+                  </Badge>
+                  <ActionIcon
+                    size="sm"
+                    color="red"
+                    variant="subtle"
+                    onClick={() => handleDeleteFilterType(type)}
+                    title={`Delete ${type}`}
+                  >
+                    <IconTrash size={12} />
+                  </ActionIcon>
+                </Group>
+              ))}
+            </Group>
+          </div>
+          
+          {showNewFilterTypeInput ? (
+            <Group>
+              <TextInput
+                placeholder="Enter new filter type"
+                value={newFilterType}
+                onChange={(e) => setNewFilterType(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddNewFilterType();
+                  }
+                  if (e.key === 'Escape') {
+                    setShowNewFilterTypeInput(false);
+                    setNewFilterType('');
+                  }
+                }}
+                autoFocus
+                size="sm"
+                style={{ flex: 1 }}
+              />
+              <Button size="sm" onClick={handleAddNewFilterType} disabled={!newFilterType.trim()}>
+                Add
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowNewFilterTypeInput(false);
+                  setNewFilterType('');
+                }}
+              >
+                Cancel
+              </Button>
+            </Group>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setShowNewFilterTypeInput(true)}
+            >
+              Add New Filter Type
+            </Button>
+          )}
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Title order={4} mb="md">System Configuration</Title>
         <Stack gap="md">
           <Checkbox label="Enable automatic notifications" defaultChecked />
@@ -2154,11 +2354,7 @@ export default function HomePage() {
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between" style={{ 
             paddingLeft: 'var(--mantine-spacing-xs)', 
-            paddingRight: 'var(--mantine-spacing-xs)',
-            '@media (min-width: 768px)': {
-              paddingLeft: 'var(--mantine-spacing-md)',
-              paddingRight: 'var(--mantine-spacing-md)'
-            }
+            paddingRight: 'var(--mantine-spacing-xs)'
           }}>
             <Group gap="xs">
               <ActionIcon
@@ -2182,7 +2378,7 @@ export default function HomePage() {
                     <Text component="span" visibleFrom="sm">Water Asset Management</Text>
                     <Text component="span" hiddenFrom="sm">Asset Mgmt</Text>
                   </Text>
-        </div>
+                </div>
               </Group>
             </Group>
 
@@ -2235,7 +2431,7 @@ export default function HomePage() {
           </Group>
         </AppShell.Header>
 
-{!hideTabContainer && (
+        {!hideTabContainer && (
           <AppShell.Navbar p="md">
             <Stack gap="xs">
               <Button
@@ -2427,6 +2623,12 @@ export default function HomePage() {
                     {...form.getInputProps('status')}
                   />
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Augmented Care"
+                    {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
               </Grid>
     </div>
 
@@ -2495,9 +2697,9 @@ export default function HomePage() {
               <Title order={5} mb="sm">Filter Information</Title>
               <Group mt="md" mb="md" wrap="wrap">
                 <Group gap="xs">
-                  <Checkbox
-                    label="Filter Needed"
-                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                <Checkbox
+                  label="Filter Needed"
+                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
                     onChange={(event) => {
                       applyFilterLogicToForm(
                         form.values.filterInstalledOn,
@@ -2511,9 +2713,9 @@ export default function HomePage() {
                   </Tooltip>
                 </Group>
                 <Group gap="xs">
-                  <Checkbox
-                    label="Filters On"
-                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                <Checkbox
+                  label="Filters On"
+                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
                     onChange={(event) => {
                       applyFilterLogicToForm(
                         form.values.filterInstalledOn,
@@ -2526,10 +2728,12 @@ export default function HomePage() {
                     <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
                   </Tooltip>
                 </Group>
-                <Checkbox
-                  label="Augmented Care"
-                  {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
-                />
+                <Group gap="xs">
+                  <Checkbox
+                    label="Need Flushing"
+                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                  />
+                </Group>
               </Group>
               <Grid>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -2554,6 +2758,39 @@ export default function HomePage() {
                     disabled={true}
                     {...form.getInputProps('filterExpiryDate')}
                   />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Stack gap="xs">
+                    <Select
+                      label="Filter Type"
+                      placeholder="Select filter type"
+                      data={[...filterTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      value={form.values.filterType}
+                      onChange={handleFilterTypeSelect}
+                    />
+                    {showNewFilterTypeInput && (
+                      <Group gap="xs">
+                        <TextInput
+                          placeholder="Enter new filter type"
+                          value={newFilterType}
+                          onChange={(e) => setNewFilterType(e.currentTarget.value)}
+                          style={{ flex: 1 }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewFilterType();
+                            }
+                          }}
+                        />
+                        <Button size="xs" onClick={handleAddNewFilterType}>
+                          Add
+                        </Button>
+                        <Button size="xs" variant="outline" onClick={() => setShowNewFilterTypeInput(false)}>
+                          Cancel
+                        </Button>
+                      </Group>
+                    )}
+                  </Stack>
                 </Grid.Col>
               </Grid>
             </div>
@@ -2667,6 +2904,12 @@ export default function HomePage() {
                     {...form.getInputProps('status')}
                   />
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Augmented Care"
+                    {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
               </Grid>
             </div>
 
@@ -2735,9 +2978,9 @@ export default function HomePage() {
               <Title order={5} mb="sm">Filter Information</Title>
               <Group mt="md" mb="md" wrap="wrap">
                 <Group gap="xs">
-                  <Checkbox
-                    label="Filter Needed"
-                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                <Checkbox
+                  label="Filter Needed"
+                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
                     onChange={(event) => {
                       applyFilterLogicToForm(
                         form.values.filterInstalledOn,
@@ -2751,9 +2994,9 @@ export default function HomePage() {
                   </Tooltip>
                 </Group>
                 <Group gap="xs">
-                  <Checkbox
-                    label="Filters On"
-                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                <Checkbox
+                  label="Filters On"
+                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
                     onChange={(event) => {
                       applyFilterLogicToForm(
                         form.values.filterInstalledOn,
@@ -2766,10 +3009,12 @@ export default function HomePage() {
                     <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
                   </Tooltip>
                 </Group>
-                <Checkbox
-                  label="Augmented Care"
-                  {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
-                />
+                <Group gap="xs">
+                  <Checkbox
+                    label="Need Flushing"
+                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                  />
+                </Group>
               </Group>
               <Grid>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -2794,6 +3039,39 @@ export default function HomePage() {
                     disabled={true}
                     {...form.getInputProps('filterExpiryDate')}
                   />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Stack gap="xs">
+                    <Select
+                      label="Filter Type"
+                      placeholder="Select filter type"
+                      data={[...filterTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      value={form.values.filterType}
+                      onChange={handleFilterTypeSelect}
+                    />
+                    {showNewFilterTypeInput && (
+                      <Group gap="xs">
+                        <TextInput
+                          placeholder="Enter new filter type"
+                          value={newFilterType}
+                          onChange={(e) => setNewFilterType(e.currentTarget.value)}
+                          style={{ flex: 1 }}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddNewFilterType();
+                            }
+                          }}
+                        />
+                        <Button size="xs" onClick={handleAddNewFilterType}>
+                          Add
+                        </Button>
+                        <Button size="xs" variant="outline" onClick={() => setShowNewFilterTypeInput(false)}>
+                          Cancel
+                        </Button>
+                      </Group>
+                    )}
+                  </Stack>
                 </Grid.Col>
               </Grid>
             </div>
@@ -2996,6 +3274,16 @@ export default function HomePage() {
                   <Text size="sm" c="dimmed">Asset Type</Text>
                   <Text size="sm">{selectedAsset.assetType}</Text>
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Augmented Care</Text>
+                  <Badge 
+                    color={(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
               </Grid>
             </div>
 
@@ -3083,14 +3371,18 @@ export default function HomePage() {
                   ) : null;
                 })()}
                 <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Augmented Care</Text>
+                  <Text size="sm" c="dimmed">Need Flushing</Text>
                   <Badge 
-                    color={(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    color={(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'orange' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'Yes' : 'No'}
                   </Badge>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Filter Type</Text>
+                  <Text size="sm">{selectedAsset.filterType || 'N/A'}</Text>
                 </Grid.Col>
               </Grid>
             </div>
@@ -3197,6 +3489,8 @@ export default function HomePage() {
                     filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
                     filterExpiryDate: selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate) : null,
                     filterInstalledOn: selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn) : null,
+                    needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true',
+                    filterType: selectedAsset.filterType || '',
                     notes: selectedAsset.notes,
                     augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
                   });
@@ -3259,7 +3553,7 @@ export default function HomePage() {
                             </Group>
                             <Group gap="xs">
                               <Text size="xs" c="dimmed">
-                              {new Date(entry.timestamp).toLocaleDateString('en-GB')} at {new Date(entry.timestamp).toLocaleTimeString('en-GB', { hour12: false })}
+                                {formatTimestamp(entry.timestamp)}
                               </Text>
                               <Text size="xs" c="dimmed">
                                 by {entry.user}

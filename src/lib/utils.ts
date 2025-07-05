@@ -234,3 +234,31 @@ export const isString = (value: unknown): value is string => {
 export const isNumber = (value: unknown): value is number => {
   return typeof value === 'number' && !isNaN(value);
 }; 
+
+// Date and time formatting utilities
+export const formatTimestamp = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  
+  // Format as DD/MM/YYYY HH:mm:ss (UK format, 24-hour clock)
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const seconds = d.getSeconds().toString().padStart(2, '0');
+  
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+};
+
+// User identification utilities
+export const getCurrentUser = (): string => {
+  // TODO: Implement Cognito user identification
+  // For now, return a placeholder that can be easily identified and replaced
+  return 'system-user';
+};
+
+export const getCurrentUserEmail = (): string => {
+  // TODO: Implement Cognito user email retrieval
+  // For now, return a placeholder
+  return 'system@example.com';
+}; 
