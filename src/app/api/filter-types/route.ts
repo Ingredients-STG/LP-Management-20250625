@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBDocumentClient, PutCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, CreateTableCommand, DescribeTableCommand, waitUntilTableExists } from '@aws-sdk/client-dynamodb';
 
 const client = new DynamoDBClient({
   region: process.env.AMPLIFY_AWS_REGION || 'eu-west-2',
@@ -13,8 +13,83 @@ const client = new DynamoDBClient({
 const ddbClient = DynamoDBDocumentClient.from(client);
 const FILTER_TYPES_TABLE = 'FilterTypes';
 
+// Helper function to create filter types table if it doesn't exist
+async function createFilterTypesTableIfNotExists() {
+  try {
+    // Check if table exists
+    const describeCommand = new DescribeTableCommand({
+      TableName: FILTER_TYPES_TABLE,
+    });
+    
+    await client.send(describeCommand);
+    console.log(`Filter types table ${FILTER_TYPES_TABLE} already exists`);
+  } catch (error: any) {
+    if (error.name === 'ResourceNotFoundException') {
+      console.log(`Creating filter types table ${FILTER_TYPES_TABLE}...`);
+      
+      const createCommand = new CreateTableCommand({
+        TableName: FILTER_TYPES_TABLE,
+        KeySchema: [
+          {
+            AttributeName: 'typeId',
+            KeyType: 'HASH', // Partition key
+          },
+        ],
+        AttributeDefinitions: [
+          {
+            AttributeName: 'typeId',
+            AttributeType: 'S',
+          },
+        ],
+        BillingMode: 'PAY_PER_REQUEST',
+      });
+
+      await client.send(createCommand);
+      
+      // Wait for table to be created
+      await waitUntilTableExists(
+        { client, maxWaitTime: 60 },
+        { TableName: FILTER_TYPES_TABLE }
+      );
+      
+      console.log(`Filter types table ${FILTER_TYPES_TABLE} created successfully`);
+      
+      // Seed default filter types
+      await seedDefaultFilterTypes();
+    } else {
+      console.error('Error checking/creating filter types table:', error);
+      throw error;
+    }
+  }
+}
+
+// Helper function to seed default filter types
+async function seedDefaultFilterTypes() {
+  const defaultTypes = ['Standard', 'Advanced', 'Premium', 'Basic'];
+  
+  for (const label of defaultTypes) {
+    try {
+      const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      await ddbClient.send(new PutCommand({
+        TableName: FILTER_TYPES_TABLE,
+        Item: {
+          typeId,
+          label: label.trim(),
+          createdAt: new Date().toISOString(),
+          createdBy: 'system'
+        },
+      }));
+    } catch (error) {
+      console.error(`Error seeding filter type ${label}:`, error);
+    }
+  }
+}
+
 export async function GET() {
   try {
+    await createFilterTypesTableIfNotExists();
+    
     const result = await ddbClient.send(new ScanCommand({
       TableName: FILTER_TYPES_TABLE,
     }));
@@ -32,6 +107,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await createFilterTypesTableIfNotExists();
+    
     const { label } = await req.json();
 
     if (!label || typeof label !== 'string') {
@@ -79,6 +156,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    await createFilterTypesTableIfNotExists();
+    
     console.log('DELETE filter type request received');
     const body = await req.json();
     console.log('Request body:', body);
