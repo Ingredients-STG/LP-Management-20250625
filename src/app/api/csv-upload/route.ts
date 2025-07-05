@@ -67,29 +67,7 @@ function parseExcelDate(value: any, rowNum?: number): { date?: string; error?: s
   };
 }
 
-/**
- * Calculate filter expiry date exactly 3 months from installation date
- * Handles month overflow by adjusting to the last valid day of the target month
- */
-function getFilterExpiryFromInstalledDate(installed: Date): Date {
-  // Work with UTC to avoid timezone issues
-  const year = installed.getUTCFullYear();
-  const month = installed.getUTCMonth();
-  const day = installed.getUTCDate();
-  
-  // Calculate target month and year
-  const targetMonth = (month + 3) % 12;
-  const targetYear = year + Math.floor((month + 3) / 12);
-  
-  // Get the last day of the target month
-  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  
-  // Set to the original day or the last valid day of the target month
-  const targetDay = Math.min(day, lastDayOfTargetMonth);
-  
-  // Create the result date in UTC
-  return new Date(Date.UTC(targetYear, targetMonth, targetDay));
-}
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -201,6 +179,12 @@ export async function POST(req: NextRequest) {
           row['filter_installed_on'] ||
           row['Filter Installed On'];
 
+        const rawExpiry = 
+          row['Filter Expiry Date'] || 
+          row['filterExpiryDate'] || 
+          row['filter_expiry_date'] ||
+          row['Filter Expiry'];
+
         const assetType = (
           row['Asset Type'] || 
           row['assetType'] || 
@@ -248,14 +232,9 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // ✅ REVISED BULK UPLOAD FILTER RULES - Preserve legacy data, only auto-calculate expiry
-        let filterNeeded: boolean;
-        let filtersOn: boolean;
-        let filterInstalledOn: string | undefined = undefined;
-        let filterExpiryDate: string | undefined = undefined;
-
-        // Parse filter installed date using enhanced parseExcelDate
+        // Parse filter dates - no logic, just store values as provided
         const parsedInstalled = parseExcelDate(rawInstalled, rowNum);
+        const parsedExpiry = parseExcelDate(rawExpiry, rowNum);
         
         // Check for date parsing errors
         if (parsedInstalled.error) {
@@ -263,42 +242,22 @@ export async function POST(req: NextRequest) {
           results.errors.push(parsedInstalled.error);
           continue;
         }
-
-        // Parse user-provided values (preserve legacy data)
-        filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
-        filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
-
-        // Parse new boolean fields
-        const needFlushing = needFlushingRaw ? ['YES', 'TRUE', '1', 'Y'].includes(needFlushingRaw) : false;
-        const augmentedCare = augmentedCareRaw ? ['YES', 'TRUE', '1', 'Y'].includes(augmentedCareRaw) : false;
-
-        // Special override: If filtersOn = 'NO' explicitly provided, force clear dates
-        if (filtersOnRaw && ['NO', 'FALSE', '0', 'N'].includes(filtersOnRaw)) {
-          filtersOn = false;
-          filterInstalledOn = undefined;
-          filterExpiryDate = undefined;
-        }
-        // If filterInstalledOn is valid, calculate expiry regardless of other fields
-        else if (parsedInstalled.date) {
-          filterInstalledOn = parsedInstalled.date;
-          
-          // Calculate filter expiry using enhanced function
-          const installedDate = new Date(parsedInstalled.date);
-          const expiryDate = getFilterExpiryFromInstalledDate(installedDate);
-          filterExpiryDate = expiryDate.toISOString().split('T')[0];
-          
-          // If filtersOn was set to YES in CSV, preserve that value
-          if (filtersOnRaw && ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw)) {
-            filtersOn = true;
-          }
-        }
-
-        // Rule 4: Validation Check
-        if (filterNeededRaw && ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) && !parsedInstalled.date) {
+        
+        if (parsedExpiry.error) {
           results.failed++;
-          results.errors.push(`Row ${rowNum}: Filter Installed Date is required if Filter Needed is YES`);
+          results.errors.push(parsedExpiry.error);
           continue;
         }
+
+        // Parse all fields independently - no interdependencies
+        const filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
+        const filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
+        const needFlushing = needFlushingRaw ? ['YES', 'TRUE', '1', 'Y'].includes(needFlushingRaw) : false;
+        const augmentedCare = augmentedCareRaw ? ['YES', 'TRUE', '1', 'Y'].includes(augmentedCareRaw) : false;
+        
+        // Store dates as provided - no auto-calculation
+        const filterInstalledOn = parsedInstalled.date || '';
+        const filterExpiryDate = parsedExpiry.date || '';
 
         // Auto-create asset type if provided and doesn't exist
         if (assetType && !existingTypeLabels.has(assetType)) {
@@ -332,8 +291,8 @@ export async function POST(req: NextRequest) {
           room: location, // Using 'room' field as per existing schema
           assetType: assetType || '',
           filterNeeded,
-          filterInstalledOn: filterInstalledOn || '',
-          filterExpiryDate: filterExpiryDate || '',
+          filterInstalledOn,
+          filterExpiryDate,
           filtersOn,
           needFlushing,
           filterType: filterType || '',

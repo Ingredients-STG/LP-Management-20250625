@@ -43,7 +43,7 @@ import { modals } from '@mantine/modals';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
-import { applyFilterLogic, formatFilterAge } from '@/lib/filterLogic';
+
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
 import {
   IconDroplet,
@@ -678,26 +678,7 @@ export default function HomePage() {
     }
   };
 
-  // Apply filter logic and update form fields
-  const applyFilterLogicToForm = (
-    filterInstalledOn?: Date | string | null,
-    filterNeeded?: boolean,
-    filtersOn?: boolean
-  ) => {
-    const filterResult = applyFilterLogic({
-      filterInstalledOn: filterInstalledOn,
-      filterNeeded: filterNeeded,
-      filtersOn: filtersOn
-    });
 
-    // Update form fields with calculated values
-    form.setFieldValue('filterNeeded', filterResult.filterNeeded);
-    form.setFieldValue('filtersOn', filterResult.filtersOn);
-    form.setFieldValue('filterInstalledOn', filterResult.filterInstalledOn ? new Date(filterResult.filterInstalledOn) : null);
-    form.setFieldValue('filterExpiryDate', filterResult.filterExpiryDate ? new Date(filterResult.filterExpiryDate) : null);
-
-    return filterResult;
-  };
 
   // Handle bulk upload
   const handleBulkUpload = async () => {
@@ -984,31 +965,11 @@ export default function HomePage() {
 
   const handleAddAsset = async (values: any) => {
     try {
-      // Apply filter logic before saving
-      const filterResult = applyFilterLogic({
-        filterInstalledOn: values.filterInstalledOn,
-        filterNeeded: values.filterNeeded,
-        filtersOn: values.filtersOn
-      });
-
-      // Check for validation errors
-      if (filterResult.errors.length > 0) {
-        notifications.show({
-          title: 'Validation Error',
-          message: filterResult.errors[0],
-          color: 'red',
-          icon: <IconX size={16} />,
-        });
-        return;
-      }
-
       const assetData = {
         ...values,
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
-        filterNeeded: filterResult.filterNeeded,
-        filtersOn: filterResult.filtersOn,
-        filterExpiryDate: filterResult.filterExpiryDate || '',
-        filterInstalledOn: filterResult.filterInstalledOn || '',
+        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString().split('T')[0] : '',
+        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString().split('T')[0] : '',
       };
 
 
@@ -1068,30 +1029,10 @@ export default function HomePage() {
         throw new Error('No asset selected for update');
       }
 
-      // Apply filter logic before saving
-      const filterResult = applyFilterLogic({
-        filterInstalledOn: values.filterInstalledOn,
-        filterNeeded: values.filterNeeded,
-        filtersOn: values.filtersOn
-      });
-
-      // Check for validation errors
-      if (filterResult.errors.length > 0) {
-        notifications.show({
-          title: 'Validation Error',
-          message: filterResult.errors[0],
-          color: 'red',
-          icon: <IconX size={16} />,
-        });
-        return;
-      }
-
       const updateData = {
         ...values,
-        filterNeeded: filterResult.filterNeeded,
-        filtersOn: filterResult.filtersOn,
-        filterExpiryDate: filterResult.filterExpiryDate || '',
-        filterInstalledOn: filterResult.filterInstalledOn || '',
+        filterExpiryDate: values.filterExpiryDate ? values.filterExpiryDate.toISOString().split('T')[0] : '',
+        filterInstalledOn: values.filterInstalledOn ? values.filterInstalledOn.toISOString().split('T')[0] : '',
         attachments: selectedAsset?.attachments || [], // Include current attachments
         modifiedBy: getCurrentUser(),
       };
@@ -2696,66 +2637,31 @@ export default function HomePage() {
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
               <Group mt="md" mb="md" wrap="wrap">
-                <Group gap="xs">
                 <Checkbox
                   label="Filter Needed"
                   {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                    onChange={(event) => {
-                      applyFilterLogicToForm(
-                        form.values.filterInstalledOn,
-                        event.currentTarget.checked,
-                        form.values.filtersOn
-                      );
-                    }}
-                  />
-                  <Tooltip label="💡 If YES, select filter installation date. System will auto-calculate expiry.">
-                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
-                  </Tooltip>
-                </Group>
-                <Group gap="xs">
+                />
                 <Checkbox
                   label="Filters On"
                   {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                    onChange={(event) => {
-                      applyFilterLogicToForm(
-                        form.values.filterInstalledOn,
-                        form.values.filterNeeded,
-                        event.currentTarget.checked
-                      );
-                    }}
-                  />
-                  <Tooltip label="💡 If NO, filter dates will be cleared. Used when filter is physically removed.">
-                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
-                  </Tooltip>
-                </Group>
-                <Group gap="xs">
-                  <Checkbox
-                    label="Need Flushing"
-                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
-                  />
-                </Group>
+                />
+                <Checkbox
+                  label="Need Flushing"
+                  {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                />
               </Group>
               <Grid>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
-                    disabled={form.values.filtersOn === false}
                     {...form.getInputProps('filterInstalledOn')}
-                    onChange={(value) => {
-                      applyFilterLogicToForm(
-                        value,
-                        form.values.filterNeeded,
-                        form.values.filtersOn
-                      );
-                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
-                    label="Filter Expiry Date (Auto-calculated)"
-                    placeholder="Auto-calculated as Installed + 3 months"
-                    disabled={true}
+                    label="Filter Expiry Date"
+                    placeholder="Select filter expiry date"
                     {...form.getInputProps('filterExpiryDate')}
                   />
                 </Grid.Col>
@@ -2977,66 +2883,31 @@ export default function HomePage() {
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
               <Group mt="md" mb="md" wrap="wrap">
-                <Group gap="xs">
                 <Checkbox
                   label="Filter Needed"
                   {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                    onChange={(event) => {
-                      applyFilterLogicToForm(
-                        form.values.filterInstalledOn,
-                        event.currentTarget.checked,
-                        form.values.filtersOn
-                      );
-                    }}
-                  />
-                  <Tooltip label="💡 If YES, select filter installation date. System will auto-calculate expiry.">
-                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
-                  </Tooltip>
-                </Group>
-                <Group gap="xs">
+                />
                 <Checkbox
                   label="Filters On"
                   {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                    onChange={(event) => {
-                      applyFilterLogicToForm(
-                        form.values.filterInstalledOn,
-                        form.values.filterNeeded,
-                        event.currentTarget.checked
-                      );
-                    }}
-                  />
-                  <Tooltip label="💡 If NO, filter dates will be cleared. Used when filter is physically removed.">
-                    <IconInfoCircle size={16} style={{ color: 'var(--mantine-color-blue-6)' }} />
-                  </Tooltip>
-                </Group>
-                <Group gap="xs">
-                  <Checkbox
-                    label="Need Flushing"
-                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
-                  />
-                </Group>
+                />
+                <Checkbox
+                  label="Need Flushing"
+                  {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                />
               </Group>
               <Grid>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
                     placeholder="Select installation date"
-                    disabled={form.values.filtersOn === false}
                     {...form.getInputProps('filterInstalledOn')}
-                    onChange={(value) => {
-                      applyFilterLogicToForm(
-                        value,
-                        form.values.filterNeeded,
-                        form.values.filtersOn
-                      );
-                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
-                    label="Filter Expiry Date (Auto-calculated)"
-                    placeholder="Auto-calculated as Installed + 3 months"
-                    disabled={true}
+                    label="Filter Expiry Date"
+                    placeholder="Select filter expiry date"
                     {...form.getInputProps('filterExpiryDate')}
                   />
                 </Grid.Col>
@@ -3358,18 +3229,7 @@ export default function HomePage() {
                   <Text size="sm" c="dimmed">Filter Expiry Date</Text>
                   <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
                 </Grid.Col>
-                {(() => {
-                  const filterAge = formatFilterAge(
-                    selectedAsset.filterInstalledOn,
-                    typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true'
-                  );
-                  return filterAge ? (
-                    <Grid.Col span={{ base: 12, sm: 6 }}>
-                      <Text size="sm" c="dimmed">Filter Age</Text>
-                      <Text size="sm" c="blue" fw={500}>{filterAge}</Text>
-                    </Grid.Col>
-                  ) : null;
-                })()}
+
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Need Flushing</Text>
                   <Badge 
