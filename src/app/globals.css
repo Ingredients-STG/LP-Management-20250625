@@ -131,10 +131,61 @@
   box-shadow: 0 0 6px rgba(107, 114, 128, 0.6);
 }
 
-/* ✅ RESPONSIVE UI OPTIMIZATIONS */
+/* ✅ COMPREHENSIVE RESPONSIVE UI OVERHAUL */
 
-/* Mobile input zoom prevention */
-@media screen and (max-width: 768px) {
+/* 📱 MOBILE OPTIMIZATIONS (≤480px) */
+@media screen and (max-width: 480px) {
+  /* Remove horizontal padding and enable full-width layouts */
+  .main-shell {
+    padding: 0 !important;
+  }
+  
+  .responsive-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0.5rem !important;
+    margin: 0 !important;
+  }
+  
+  .header-container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  
+  /* Full-width asset cards and filters */
+  .asset-management-container .mantine-Stack-root {
+    gap: 0.5rem !important;
+  }
+  
+  .asset-management-container .mantine-Card-root {
+    padding: 0.75rem !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+  
+  .mobile-filter-stack .mantine-Stack-root {
+    gap: 0.5rem !important;
+  }
+  
+  .mobile-filter-stack .mantine-Group-root {
+    gap: 0.5rem !important;
+  }
+  
+  .mobile-asset-cards .mantine-Stack-root {
+    gap: 0.5rem !important;
+  }
+  
+  .mobile-asset-cards .mantine-Card-root {
+    padding: 0.75rem !important;
+    width: 100% !important;
+  }
+  
+  /* Prevent horizontal scrolling */
+  .mantine-Group-root {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Input zoom prevention */
   input[type="text"],
   input[type="email"],
   input[type="password"],
@@ -155,7 +206,34 @@
   .mantine-DateInput-input {
     font-size: 16px !important;
   }
+  
+  /* Compact button styling */
+  .mantine-Button-root {
+    padding: 0.375rem 0.5rem !important;
+    font-size: 0.875rem !important;
+  }
+  
+  /* Compact typography */
+  .mantine-Title-root {
+    font-size: 1.25rem !important;
+    margin-bottom: 0 !important;
+  }
+}
 
+/* 📱 MOBILE EXTENDED (≤768px) */
+@media screen and (max-width: 768px) {
+  .responsive-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.75rem;
+    margin: 0;
+  }
+  
+  .header-container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
   /* Mobile layout optimizations */
   .mantine-Stack-root {
     gap: 0.5rem !important;
@@ -203,28 +281,250 @@
   .mobile-asset-cards .mantine-Card-root {
     padding: 0.75rem !important;
   }
+  
+  /* Input zoom prevention */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="date"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    transform: none !important;
+  }
+  
+  .mantine-TextInput-input,
+  .mantine-Textarea-input,
+  .mantine-Select-input,
+  .mantine-DateInput-input {
+    font-size: 16px !important;
+  }
 }
 
-/* Container optimizations */
-.main-container {
-  max-width: 100%;
-  padding: 0 1rem;
+/* 💻 DESKTOP OPTIMIZATIONS (≥769px) */
+@media screen and (min-width: 769px) {
+  .responsive-container {
+    width: 100%;
+    max-width: 1200px;
+    padding: 1rem 2rem;
+    margin: 0 auto;
+  }
+  
+  .header-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* 🖥️ WIDESCREEN OPTIMIZATIONS (≥1440px) */
+@media screen and (min-width: 1440px) {
+  .responsive-container {
+    max-width: 1440px !important;
+    padding: 1.5rem 3rem !important;
+  }
+  
+  .header-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  
+  /* Expand layout width and remove dead space */
+  .main-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  /* Enhanced card layouts for widescreen */
+  .asset-management-container .mantine-Card-root {
+    padding: 1.5rem !important;
+  }
+  
+  /* Better spacing for widescreen */
+  .mantine-Stack-root {
+    gap: 1rem;
+  }
+  
+  .mantine-Group-root {
+    gap: 1rem;
+  }
+}
+
+/* 🖥️ ULTRA-WIDE OPTIMIZATIONS (≥1920px) */
+@media screen and (min-width: 1920px) {
+  .responsive-container {
+    max-width: 1680px !important;
+    padding: 2rem 4rem !important;
+  }
+  
+  .header-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  
+  /* Enhanced layouts for ultra-wide */
+  .asset-management-container .mantine-Card-root {
+    padding: 2rem !important;
+  }
+  
+  /* Better spacing for ultra-wide */
+  .mantine-Stack-root {
+    gap: 1.5rem;
+  }
+  
+  .mantine-Group-root {
+    gap: 1.5rem;
+  }
+}
+
+/* 🖥️ 4K OPTIMIZATIONS (≥2560px) */
+@media screen and (min-width: 2560px) {
+  .responsive-container {
+    max-width: 2200px !important;
+    padding: 2.5rem 5rem !important;
+  }
+  
+  .header-container {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+  
+  /* Enhanced layouts for 4K */
+  .asset-management-container .mantine-Card-root {
+    padding: 2.5rem !important;
+  }
+  
+  /* Better spacing for 4K */
+  .mantine-Stack-root {
+    gap: 2rem;
+  }
+  
+  .mantine-Group-root {
+    gap: 2rem;
+  }
+}
+
+/* 🎯 RESPONSIVE GRID SYSTEM */
+.responsive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media screen and (min-width: 640px) {
+  .responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media screen and (min-width: 768px) {
-  .main-container {
-    max-width: 90vw;
-    margin: 0 auto;
-    padding: 0 2rem;
+  .responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media screen and (min-width: 1200px) {
-  .main-container {
-    max-width: 85vw;
-    padding: 0 3rem;
+@media screen and (min-width: 1024px) {
+  .responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
+
+@media screen and (min-width: 1440px) {
+  .responsive-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media screen and (min-width: 1920px) {
+  .responsive-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* 🎯 TAB CONTAINER RESPONSIVE STYLING */
+.tab-container-card {
+  padding: 0.75rem;
+}
+
+@media screen and (max-width: 480px) {
+  .tab-container-card {
+    padding: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+}
+
+@media screen and (min-width: 1440px) {
+  .tab-container-card {
+    padding: 1.5rem !important;
+  }
+}
+
+@media screen and (min-width: 1920px) {
+  .tab-container-card {
+    padding: 2rem !important;
+  }
+}
+
+@media screen and (min-width: 2560px) {
+  .tab-container-card {
+    padding: 2.5rem !important;
+  }
+}
+
+/* 🎯 DASHBOARD CONTAINER RESPONSIVE STYLING */
+.dashboard-container {
+  gap: 1rem;
+}
+
+@media screen and (max-width: 480px) {
+  .dashboard-container {
+    gap: 0.5rem !important;
+  }
+  
+  .dashboard-container .mantine-Grid-root {
+    gap: 0.5rem !important;
+  }
+  
+  .dashboard-container .mantine-Card-root {
+    padding: 0.75rem !important;
+  }
+}
+
+@media screen and (min-width: 1440px) {
+  .dashboard-container {
+    gap: 1.5rem !important;
+  }
+  
+  .dashboard-container .mantine-Card-root {
+    padding: 1.5rem !important;
+  }
+}
+
+@media screen and (min-width: 1920px) {
+  .dashboard-container {
+    gap: 2rem !important;
+  }
+  
+  .dashboard-container .mantine-Card-root {
+    padding: 2rem !important;
+  }
+}
+
+@media screen and (min-width: 2560px) {
+  .dashboard-container {
+    gap: 2.5rem !important;
+  }
+  
+  .dashboard-container .mantine-Card-root {
+    padding: 2.5rem !important;
+  }
+}
+
+/* Legacy container styles removed - now handled by responsive-container */
 
 /* Modal responsive optimizations */
 @media screen and (max-width: 768px) {

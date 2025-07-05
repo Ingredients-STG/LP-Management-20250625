@@ -1594,7 +1594,7 @@ export default function HomePage() {
   }));
 
   const renderDashboard = () => (
-    <Stack gap="lg">
+    <Stack gap="lg" className="dashboard-container">
       {/* Stats Grid */}
       <Grid>
         <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
@@ -2388,13 +2388,10 @@ export default function HomePage() {
       <AppShell
         header={{ height: 70 }}
         navbar={hideTabContainer ? undefined : { width: 280, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-        padding={{ base: 'xs', sm: 'md', lg: 'xl' }}
+        padding={0}
       >
         <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between" style={{ 
-            paddingLeft: 'var(--mantine-spacing-xs)', 
-            paddingRight: 'var(--mantine-spacing-xs)'
-          }}>
+          <Group h="100%" px="md" justify="space-between" className="header-container">
             <Group gap="xs">
               <ActionIcon
                 onClick={toggle}
@@ -2533,23 +2530,8 @@ export default function HomePage() {
           </AppShell.Navbar>
         )}
 
-        <AppShell.Main>
-          <Container 
-            size="xl" 
-            className="main-container"
-            style={{
-              maxWidth: '100%',
-              '@media (min-width: 1440px)': {
-                maxWidth: '85vw',
-              },
-              '@media (min-width: 1920px)': {
-                maxWidth: '80vw',
-              },
-              '@media (min-width: 2560px)': {
-                maxWidth: '75vw',
-              },
-            }}
-          >
+        <AppShell.Main className="main-shell">
+          <div className="responsive-container">
 
             {hideTabContainer && (
               <Card 
@@ -2558,14 +2540,7 @@ export default function HomePage() {
                 radius="md" 
                 withBorder 
                 mb="lg"
-                style={{
-                  '@media (min-width: 1440px)': {
-                    padding: '1.5rem',
-                  },
-                  '@media (min-width: 1920px)': {
-                    padding: '2rem',
-                  },
-                }}
+                className="tab-container-card"
               >
                 <ScrollArea>
                   <Group wrap="nowrap" gap="xs" justify="center">
@@ -2615,7 +2590,7 @@ export default function HomePage() {
             {activeTab === 'assets' && renderAssets()}
             {activeTab === 'reports' && renderReports()}
             {activeTab === 'settings' && renderSettings()}
-          </Container>
+          </div>
         </AppShell.Main>
       </AppShell>
 
