@@ -518,11 +518,22 @@
   padding: 0;
 }
 
-/* Ensure dashboard uses full available width */
-.dashboard-container .mantine-Grid-root {
-  width: 100%;
-  max-width: 100%;
-  margin: 0;
+.dashboard-container .mantine-Grid-root,
+.dashboard-stats-grid,
+.dashboard-charts-grid {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.dashboard-container .mantine-Card-root {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 1rem 0 !important;
+  padding: 1rem !important;
+  border-radius: 16px !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
 }
 
 /* StatCard responsive styles */

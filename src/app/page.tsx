@@ -1680,8 +1680,8 @@ export default function HomePage() {
   const renderDashboard = () => (
     <Stack gap="lg" className="dashboard-container">
       {/* Stats Grid */}
-      <Grid gutter="md" className="dashboard-stats-grid">
-        <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+      <Grid gutter="md" className="dashboard-stats-grid" style={{ margin: 0, width: '100%' }}>
+        <Grid.Col span={12}>
           <StatCard
             title="Total Assets"
             value={stats.totalAssets}
@@ -1691,7 +1691,7 @@ export default function HomePage() {
             trend={2.5}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+        <Grid.Col span={12}>
           <StatCard
             title="Active Assets"
             value={stats.activeAssets}
@@ -1701,7 +1701,7 @@ export default function HomePage() {
             trend={5.2}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+        <Grid.Col span={12}>
           <StatCard
             title="Under Maintenance"
             value={stats.maintenanceAssets}
@@ -1711,7 +1711,7 @@ export default function HomePage() {
             trend={-1.2}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
+        <Grid.Col span={12}>
           <StatCard
             title="Filters Needed"
             value={stats.filtersNeeded}
