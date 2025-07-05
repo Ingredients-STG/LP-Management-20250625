@@ -1268,30 +1268,48 @@ export default function HomePage() {
   };
 
   const StatCard = ({ title, value, icon, color, description, trend }: any) => (
-    <Card shadow="sm" padding="lg" radius="md" withBorder className="hover:shadow-lg transition-shadow">
-      <Group justify="apart">
-        <div>
-          <Text c="dimmed" size="sm" fw={500}>
+    <Card 
+      shadow="sm" 
+      padding="lg" 
+      radius="md" 
+      withBorder 
+      className="hover:shadow-lg transition-shadow"
+      style={{ 
+        minHeight: '120px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between'
+      }}
+    >
+      <Group justify="apart" align="flex-start" wrap="nowrap">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text c="dimmed" size="sm" fw={500} mb="xs">
             {title}
           </Text>
-          <Text fw={700} size="xl">
+          <Text fw={700} size="xl" mb="xs" className="stat-value">
             {loading ? <Loader size="sm" /> : value.toLocaleString()}
           </Text>
           {description && (
-            <Text c="dimmed" size="xs" mt={4}>
+            <Text c="dimmed" size="xs" mb="xs" style={{ lineHeight: 1.2 }}>
               {description}
             </Text>
           )}
           {trend && (
-            <Group gap={4} mt={4}>
+            <Group gap={4} wrap="nowrap">
               <IconTrendingUp size={12} color={trend > 0 ? 'green' : 'red'} />
-              <Text size="xs" c={trend > 0 ? 'green' : 'red'}>
+              <Text size="xs" c={trend > 0 ? 'green' : 'red'} style={{ whiteSpace: 'nowrap' }}>
                 {trend > 0 ? '+' : ''}{trend}%
               </Text>
             </Group>
           )}
         </div>
-        <ThemeIcon color={color} size={38} radius="md">
+        <ThemeIcon 
+          color={color} 
+          size={38} 
+          radius="md"
+          style={{ flexShrink: 0 }}
+          className="stat-icon"
+        >
           {icon}
         </ThemeIcon>
       </Group>
@@ -1662,7 +1680,7 @@ export default function HomePage() {
   const renderDashboard = () => (
     <Stack gap="lg" className="dashboard-container">
       {/* Stats Grid */}
-      <Grid>
+      <Grid gutter="md">
         <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
           <StatCard
             title="Total Assets"
@@ -1706,22 +1724,22 @@ export default function HomePage() {
       </Grid>
 
       {/* Charts */}
-      <Grid>
+      <Grid gutter="md">
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
             <Title order={4} mb="md">Asset Types Distribution</Title>
             {typeChartData.length > 0 && (
-                             <BarChart
-                 h={300}
-                 data={typeChartData}
-                 dataKey="type"
-                 series={[{ name: 'count', color: 'blue.6' }]}
-               />
+              <BarChart
+                h={300}
+                data={typeChartData}
+                dataKey="type"
+                series={[{ name: 'count', color: 'blue.6' }]}
+              />
             )}
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
             <Title order={4} mb="md">Status Overview</Title>
             {statusChartData.length > 0 && (
               <PieChart
@@ -1765,9 +1783,9 @@ export default function HomePage() {
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
-          <Group justify="space-between" wrap="wrap">
+          <Group justify="space-between" wrap="wrap" gap="md">
             <Title order={3} style={{ marginBottom: 0 }}>Asset Management</Title>
-            <Group gap="xs" wrap="nowrap">
+            <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }}>
               <Button
                 leftSection={<IconRefresh size={16} />}
                 variant="light"
@@ -1775,6 +1793,7 @@ export default function HomePage() {
                 loading={loading}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
+                style={{ minHeight: '44px' }}
               >
                 <Text visibleFrom="sm">Refresh</Text>
                 <Text hiddenFrom="sm" size="xs">Refresh</Text>
@@ -1785,6 +1804,7 @@ export default function HomePage() {
                 onClick={exportData}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
+                style={{ minHeight: '44px' }}
               >
                 <Text visibleFrom="sm">Export</Text>
                 <Text hiddenFrom="sm" size="xs">Export</Text>
@@ -1796,6 +1816,7 @@ export default function HomePage() {
                 onClick={openModal}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
+                style={{ minHeight: '44px' }}
               >
                 <Text visibleFrom="sm">Add Asset</Text>
                 <Text hiddenFrom="sm" size="xs">Add</Text>

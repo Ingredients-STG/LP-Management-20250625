@@ -497,6 +497,16 @@
   gap: 1rem;
 }
 
+/* StatCard responsive styles */
+.stat-value {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.stat-icon {
+  transition: transform 0.2s ease;
+}
+
 @media screen and (max-width: 480px) {
   .dashboard-container {
     gap: 0.5rem !important;
@@ -508,6 +518,47 @@
   
   .dashboard-container .mantine-Card-root {
     padding: 0.75rem !important;
+  }
+  
+  .stat-value {
+    font-size: 1.25rem;
+  }
+  
+  .stat-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  .stat-value {
+    font-size: 1.375rem;
+  }
+  
+  .stat-icon {
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+
+/* Chart card responsive styles */
+.chart-card {
+  transition: all 0.3s ease;
+}
+
+@media screen and (max-width: 480px) {
+  .chart-card {
+    padding: 0.75rem !important;
+  }
+  
+  .chart-card .recharts-wrapper {
+    height: 250px !important;
+  }
+}
+
+@media screen and (min-width: 481px) and (max-width: 768px) {
+  .chart-card .recharts-wrapper {
+    height: 280px !important;
   }
 }
 
