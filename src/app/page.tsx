@@ -187,7 +187,7 @@ export default function HomePage() {
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [isScannerActive, setIsScannerActive] = useState(false);
+
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
 
@@ -658,13 +658,11 @@ export default function HomePage() {
   const startBarcodeScanner = () => {
     if (!showBarcodeScanner) { // Prevent multiple modals
       setShowBarcodeScanner(true);
-      setIsScannerActive(true);
     }
   };
 
   const stopBarcodeScanner = () => {
     setShowBarcodeScanner(false);
-    setIsScannerActive(false);
   };
 
   const handleBarcodeScan = (result: string) => {
@@ -3663,27 +3661,13 @@ export default function HomePage() {
         </Stack>
       </Modal>
 
-      {/* Barcode Scanner Modal */}
-      <Modal
+      {/* Barcode Scanner */}
+      <BarcodeScanner
         opened={showBarcodeScanner}
         onClose={stopBarcodeScanner}
-        title="Scan Barcode"
-        size="md"
-        centered
-      >
-        {isScannerActive && (
-          <BarcodeScanner
-            onScan={handleBarcodeScan}
-            onError={handleScannerError}
-          />
-        )}
-        
-        <Group justify="center" mt="md">
-          <Button variant="outline" onClick={stopBarcodeScanner}>
-            Cancel
-          </Button>
-        </Group>
-      </Modal>
+        onScan={handleBarcodeScan}
+        onError={handleScannerError}
+      />
 
       {/* Global Audit Trail Drawer */}
       <Drawer
