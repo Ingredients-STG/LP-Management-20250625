@@ -3,15 +3,15 @@ import { DynamoDBDocumentClient, PutCommand, ScanCommand, DeleteCommand } from "
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: process.env.AMPLIFY_AWS_REGION || 'eu-west-2',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    accessKeyId: process.env.AMPLIFY_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AMPLIFY_SECRET_ACCESS_KEY || '',
   },
 });
 
 const ddbClient = DynamoDBDocumentClient.from(client);
-const FILTER_TYPES_TABLE = process.env.FILTER_TYPES_TABLE_NAME || 'FilterTypes';
+const FILTER_TYPES_TABLE = 'FilterTypes';
 
 export async function GET() {
   try {

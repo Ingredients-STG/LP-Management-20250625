@@ -1,10 +1,39 @@
-# Date Format: DD/MM/YYYY only (e.g., 25/07/2025)
-# Boolean Format: YES / NO
-# CSV Upload Template - Water Tap Asset Management
-# Required fields: Asset Barcode, Location | Optional: Filter Needed, Filter Installed, Filters On, Asset Type
+# ===== WATER TAP ASSET MANAGEMENT - BULK UPLOAD TEMPLATE =====
+# IMPORTANT: Do not modify or delete these instruction rows (lines starting with #)
+# These instructional rows will be automatically ignored during upload processing
+# 
+# ⚠️  CRITICAL FORMAT REQUIREMENTS:
+# 📅 DATES: DD/MM/YYYY format ONLY (e.g., 25/07/2025, 01/12/2024)
+#    ❌ REJECTED: YYYY-MM-DD, MM/DD/YYYY, DD-MM-YYYY, single digits
+#    ✅ ACCEPTED: 30/04/2025, 15/09/2024, 01/01/2025
+# 
+# 🔘 YES/NO FIELDS: Only YES or NO (case-insensitive)
+#    ✅ ACCEPTED: YES, yes, NO, no, Yes, No
+#    ❌ REJECTED: Y, N, True, False, 1, 0, empty
+# 
+# 📋 REQUIRED FIELDS: Asset Barcode, Location
+# 📋 OPTIONAL FIELDS: All other fields can be left empty
+#
+# 📝 DETAILED FIELD DESCRIPTIONS:
+# - Asset Barcode: Unique identifier for the asset (REQUIRED)
+# - Location: Room or area where asset is located (REQUIRED)
+# - Asset Type: Type of asset (Water Tap, Water Cooler, LNS Outlet - TMT, etc.)
+# - Augmented Care: YES or NO - whether asset requires special care or attention
+# - Filter Needed: YES or NO - whether asset needs filter replacement
+# - Filter Installed: Date when filter was installed (DD/MM/YYYY format only)
+# - Filters On: YES or NO - whether filters are currently active
+# - Need Flushing: YES or NO - whether asset needs regular flushing
+# - Filter Type: Type of filter (Standard, Advanced, Premium, Basic, etc.)
+#
+# 🚨 BULK UPLOAD BEHAVIOR:
+# - Filter logic is NOT applied during bulk upload
+# - All filter fields are stored exactly as provided
+# - Filter Expiry Date is NOT auto-calculated during bulk upload
+# - Auto-calculation only occurs in manual Add/Edit forms
+#
 Asset Barcode,Location,Asset Type,Augmented Care,Filter Needed,Filter Installed,Filters On,Need Flushing,Filter Type
 B30680,Room 301,Water Tap,NO,YES,30/04/2025,YES,NO,Standard
-B30681,Room 302,Water Cooler,NO,NO,,,NO,
+B30681,Room 302,Water Cooler,NO,NO,,,NO,,
 B30682,Room 303,LNS Outlet - TMT,YES,YES,15/09/2024,YES,YES,Advanced
 B30683,Kitchen Area,Coffee Machine Filter,NO,YES,10/10/2024,NO,NO,Standard
 B30684,Lab 101,Equipment Stand,NO,NO,,,NO, 

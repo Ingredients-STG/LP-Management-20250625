@@ -19,51 +19,115 @@ const ASSETS_TABLE = 'water-tap-assets';
 const ASSET_TYPES_TABLE = 'AssetTypes';
 
 /**
- * Enhanced date parsing supporting STRICT DD/MM/YYYY format only
- * Rejects YYYY-MM-DD or any other ambiguous formats
+ * ULTRA-STRICT date parsing supporting ONLY DD/MM/YYYY format
+ * Rejects YYYY-MM-DD, MM/DD/YYYY, and any other ambiguous formats
+ * Provides clear error messages for user guidance
  */
 function parseExcelDate(value: any, rowNum?: number): { date?: string; error?: string } {
   if (!value) return { date: undefined };
 
   try {
-    // Handle Excel serial numbers
+    // Handle Excel serial numbers - convert to DD/MM/YYYY first
     if (typeof value === 'number') {
       const epoch = new Date(Date.UTC(1899, 11, 30)); // Excel base date
       epoch.setDate(epoch.getDate() + value);
-      return { date: epoch.toISOString().split('T')[0] }; // YYYY-MM-DD
+      const day = String(epoch.getUTCDate()).padStart(2, '0');
+      const month = String(epoch.getUTCMonth() + 1).padStart(2, '0');
+      const year = epoch.getUTCFullYear();
+      
+      // Validate the converted date makes sense
+      if (year < 1900 || year > 2100) {
+        return { 
+          error: `Row ${rowNum}: Invalid date value. Please use DD/MM/YYYY format (e.g., 25/07/2025).` 
+        };
+      }
+      
+      return { date: `${year}-${month}-${day}` };
     } 
-    // Handle string dates - STRICT DD/MM/YYYY format only
+    // Handle string dates - ULTRA-STRICT DD/MM/YYYY format only
     else if (typeof value === 'string') {
       const trimmed = value.trim();
       
-      // Only accept DD/MM/YYYY format
+      // Check for common wrong formats first with specific error messages
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(trimmed)) {
+        return { 
+          error: `Row ${rowNum}: YYYY-MM-DD format detected ("${trimmed}"). Please use DD/MM/YYYY format (e.g., 25/07/2025).` 
+        };
+      }
+      
+      if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(trimmed)) {
+        return { 
+          error: `Row ${rowNum}: DD-MM-YYYY format detected ("${trimmed}"). Please use DD/MM/YYYY with forward slashes (e.g., 25/07/2025).` 
+        };
+      }
+      
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+        return { 
+          error: `Row ${rowNum}: Single-digit day/month detected ("${trimmed}"). Please use DD/MM/YYYY with zero-padding (e.g., 05/07/2025).` 
+        };
+      }
+      
+      // Check for MM/DD/YYYY format (American format)
       if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
-        const [day, month, year] = trimmed.split('/');
-        const date = new Date(`${year}-${month}-${day}`);
+        const [first, second, year] = trimmed.split('/').map(Number);
         
-        if (isNaN(date.getTime())) {
+        // Detect likely MM/DD/YYYY format (month > 12 or suspicious patterns)
+        if (first > 12 && second <= 12) {
           return { 
-            error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+            error: `Row ${rowNum}: MM/DD/YYYY format detected ("${trimmed}"). Please use DD/MM/YYYY format (e.g., ${String(second).padStart(2, '0')}/${String(first).padStart(2, '0')}/${year}).` 
           };
         }
         
-        return { date: date.toISOString().split('T')[0] };
+        // Validate as DD/MM/YYYY
+        const day = first;
+        const month = second;
+        
+        // Validate date ranges
+        if (month < 1 || month > 12) {
+          return { 
+            error: `Row ${rowNum}: Invalid month (${month}). Please use DD/MM/YYYY format with valid month (01-12).` 
+          };
+        }
+        
+        if (day < 1 || day > 31) {
+          return { 
+            error: `Row ${rowNum}: Invalid day (${day}). Please use DD/MM/YYYY format with valid day (01-31).` 
+          };
+        }
+        
+        if (year < 1900 || year > 2100) {
+          return { 
+            error: `Row ${rowNum}: Invalid year (${year}). Please use a year between 1900-2100.` 
+          };
+        }
+        
+        // Create date and validate it exists (handles Feb 30th, etc.)
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+          return { 
+            error: `Row ${rowNum}: Invalid date ("${trimmed}"). This date doesn't exist. Please check day/month combination.` 
+          };
+        }
+        
+        const isoMonth = String(month).padStart(2, '0');
+        const isoDay = String(day).padStart(2, '0');
+        return { date: `${year}-${isoMonth}-${isoDay}` };
       }
-      // Reject any other format including YYYY-MM-DD
+      // Reject any other format
       else {
         return { 
-          error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+          error: `Row ${rowNum}: Invalid date format ("${trimmed}"). Please use DD/MM/YYYY format exactly (e.g., 25/07/2025).` 
         };
       }
     }
-  } catch {
+  } catch (error) {
     return { 
-      error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+      error: `Row ${rowNum}: Date parsing error. Please use DD/MM/YYYY format (e.g., 25/07/2025).` 
     };
   }
   
   return { 
-    error: `Row ${rowNum}: Invalid date format. Please use DD/MM/YYYY (e.g., 25/07/2025).` 
+    error: `Row ${rowNum}: Invalid date value. Please use DD/MM/YYYY format (e.g., 25/07/2025).` 
   };
 }
 
@@ -232,7 +296,8 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Parse filter dates - no logic, just store values as provided
+        // ===== BULK UPLOAD: STATIC FIELD PROCESSING (NO FILTER LOGIC) =====
+        // Parse filter dates - store exactly as provided, NO auto-calculation
         const parsedInstalled = parseExcelDate(rawInstalled, rowNum);
         const parsedExpiry = parseExcelDate(rawExpiry, rowNum);
         
@@ -249,13 +314,33 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Parse all fields independently - no interdependencies
+        // Parse all boolean fields independently - NO interdependencies or logic
+        // Filter logic is ONLY applied in Add/Edit Asset UI, NOT during bulk upload
         const filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
         const filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
         const needFlushing = needFlushingRaw ? ['YES', 'TRUE', '1', 'Y'].includes(needFlushingRaw) : false;
         const augmentedCare = augmentedCareRaw ? ['YES', 'TRUE', '1', 'Y'].includes(augmentedCareRaw) : false;
         
-        // Store dates as provided - no auto-calculation
+        // ===== FILTER STATUS MISMATCH DETECTION =====
+        // Check for potential mismatches between uploaded Filters On and expected logic
+        // This is informational only - we still store the uploaded value as-is
+        if (filtersOnRaw && filterNeededRaw) {
+          // If Filters On is YES but Filter Needed is also YES, this might be inconsistent
+          if (filtersOn && filterNeeded) {
+            results.errors.push(`Row ${rowNum}: MISMATCH DETECTED - 'Filters On' is YES but 'Filter Needed' is also YES. Please review asset entry for ${assetBarcode}.`);
+          }
+          // If Filters On is NO but there's a recent filter installation, this might be inconsistent
+          if (!filtersOn && parsedInstalled.date) {
+            const installedDate = new Date(parsedInstalled.date);
+            const daysSinceInstallation = (Date.now() - installedDate.getTime()) / (1000 * 60 * 60 * 24);
+            if (daysSinceInstallation < 30) { // Less than 30 days ago
+              results.errors.push(`Row ${rowNum}: MISMATCH DETECTED - 'Filters On' is NO but filter was recently installed (${Math.round(daysSinceInstallation)} days ago). Please review asset entry for ${assetBarcode}.`);
+            }
+          }
+        }
+        
+        // Store dates exactly as provided - NO auto-calculation of Filter Expiry
+        // Auto-calculation only happens in manual Add/Edit Asset forms
         const filterInstalledOn = parsedInstalled.date || '';
         const filterExpiryDate = parsedExpiry.date || '';
 

@@ -253,12 +253,12 @@ export const formatTimestamp = (date: Date | string): string => {
 // User identification utilities
 export const getCurrentUser = (): string => {
   // TODO: Implement Cognito user identification
-  // For now, return a placeholder that can be easily identified and replaced
-  return 'system-user';
+  // For now, return a descriptive user name for SGWST team
+  return 'SGWST Admin';
 };
 
 export const getCurrentUserEmail = (): string => {
   // TODO: Implement Cognito user email retrieval
-  // For now, return a placeholder
-  return 'system@example.com';
+  // For now, return a placeholder for SGWST team
+  return 'admin@sgwst.nhs.uk';
 }; 

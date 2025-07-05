@@ -836,6 +836,29 @@ export default function HomePage() {
     return String(value);
   };
 
+  /**
+   * Auto-calculate Filter Expiry Date (exactly 3 months later)
+   * If the resulting date doesn't exist (e.g., 30th Feb), shift to next valid date
+   */
+  const calculateFilterExpiry = (installedDate: Date): Date => {
+    const expiry = new Date(installedDate);
+    
+    // Add exactly 3 months
+    expiry.setMonth(expiry.getMonth() + 3);
+    
+    // Handle edge cases where the day doesn't exist in the target month
+    // (e.g., Jan 31 + 3 months = Apr 31, which doesn't exist)
+    if (expiry.getDate() !== installedDate.getDate()) {
+      // The date was automatically adjusted by JavaScript
+      // Set to the first day of the next month
+      expiry.setDate(1);
+      expiry.setMonth(expiry.getMonth() + 1);
+      expiry.setDate(0); // Go to last day of previous month
+    }
+    
+    return expiry;
+  };
+
   // Form for adding/editing assets
   const form = useForm<{
     assetBarcode: string;
@@ -892,6 +915,15 @@ export default function HomePage() {
   useEffect(() => {
     filterAssets();
   }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
+
+  // Auto-calculate Filter Expiry Date when Filter Installed On changes (Add/Edit UI only)
+  useEffect(() => {
+    const installedDate = form.values.filterInstalledOn;
+    if (installedDate && installedDate instanceof Date && !isNaN(installedDate.getTime())) {
+      const expiryDate = calculateFilterExpiry(installedDate);
+      form.setFieldValue('filterExpiryDate', expiryDate);
+    }
+  }, [form.values.filterInstalledOn]);
 
   // Fetch audit logs when audit modal opens
   useEffect(() => {
@@ -1315,7 +1347,7 @@ export default function HomePage() {
           <Group gap="xs">
             <IconCalendar size={14} />
             <Text size="sm" c="dimmed">
-              {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
+              {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
             </Text>
           </Group>
         </Table.Td>
@@ -1541,7 +1573,7 @@ export default function HomePage() {
                       <Group justify="space-between">
                         <Text size="sm">Created:</Text>
                         <Text size="sm" fw={500}>
-                          {asset.created ? new Date(asset.created).toLocaleDateString() : 'N/A'}
+                          {asset.created ? formatTimestamp(asset.created) : 'N/A'}
                         </Text>
                       </Group>
                       <Group justify="space-between">
@@ -1551,7 +1583,7 @@ export default function HomePage() {
                       <Group justify="space-between">
                         <Text size="sm">Modified:</Text>
                         <Text size="sm" fw={500}>
-                          {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
+                          {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
                         </Text>
                       </Group>
                       <Group justify="space-between">
@@ -1973,7 +2005,7 @@ export default function HomePage() {
                         
                         <Group justify="space-between" align="center">
                           <Text size="xs" c="dimmed">
-                            Updated: {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
+                            Updated: {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
                           </Text>
                           <Group gap="xs">
                             <ActionIcon
@@ -2683,6 +2715,7 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Checkbox
                     label="Augmented Care"
+                    description="Requires special care or attention"
                     {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                   />
                 </Grid.Col>
@@ -2929,6 +2962,7 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Checkbox
                     label="Augmented Care"
+                    description="Requires special care or attention"
                     {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                   />
                 </Grid.Col>
@@ -3380,7 +3414,7 @@ export default function HomePage() {
               <Grid>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Created</Text>
-                  <Text size="sm">{selectedAsset.created ? new Date(selectedAsset.created).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                  <Text size="sm">{selectedAsset.created ? formatTimestamp(selectedAsset.created) : 'N/A'}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Created By</Text>
@@ -3388,7 +3422,7 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Modified</Text>
-                  <Text size="sm">{selectedAsset.modified ? new Date(selectedAsset.modified).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                  <Text size="sm">{selectedAsset.modified ? formatTimestamp(selectedAsset.modified) : 'N/A'}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Modified By</Text>
