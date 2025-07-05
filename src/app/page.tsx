@@ -1680,7 +1680,7 @@ export default function HomePage() {
   const renderDashboard = () => (
     <Stack gap="lg" className="dashboard-container">
       {/* Stats Grid */}
-      <Grid gutter="md">
+      <Grid gutter="md" className="dashboard-stats-grid">
         <Grid.Col span={{ base: 12, sm: 6, lg: 3 }}>
           <StatCard
             title="Total Assets"
@@ -1724,7 +1724,7 @@ export default function HomePage() {
       </Grid>
 
       {/* Charts */}
-      <Grid gutter="md">
+      <Grid gutter="md" className="dashboard-charts-grid">
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
             <Title order={4} mb="md">Asset Types Distribution</Title>
@@ -1783,9 +1783,9 @@ export default function HomePage() {
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
-          <Group justify="space-between" wrap="wrap" gap="md">
+          <Group justify="space-between" wrap="wrap" gap="md" align="center">
             <Title order={3} style={{ marginBottom: 0 }}>Asset Management</Title>
-            <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }}>
+            <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }} className="action-buttons-group">
               <Button
                 leftSection={<IconRefresh size={16} />}
                 variant="light"
@@ -1793,7 +1793,8 @@ export default function HomePage() {
                 loading={loading}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
-                style={{ minHeight: '44px' }}
+                style={{ minHeight: '44px', flexShrink: 0 }}
+                className="action-button"
               >
                 <Text visibleFrom="sm">Refresh</Text>
                 <Text hiddenFrom="sm" size="xs">Refresh</Text>
@@ -1804,7 +1805,8 @@ export default function HomePage() {
                 onClick={exportData}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
-                style={{ minHeight: '44px' }}
+                style={{ minHeight: '44px', flexShrink: 0 }}
+                className="action-button"
               >
                 <Text visibleFrom="sm">Export</Text>
                 <Text hiddenFrom="sm" size="xs">Export</Text>
@@ -1816,7 +1818,8 @@ export default function HomePage() {
                 onClick={openModal}
                 size="sm"
                 px={{ base: "xs", md: "sm" }}
-                style={{ minHeight: '44px' }}
+                style={{ minHeight: '44px', flexShrink: 0 }}
+                className="action-button"
               >
                 <Text visibleFrom="sm">Add Asset</Text>
                 <Text hiddenFrom="sm" size="xs">Add</Text>
