@@ -1817,12 +1817,11 @@ export default function HomePage() {
                 variant="gradient"
                 onClick={openModal}
                 size="sm"
-                px={{ base: "xs", md: "sm" }}
+                px={{ base: "sm", md: "md" }}
                 style={{ minHeight: '44px', flexShrink: 0 }}
-                className="action-button"
+                className="action-button add-asset-button"
               >
-                <Text visibleFrom="sm">Add Asset</Text>
-                <Text hiddenFrom="sm" size="xs">Add</Text>
+                <Text size="sm">Add Asset</Text>
               </Button>
             </Group>
           </Group>

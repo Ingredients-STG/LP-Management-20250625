@@ -335,6 +335,23 @@
     padding-left: 0.5rem;
     padding-right: 0.5rem;
   }
+  
+  /* Desktop dashboard optimizations */
+  .dashboard-container {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  .dashboard-stats-grid,
+  .dashboard-charts-grid {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* Desktop Add Asset button optimization */
+  .add-asset-button {
+    min-width: 130px;
+  }
 }
 
 /* 🖥️ WIDESCREEN OPTIMIZATIONS (≥1440px) */
@@ -501,6 +518,13 @@
   padding: 0;
 }
 
+/* Ensure dashboard uses full available width */
+.dashboard-container .mantine-Grid-root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
+
 /* StatCard responsive styles */
 .stat-value {
   font-size: 1.5rem;
@@ -568,6 +592,11 @@
   min-width: fit-content;
 }
 
+.add-asset-button {
+  min-width: 120px;
+  font-weight: 500;
+}
+
 /* Dashboard responsive optimizations */
 .dashboard-stats-grid {
   width: 100%;
@@ -623,6 +652,12 @@
     padding: 0.375rem 0.5rem !important;
     font-size: 0.75rem !important;
   }
+  
+  /* Mobile Add Asset button optimization */
+  .add-asset-button {
+    min-width: 90px;
+    font-size: 0.75rem !important;
+  }
 }
 
 @media screen and (min-width: 481px) and (max-width: 768px) {
@@ -643,6 +678,11 @@
   .action-buttons-group {
     gap: 0.375rem !important;
   }
+  
+  /* Tablet Add Asset button optimization */
+  .add-asset-button {
+    min-width: 100px;
+  }
 }
 
 @media screen and (min-width: 1440px) {
@@ -652,6 +692,24 @@
   
   .dashboard-container .mantine-Card-root {
     padding: 1.5rem !important;
+  }
+  
+  /* Wide screen dashboard optimizations */
+  .dashboard-stats-grid,
+  .dashboard-charts-grid {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  
+  .dashboard-stats-grid .mantine-Grid-col,
+  .dashboard-charts-grid .mantine-Grid-col {
+    padding: 0.75rem !important;
+  }
+  
+  /* Ensure cards expand to use available space */
+  .dashboard-container .mantine-Card-root {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
 
