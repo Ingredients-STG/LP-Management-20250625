@@ -1695,97 +1695,173 @@ export default function HomePage() {
   );
 
   const renderAssets = () => (
-    <Stack gap="lg">
+    <Stack gap="lg" className="asset-management-container">
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
           <Group justify="space-between" wrap="wrap">
-          <Title order={3}>Asset Management</Title>
-            <Group gap="xs" wrap="wrap">
-            <Button
-              leftSection={<IconRefresh size={16} />}
-              variant="light"
-              onClick={fetchData}
-              loading={loading}
+            <Title order={3} style={{ marginBottom: 0 }}>Asset Management</Title>
+            <Group gap="xs" wrap="nowrap">
+              <Button
+                leftSection={<IconRefresh size={16} />}
+                variant="light"
+                onClick={fetchData}
+                loading={loading}
                 size="sm"
-            >
+                px={{ base: "xs", md: "sm" }}
+              >
                 <Text visibleFrom="sm">Refresh</Text>
-                <Text hiddenFrom="sm">Refresh</Text>
-            </Button>
-            <Button
-              leftSection={<IconDownload size={16} />}
-              variant="outline"
-              onClick={exportData}
+                <Text hiddenFrom="sm" size="xs">Refresh</Text>
+              </Button>
+              <Button
+                leftSection={<IconDownload size={16} />}
+                variant="outline"
+                onClick={exportData}
                 size="sm"
-            >
+                px={{ base: "xs", md: "sm" }}
+              >
                 <Text visibleFrom="sm">Export</Text>
-                <Text hiddenFrom="sm">Export</Text>
-            </Button>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              gradient={{ from: 'blue', to: 'cyan' }}
-              variant="gradient"
-              onClick={openModal}
+                <Text hiddenFrom="sm" size="xs">Export</Text>
+              </Button>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                gradient={{ from: 'blue', to: 'cyan' }}
+                variant="gradient"
+                onClick={openModal}
                 size="sm"
-            >
+                px={{ base: "xs", md: "sm" }}
+              >
                 <Text visibleFrom="sm">Add Asset</Text>
-                <Text hiddenFrom="sm">Add</Text>
-            </Button>
+                <Text hiddenFrom="sm" size="xs">Add</Text>
+              </Button>
+            </Group>
           </Group>
-        </Group>
 
-        <Grid>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-            <Group gap="xs">
-            <TextInput
-              placeholder="Search assets..."
-              leftSection={<IconSearch size={16} />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ flex: 1 }}
+          {/* Mobile-optimized filter layout */}
+          <Stack gap="xs" hiddenFrom="md" className="mobile-filter-stack">
+            <Group gap="xs" grow>
+              <TextInput
+                placeholder="Search assets..."
+                leftSection={<IconSearch size={16} />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="sm"
+                styles={{
+                  input: {
+                    fontSize: '16px',
+                  },
+                }}
               />
               <ActionIcon
                 variant="light"
                 color="blue"
                 size="lg"
                 onClick={startBarcodeScanner}
-                hiddenFrom="md"
                 title="Scan barcode"
+                style={{ flexShrink: 0 }}
               >
                 <IconScan size={18} />
               </ActionIcon>
             </Group>
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-            <Select
-              placeholder="Filter by status"
-              data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value || '')}
-              clearable
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-            <Select
-              placeholder="Filter by type"
-              data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
-              value={typeFilter}
-              onChange={(value) => setTypeFilter(value || '')}
-              clearable
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+            <Group gap="xs" grow>
+              <Select
+                placeholder="Status"
+                data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value || '')}
+                clearable
+                size="sm"
+                styles={{
+                  input: {
+                    fontSize: '16px',
+                  },
+                }}
+              />
+              <Select
+                placeholder="Type"
+                data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
+                value={typeFilter}
+                onChange={(value) => setTypeFilter(value || '')}
+                clearable
+                size="sm"
+                styles={{
+                  input: {
+                    fontSize: '16px',
+                  },
+                }}
+              />
+            </Group>
             <Select
               placeholder="Filter by wing"
               data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
               value={wingFilter}
               onChange={(value) => setWingFilter(value || '')}
               clearable
+              size="sm"
+              styles={{
+                input: {
+                  fontSize: '16px',
+                },
+              }}
             />
-          </Grid.Col>
-        </Grid>
+          </Stack>
+
+          {/* Desktop filter layout */}
+          <Grid visibleFrom="md">
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Group gap="xs">
+                <TextInput
+                  placeholder="Search assets..."
+                  leftSection={<IconSearch size={16} />}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  size="lg"
+                  onClick={startBarcodeScanner}
+                  hiddenFrom="md"
+                  title="Scan barcode"
+                >
+                  <IconScan size={18} />
+                </ActionIcon>
+              </Group>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by status"
+                data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by type"
+                data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
+                value={typeFilter}
+                onChange={(value) => setTypeFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by wing"
+                data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
+                value={wingFilter}
+                onChange={(value) => setWingFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+          </Grid>
         </Stack>
       </Card>
+
+      {/* Visual separator for mobile */}
+      <Divider hiddenFrom="md" size="xs" color="gray.3" />
 
       {/* Assets Table */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
@@ -1798,6 +1874,7 @@ export default function HomePage() {
             value={currentPage}
             onChange={setCurrentPage}
             size="sm"
+            hiddenFrom="sm"
           />
         </Group>
 
@@ -1810,46 +1887,46 @@ export default function HomePage() {
           <>
             {/* Desktop Table View */}
             <Box visibleFrom="md">
-          <ScrollArea>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>View</Table.Th>
-                  <Table.Th>Asset</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Location</Table.Th>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Filter Status</Table.Th>
-                  <Table.Th>Last Updated</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.length > 0 ? rows : (
-                  <Table.Tr>
-                    <Table.Td colSpan={7}>
-                      <Group justify="center" py="xl">
-                        <Stack align="center" gap="xs">
-                          <IconDroplet size={48} color="gray" />
-                          <Text c="dimmed">No assets found matching your criteria.</Text>
-                        </Stack>
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
+              <ScrollArea>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>View</Table.Th>
+                      <Table.Th>Asset</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Location</Table.Th>
+                      <Table.Th>Type</Table.Th>
+                      <Table.Th>Filter Status</Table.Th>
+                      <Table.Th>Last Updated</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {rows.length > 0 ? rows : (
+                      <Table.Tr>
+                        <Table.Td colSpan={7}>
+                          <Group justify="center" py="xl">
+                            <Stack align="center" gap="xs">
+                              <IconDroplet size={48} color="gray" />
+                              <Text c="dimmed">No assets found matching your criteria.</Text>
+                            </Stack>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
             </Box>
 
             {/* Mobile Card View */}
-            <Box hiddenFrom="md">
-              <Stack gap="md">
+            <Box hiddenFrom="md" className="mobile-asset-cards">
+              <Stack gap="xs">
                 {paginatedAssets.length > 0 ? (
                   paginatedAssets.map((asset) => (
                     <Card 
                       key={asset.assetBarcode} 
                       shadow="sm" 
-                      padding="md" 
+                      padding="sm" 
                       radius="md" 
                       withBorder
                       style={{ cursor: 'pointer' }}
@@ -1858,7 +1935,7 @@ export default function HomePage() {
                         openViewModal();
                       }}
                     >
-                      <Stack gap="sm">
+                      <Stack gap="xs">
                         <Group justify="space-between" align="flex-start">
                           <div>
                             <Text fw={600} size="sm">{asset.assetBarcode}</Text>
@@ -1935,6 +2012,8 @@ export default function HomePage() {
                                   filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
                                   filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
                                   filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                  needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
+                                  filterType: asset.filterType,
                                   notes: asset.notes,
                                   augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
                                 });
@@ -1978,6 +2057,7 @@ export default function HomePage() {
               total={totalPages}
               value={currentPage}
               onChange={setCurrentPage}
+              size="sm"
             />
           </Group>
         )}
