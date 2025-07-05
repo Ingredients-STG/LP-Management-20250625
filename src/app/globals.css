@@ -7,12 +7,18 @@
     box-sizing: border-box;
   }
   
-  body {
+  html, body {
     font-family: 'var(--font-geist-sans)', system-ui, -apple-system, sans-serif;
     line-height: 1.6;
     color: #374151;
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     min-height: 100vh;
+    touch-action: manipulation;
+  }
+  
+  /* Prevent zoom on input focus for mobile */
+  input, select, textarea {
+    font-size: 16px;
   }
 }
 

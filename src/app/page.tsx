@@ -33,6 +33,7 @@ import {
   Divider,
   Box,
   FileInput,
+  Drawer,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { BarChart, PieChart } from '@mantine/charts';
@@ -186,6 +187,8 @@ export default function HomePage() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isScannerActive, setIsScannerActive] = useState(false);
+  const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
+  const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -345,6 +348,21 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
+    }
+  };
+
+  // Fetch global audit logs (all activities)
+  const fetchGlobalAuditLogs = async () => {
+    try {
+      const response = await fetch('/api/audit-entries');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setGlobalAuditLog(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching global audit logs:', error);
     }
   };
 
@@ -2332,6 +2350,18 @@ export default function HomePage() {
               >
                 <IconSearch size={18} />
               </ActionIcon>
+              <Tooltip label="Audit Trail">
+                <ActionIcon 
+                  variant="subtle" 
+                  size="lg"
+                  onClick={() => {
+                    fetchGlobalAuditLogs();
+                    openAuditDrawer();
+                  }}
+                >
+                  <IconHistory size={18} />
+                </ActionIcon>
+              </Tooltip>
               <ActionIcon variant="subtle" size="lg">
                 <Indicator color="red" size={8}>
                   <IconBell size={18} />
@@ -2424,12 +2454,41 @@ export default function HomePage() {
         )}
 
         <AppShell.Main>
-          <Container size="xl" className="main-container">
+          <Container 
+            size="xl" 
+            className="main-container"
+            style={{
+              maxWidth: '100%',
+              '@media (min-width: 1440px)': {
+                maxWidth: '85vw',
+              },
+              '@media (min-width: 1920px)': {
+                maxWidth: '80vw',
+              },
+              '@media (min-width: 2560px)': {
+                maxWidth: '75vw',
+              },
+            }}
+          >
 
             {hideTabContainer && (
-              <Card shadow="sm" padding="md" radius="md" withBorder mb="lg">
+              <Card 
+                shadow="sm" 
+                padding="md" 
+                radius="md" 
+                withBorder 
+                mb="lg"
+                style={{
+                  '@media (min-width: 1440px)': {
+                    padding: '1.5rem',
+                  },
+                  '@media (min-width: 1920px)': {
+                    padding: '2rem',
+                  },
+                }}
+              >
                 <ScrollArea>
-                  <Group wrap="nowrap" gap="xs">
+                  <Group wrap="nowrap" gap="xs" justify="center">
                   <Button
                     variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
                     leftSection={<IconDashboard size={16} />}
@@ -2504,6 +2563,7 @@ export default function HomePage() {
                   <TextInput
                     label="Asset Barcode"
                     placeholder="Enter barcode"
+                    inputMode="text"
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>
@@ -2512,6 +2572,7 @@ export default function HomePage() {
                     label="Primary Identifier"
                     placeholder="Enter identifier"
                     required
+                    inputMode="text"
                     {...form.getInputProps('primaryIdentifier')}
                   />
                 </Grid.Col>
@@ -3492,6 +3553,155 @@ export default function HomePage() {
           </Button>
         </Group>
       </Modal>
+
+      {/* Global Audit Trail Drawer */}
+      <Drawer
+        opened={showAuditDrawer}
+        onClose={closeAuditDrawer}
+        title="System Audit Trail"
+        position="right"
+        size="xl"
+        scrollAreaComponent={ScrollArea.Autosize}
+      >
+        <Stack gap="md">
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              Recent system activities across all assets
+            </Text>
+            <Badge color="blue" variant="light">
+              {globalAuditLog.length} entries
+            </Badge>
+          </Group>
+
+          <ScrollArea h="calc(100vh - 200px)">
+            <Stack gap="sm">
+              {/* Mock Data - Replace with real data when backend is ready */}
+              {[
+                {
+                  id: '1',
+                  action: 'CREATE',
+                  timestamp: new Date().toISOString(),
+                  user: 'john.doe@sgwst.nhs.uk',
+                  assetBarcode: 'ASSET-001',
+                  assetName: 'Water Tap - Room 101',
+                  changes: [
+                    { field: 'status', oldValue: null, newValue: 'ACTIVE' },
+                    { field: 'filterNeeded', oldValue: null, newValue: true },
+                  ]
+                },
+                {
+                  id: '2',
+                  action: 'UPDATE',
+                  timestamp: new Date(Date.now() - 3600000).toISOString(),
+                  user: 'jane.smith@sgwst.nhs.uk',
+                  assetBarcode: 'ASSET-002',
+                  assetName: 'Water Cooler - Reception',
+                  changes: [
+                    { field: 'filterExpiryDate', oldValue: '2024-12-01', newValue: '2025-03-01' },
+                    { field: 'filtersOn', oldValue: false, newValue: true },
+                  ]
+                },
+                {
+                  id: '3',
+                  action: 'DELETE',
+                  timestamp: new Date(Date.now() - 7200000).toISOString(),
+                  user: 'admin@sgwst.nhs.uk',
+                  assetBarcode: 'ASSET-003',
+                  assetName: 'Old Water Tap - Room 205',
+                  changes: []
+                },
+              ].map((entry, index) => (
+                <Card key={entry.id} shadow="sm" padding="md" radius="md" withBorder>
+                  <Stack gap="xs">
+                    <Group justify="space-between">
+                      <Group gap="xs">
+                        <Badge 
+                          color={
+                            entry.action === 'CREATE' ? 'green' : 
+                            entry.action === 'UPDATE' ? 'blue' : 'red'
+                          }
+                          variant="light"
+                        >
+                          {entry.action}
+                        </Badge>
+                        <Text size="sm" fw={500}>
+                          {entry.assetName}
+                        </Text>
+                      </Group>
+                      <Text size="xs" c="dimmed">
+                        {formatTimestamp(entry.timestamp)}
+                      </Text>
+                    </Group>
+                    
+                    <Group gap="xs">
+                      <Text size="xs" c="dimmed">Asset:</Text>
+                      <Text size="xs" fw={500}>{entry.assetBarcode}</Text>
+                      <Text size="xs" c="dimmed">•</Text>
+                      <Text size="xs" c="dimmed">by {entry.user}</Text>
+                    </Group>
+
+                    {entry.changes && entry.changes.length > 0 && (
+                      <div>
+                        <Text size="xs" fw={500} mb="xs" c="dimmed">Changes:</Text>
+                        <Stack gap="xs">
+                          {entry.changes.map((change: any, changeIndex: number) => (
+                            <Paper key={changeIndex} p="xs" bg="gray.0" radius="sm">
+                              <Group justify="space-between" wrap="nowrap">
+                                <Text size="xs" fw={500} style={{ minWidth: '80px' }}>
+                                  {getFieldDisplayName(change.field)}
+                                </Text>
+                                <Group gap="xs" wrap="nowrap" style={{ flex: 1 }}>
+                                  <Text size="xs" c="red" truncate style={{ flex: 1 }}>
+                                    {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
+                                  </Text>
+                                  <Text size="xs">→</Text>
+                                  <Text size="xs" c="green" truncate style={{ flex: 1 }}>
+                                    {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
+                                  </Text>
+                                </Group>
+                              </Group>
+                            </Paper>
+                          ))}
+                        </Stack>
+                      </div>
+                    )}
+
+                    {entry.action === 'DELETE' && (
+                      <Paper p="xs" bg="red.0" radius="sm">
+                        <Text size="xs" c="red" fw={500}>Asset permanently removed from system</Text>
+                      </Paper>
+                    )}
+                  </Stack>
+                </Card>
+              ))}
+
+              {globalAuditLog.length === 0 && (
+                <Group justify="center" py="xl">
+                  <Stack align="center" gap="xs">
+                    <IconHistory size={48} color="gray" />
+                    <Text c="dimmed">No audit entries found.</Text>
+                    <Text size="xs" c="dimmed">System activities will appear here as they occur.</Text>
+                  </Stack>
+                </Group>
+              )}
+            </Stack>
+          </ScrollArea>
+
+          <Group justify="space-between" pt="md" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
+            <Text size="xs" c="dimmed">
+              Last updated: {new Date().toLocaleTimeString()}
+            </Text>
+            <Button 
+              size="xs" 
+              variant="subtle" 
+              onClick={fetchGlobalAuditLogs}
+              leftSection={<IconRefresh size={14} />}
+            >
+              Refresh
+            </Button>
+          </Group>
+        </Stack>
+      </Drawer>
 
       {/* Spotlight Search */}
       <Spotlight
