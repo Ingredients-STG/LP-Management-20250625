@@ -968,6 +968,19 @@ export default function HomePage() {
     fetchData();
     fetchAssetTypes();
     fetchFilterTypes();
+    
+    // Add global error handler for unhandled promise rejections
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      // Prevent the default behavior that logs to console
+      event.preventDefault();
+    };
+    
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   useEffect(() => {
@@ -3073,7 +3086,7 @@ export default function HomePage() {
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        <form onSubmit={form.onSubmit(handleEditAsset)}>
+        <form onSubmit={form.onSubmit(handleEditAsset)} onError={(e) => console.error('Form error:', e)}>
           <Stack gap="lg">
             {/* Basic Information */}
             <div>
