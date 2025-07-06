@@ -1680,9 +1680,10 @@ export default function HomePage() {
   const renderDashboard = () => (
     <div className="dashboard-outer-container">
       <Stack gap="lg" className="dashboard-container">
-        {/* Stats Grid */}
-        <div className="card-grid" style={{ width: '100%' }}>
+        {/* Stats Row */}
+        <div className="dashboard-stats-row">
           <StatCard
+            className="stat-card"
             title="Total Assets"
             value={stats.totalAssets}
             icon={<IconDroplet size={20} />}
@@ -1691,6 +1692,7 @@ export default function HomePage() {
             trend={2.5}
           />
           <StatCard
+            className="stat-card"
             title="Active Assets"
             value={stats.activeAssets}
             icon={<IconCheck size={20} />}
@@ -1699,6 +1701,7 @@ export default function HomePage() {
             trend={5.2}
           />
           <StatCard
+            className="stat-card"
             title="Under Maintenance"
             value={stats.maintenanceAssets}
             icon={<IconAlertTriangle size={20} />}
@@ -1707,6 +1710,7 @@ export default function HomePage() {
             trend={-1.2}
           />
           <StatCard
+            className="stat-card"
             title="Filters Needed"
             value={stats.filtersNeeded}
             icon={<IconFilter size={20} />}
