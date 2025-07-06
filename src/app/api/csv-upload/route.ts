@@ -316,10 +316,14 @@ export async function POST(req: NextRequest) {
 
         // Parse all boolean fields independently - NO interdependencies or logic
         // Filter logic is ONLY applied in Add/Edit Asset UI, NOT during bulk upload
-        const filterNeeded = filterNeededRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filterNeededRaw) : false;
-        const filtersOn = filtersOnRaw ? ['YES', 'TRUE', '1', 'Y'].includes(filtersOnRaw) : false;
-        const needFlushing = needFlushingRaw ? ['YES', 'TRUE', '1', 'Y'].includes(needFlushingRaw) : false;
-        const augmentedCare = augmentedCareRaw ? ['YES', 'TRUE', '1', 'Y'].includes(augmentedCareRaw) : false;
+        function parseBoolField(val: string | undefined): boolean {
+          if (!val) return false;
+          return ['YES', 'TRUE', '1', 'Y'].includes(val.trim().toUpperCase());
+        }
+        const filterNeeded = parseBoolField(filterNeededRaw);
+        const filtersOn = parseBoolField(filtersOnRaw);
+        const needFlushing = parseBoolField(needFlushingRaw);
+        const augmentedCare = parseBoolField(augmentedCareRaw);
         
         // ===== FILTER STATUS MISMATCH DETECTION =====
         // Check for potential mismatches between uploaded Filters On and expected logic

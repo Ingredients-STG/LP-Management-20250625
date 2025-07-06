@@ -33,7 +33,7 @@
 #
 Asset Barcode,Location,Asset Type,Augmented Care,Filter Needed,Filter Installed,Filters On,Need Flushing,Filter Type
 B30680,Room 301,Water Tap,NO,YES,30/04/2025,YES,NO,Standard
-B30681,Room 302,Water Cooler,NO,NO,,,NO,,
+B30681,Room 302,Water Cooler,NO,NO,,,NO,
 B30682,Room 303,LNS Outlet - TMT,YES,YES,15/09/2024,YES,YES,Advanced
 B30683,Kitchen Area,Coffee Machine Filter,NO,YES,10/10/2024,NO,NO,Standard
 B30684,Lab 101,Equipment Stand,NO,NO,,,NO, 
