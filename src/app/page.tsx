@@ -1665,10 +1665,7 @@ export default function HomePage() {
                         <Text size="sm">Filter Expiry:</Text>
                         <div style={{ textAlign: 'right' }}>
                           <Group gap="xs" justify="flex-end">
-                            <Text size="sm" fw={500}>
-                              {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
-                            </Text>
-                            {asset.filterExpiryDate && asset.filterInstalledOn && (
+                            {asset.filterExpiryDate && (
                               <Badge 
                                 color={getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).color} 
                                 variant="light" 
@@ -1678,6 +1675,9 @@ export default function HomePage() {
                                 {getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).text}
                               </Badge>
                             )}
+                            <Text size="sm" fw={500}>
+                              {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
+                            </Text>
                           </Group>
                         </div>
                       </Group>
@@ -3040,6 +3040,16 @@ export default function HomePage() {
               />
             </div>
 
+            <Grid.Col span={{ base: 12, sm: 12 }}>
+              <Textarea
+                label="Notes"
+                placeholder="Enter any notes or comments about this asset"
+                autosize
+                minRows={2}
+                {...form.getInputProps('notes')}
+              />
+            </Grid.Col>
+
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeModal}>
                 Cancel
@@ -3300,6 +3310,16 @@ export default function HomePage() {
                 {...form.getInputProps('notes')}
               />
             </div>
+
+            <Grid.Col span={{ base: 12, sm: 12 }}>
+              <Textarea
+                label="Notes"
+                placeholder="Enter any notes or comments about this asset"
+                autosize
+                minRows={2}
+                {...form.getInputProps('notes')}
+              />
+            </Grid.Col>
 
             <Divider />
 
