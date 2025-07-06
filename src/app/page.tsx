@@ -406,8 +406,10 @@ export default function HomePage() {
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          const typeLabels = result.data.map((type: any) => type.label);
-          setAssetTypes(typeLabels);
+          const typeLabels = result.data.map((type: any) => type.label).filter(Boolean);
+          // Remove duplicates using Set
+          const uniqueTypeLabels = [...new Set(typeLabels)] as string[];
+          setAssetTypes(uniqueTypeLabels);
         }
       }
     } catch (error) {
@@ -421,7 +423,9 @@ export default function HomePage() {
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setFilterTypes(result.data);
+          // Remove duplicates using Set and filter out any null/undefined values
+          const uniqueFilterTypes = [...new Set(result.data.filter(Boolean))] as string[];
+          setFilterTypes(uniqueFilterTypes);
         }
       }
     } catch (error) {
@@ -3101,7 +3105,7 @@ export default function HomePage() {
                   <Select
                     label="Asset Type"
                     placeholder="Select type"
-                      data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
                     required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
@@ -3259,7 +3263,7 @@ export default function HomePage() {
                     <Select
                       label="Filter Type"
                       placeholder="Select filter type"
-                      data={[...filterTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[...filterTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
                       value={form.values.filterType}
                       onChange={handleFilterTypeSelect}
                     />
@@ -3403,7 +3407,7 @@ export default function HomePage() {
                   <Select
                     label="Asset Type"
                     placeholder="Select type"
-                      data={[...assetTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
                     required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
@@ -3561,7 +3565,7 @@ export default function HomePage() {
                     <Select
                       label="Filter Type"
                       placeholder="Select filter type"
-                      data={[...filterTypes, { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[...filterTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
                       value={form.values.filterType}
                       onChange={handleFilterTypeSelect}
                     />
