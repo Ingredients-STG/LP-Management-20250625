@@ -145,7 +145,7 @@ export class DynamoDBService {
 
       // Build update expression
       for (const [key, value] of Object.entries(updates)) {
-        if (key !== 'id' && key !== 'created') {
+        if (key !== 'id' && key !== 'created' && key !== 'modified') {
           updateExpression.push(`#${key} = :${key}`);
           expressionAttributeNames[`#${key}`] = key;
           expressionAttributeValues[`:${key}`] = value;

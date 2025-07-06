@@ -1935,20 +1935,6 @@ export default function HomePage() {
                           {asset.filterType || 'N/A'}
                         </Text>
                       </Group>
-                      
-                      {/* Remove Filter Button */}
-                      <Group justify="center" mt="md">
-                        <Button
-                          variant="outline"
-                          color="orange"
-                          size="xs"
-                          leftSection={<IconX size={14} />}
-                          onClick={() => handleRemoveFilter(asset)}
-                          disabled={!asset.filterNeeded && !asset.filtersOn && !asset.filterType}
-                        >
-                          Remove Filter
-                        </Button>
-                      </Group>
                     </Stack>
                   </Grid.Col>
                   
@@ -3627,6 +3613,20 @@ export default function HomePage() {
                   </Stack>
                 </Grid.Col>
               </Grid>
+              
+              {/* Remove Filter Button */}
+              <Group justify="center" mt="md">
+                <Button
+                  variant="outline"
+                  color="orange"
+                  size="sm"
+                  leftSection={<IconX size={16} />}
+                  onClick={() => selectedAsset && handleRemoveFilter(selectedAsset)}
+                  disabled={!selectedAsset || (!selectedAsset.filterNeeded && !selectedAsset.filtersOn && !selectedAsset.filterType)}
+                >
+                  Remove Filter
+                </Button>
+              </Group>
             </div>
 
             <Divider />
