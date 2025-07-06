@@ -11,7 +11,7 @@ echo "========================================"
 # Configuration
 POOL_NAME="LP-Management-Users"
 CLIENT_NAME="LP-Management-Client"
-REGION="us-east-1"
+REGION="eu-west-2"
 ADMIN_EMAIL=""
 
 # Colors for output
@@ -107,7 +107,7 @@ create_user_pool_client() {
         --user-pool-id "$USER_POOL_ID" \
         --client-name "$CLIENT_NAME" \
         --generate-secret \
-        --explicit-auth-flows "ADMIN_NO_SRP_AUTH" "ALLOW_USER_PASSWORD_AUTH" "ALLOW_REFRESH_TOKEN_AUTH" \
+        --explicit-auth-flows "ALLOW_USER_PASSWORD_AUTH" "ALLOW_REFRESH_TOKEN_AUTH" \
         --supported-identity-providers "COGNITO" \
         --read-attributes "email" "email_verified" "given_name" "family_name" \
         --write-attributes "email" "given_name" "family_name" \
