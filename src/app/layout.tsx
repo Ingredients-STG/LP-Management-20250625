@@ -11,6 +11,7 @@ import '@mantine/spotlight/styles.css';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { ModalsProvider } from '@mantine/modals';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -70,10 +71,12 @@ export default function RootLayout({
             },
           }}
         >
-          <ModalsProvider>
-            <Notifications position="top-right" />
-            {children}
-          </ModalsProvider>
+          <AuthProvider>
+            <ModalsProvider>
+              <Notifications position="top-right" />
+              {children}
+            </ModalsProvider>
+          </AuthProvider>
         </MantineProvider>
       </body>
     </html>

@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.840.0",
     "@aws-sdk/client-dynamodb": "^3.839.0",
     "@aws-sdk/client-s3": "^3.840.0",
+    "@aws-sdk/credential-providers": "^3.840.0",
     "@aws-sdk/lib-dynamodb": "^3.839.0",
     "@heroicons/react": "^2.2.0",
     "@mantine/charts": "^8.1.2",
@@ -28,6 +30,7 @@
     "@types/uuid": "^10.0.0",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
+    "aws-amplify": "^6.15.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

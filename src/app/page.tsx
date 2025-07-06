@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   AppShell,
   Title,
@@ -161,6 +163,7 @@ function safeDate(val: any): Date | null {
 }
 
 export default function HomePage() {
+  const { user, signOut } = useAuth();
   const [opened, { toggle }] = useDisclosure();
 
   // Handle unhandled promise rejections for Safari compatibility
@@ -2885,7 +2888,7 @@ export default function HomePage() {
   );
 
   return (
-    <>
+    <ProtectedRoute>
       <AppShell
         header={{ height: 70 }}
         navbar={hideTabContainer ? undefined : { width: 280, breakpoint: 'sm', collapsed: { mobile: !opened } }}
@@ -2945,7 +2948,7 @@ export default function HomePage() {
                   <IconBell size={18} />
                 </Indicator>
               </ActionIcon>
-              <Menu shadow="md" width={200}>
+              <Menu shadow="md" width={250}>
                 <Menu.Target>
                   <ActionIcon variant="subtle" size="lg">
                     <Avatar size={32} color="blue">
@@ -2954,6 +2957,9 @@ export default function HomePage() {
                   </ActionIcon>
                 </Menu.Target>
                 <Menu.Dropdown>
+                  <Menu.Label>
+                    {user?.name || user?.username || 'User'}
+                  </Menu.Label>
                   <Menu.Item leftSection={<IconUser size={14} />}>
                     Profile
                   </Menu.Item>
@@ -2963,6 +2969,14 @@ export default function HomePage() {
                   <Menu.Divider />
                   <Menu.Item leftSection={<IconMail size={14} />}>
                     Support
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item 
+                    leftSection={<IconX size={14} />}
+                    color="red"
+                    onClick={signOut}
+                  >
+                    Sign Out
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
@@ -4333,6 +4347,6 @@ export default function HomePage() {
           placeholder: 'Search assets...',
         }}
       />
-    </>
+    </ProtectedRoute>
   );
 }

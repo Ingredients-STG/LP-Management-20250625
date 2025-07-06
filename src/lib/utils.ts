@@ -252,13 +252,31 @@ export const formatTimestamp = (date: Date | string): string => {
 
 // User identification utilities
 export const getCurrentUser = (): string => {
-  // TODO: Implement Cognito user identification
-  // For now, return a descriptive user name for SGWST team
+  if (typeof window !== 'undefined') {
+    try {
+      const userStr = localStorage.getItem('auth_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.name || user.username || 'SGWST Admin';
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
+    }
+  }
   return 'SGWST Admin';
 };
 
 export const getCurrentUserEmail = (): string => {
-  // TODO: Implement Cognito user email retrieval
-  // For now, return a placeholder for SGWST team
+  if (typeof window !== 'undefined') {
+    try {
+      const userStr = localStorage.getItem('auth_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.email || 'admin@sgwst.nhs.uk';
+      }
+    } catch (error) {
+      console.error('Error getting current user email:', error);
+    }
+  }
   return 'admin@sgwst.nhs.uk';
 }; 
