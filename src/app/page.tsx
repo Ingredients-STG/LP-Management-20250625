@@ -1418,6 +1418,21 @@ export default function HomePage() {
             a.id === asset.id ? result.data : a
           ));
           
+          // Update selectedAsset if it's the same asset being edited
+          if (selectedAsset && selectedAsset.id === asset.id) {
+            setSelectedAsset(result.data);
+            
+            // Update form values to reflect the changes
+            form.setValues({
+              ...form.values,
+              filterNeeded: false,
+              filtersOn: false,
+              filterInstalledOn: null,
+              filterExpiryDate: null,
+              filterType: '',
+            });
+          }
+          
           notifications.show({
             title: 'Success',
             message: 'Filter removed successfully!',
