@@ -1681,48 +1681,40 @@ export default function HomePage() {
     <div className="dashboard-outer-container">
       <Stack gap="lg" className="dashboard-container">
         {/* Stats Grid */}
-        <Grid gutter="md" className="dashboard-stats-grid">
-          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
-            <StatCard
-              title="Total Assets"
-              value={stats.totalAssets}
-              icon={<IconDroplet size={20} />}
-              color="blue"
-              description="All registered assets"
-              trend={2.5}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
-            <StatCard
-              title="Active Assets"
-              value={stats.activeAssets}
-              icon={<IconCheck size={20} />}
-              color="green"
-              description="Currently operational"
-              trend={5.2}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
-            <StatCard
-              title="Under Maintenance"
-              value={stats.maintenanceAssets}
-              icon={<IconAlertTriangle size={20} />}
-              color="yellow"
-              description="Requires attention"
-              trend={-1.2}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
-            <StatCard
-              title="Filters Needed"
-              value={stats.filtersNeeded}
-              icon={<IconFilter size={20} />}
-              color="red"
-              description="Filter replacement due"
-              trend={0.8}
-            />
-          </Grid.Col>
-        </Grid>
+        <div className="card-grid" style={{ width: '100%' }}>
+          <StatCard
+            title="Total Assets"
+            value={stats.totalAssets}
+            icon={<IconDroplet size={20} />}
+            color="blue"
+            description="All registered assets"
+            trend={2.5}
+          />
+          <StatCard
+            title="Active Assets"
+            value={stats.activeAssets}
+            icon={<IconCheck size={20} />}
+            color="green"
+            description="Currently operational"
+            trend={5.2}
+          />
+          <StatCard
+            title="Under Maintenance"
+            value={stats.maintenanceAssets}
+            icon={<IconAlertTriangle size={20} />}
+            color="yellow"
+            description="Requires attention"
+            trend={-1.2}
+          />
+          <StatCard
+            title="Filters Needed"
+            value={stats.filtersNeeded}
+            icon={<IconFilter size={20} />}
+            color="red"
+            description="Filter replacement due"
+            trend={0.8}
+          />
+        </div>
 
         {/* Charts */}
         <Grid gutter="md" className="dashboard-charts-grid">
