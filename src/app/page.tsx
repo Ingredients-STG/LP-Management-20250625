@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   AppShell,
   Title,
@@ -933,12 +933,21 @@ export default function HomePage() {
     setCurrentPage(1);
   }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
 
+  // Track previous installed date to prevent infinite loops
+  const prevInstalledDateRef = useRef<Date | null>(null);
+  
   // Auto-calculate Filter Expiry Date when Filter Installed On changes (Add/Edit UI only)
   useEffect(() => {
     const installedDate = form.values.filterInstalledOn;
     if (installedDate && installedDate instanceof Date && !isNaN(installedDate.getTime())) {
-      const expiryDate = calculateFilterExpiry(installedDate);
-      form.setFieldValue('filterExpiryDate', expiryDate);
+      // Only update if the installed date has actually changed
+      if (!prevInstalledDateRef.current || prevInstalledDateRef.current.getTime() !== installedDate.getTime()) {
+        const expiryDate = calculateFilterExpiry(installedDate);
+        form.setFieldValue('filterExpiryDate', expiryDate);
+        prevInstalledDateRef.current = installedDate;
+      }
+    } else {
+      prevInstalledDateRef.current = null;
     }
   }, [form.values.filterInstalledOn]);
 
