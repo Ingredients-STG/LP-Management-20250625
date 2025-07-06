@@ -152,6 +152,10 @@ export async function POST(request: NextRequest) {
     const rawHeaders = rows[0].map((h: any) => String(h || '').trim());
     const headerMapping = createHeaderMapping(rawHeaders);
     
+    // Debug log header mapping
+    console.log('Raw headers:', rawHeaders);
+    console.log('Header mapping:', headerMapping);
+    
     // Check for required field presence
     const requiredFields = ['assetBarcode', 'room', 'filterNeeded'];
     const missingFields = requiredFields.filter(field => !(field in headerMapping));
@@ -280,6 +284,17 @@ export async function POST(request: NextRequest) {
           results.errors.push(parsedExpiry.error);
           continue;
         }
+        // Auto-calculate filter expiry if installed date is provided but expiry is not
+        let finalExpiryDate = parsedExpiry.date;
+        if (parsedInstalled.date && !parsedExpiry.date) {
+          // Calculate expiry as 3 months from installed date
+          const installedDate = new Date(parsedInstalled.date);
+          const expiryDate = new Date(installedDate);
+          expiryDate.setMonth(expiryDate.getMonth() + 3);
+          finalExpiryDate = expiryDate.toISOString().split('T')[0];
+          console.log(`Row ${rowNumber}: Auto-calculated expiry ${finalExpiryDate} from installed ${parsedInstalled.date}`);
+        }
+
         // Build asset object with validated required fields
         const asset: any = {
           assetBarcode,
@@ -292,7 +307,7 @@ export async function POST(request: NextRequest) {
           filtersOn: filtersOnParsed,
           augmentedCare: parseBoolField(augmentedCareRaw),
           filterInstalledOn: parsedInstalled.date || null,
-          filterExpiryDate: parsedExpiry.date || null
+          filterExpiryDate: finalExpiryDate || null
         };
 
         // Add optional fields using header mapping
