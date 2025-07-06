@@ -45,7 +45,9 @@ function createHeaderMapping(headers: string[]): { [key: string]: number } {
       'roomName': ['roomname', 'room_name', 'roomtitle', 'room_title'],
       'filtersOn': ['filtersonn', 'filters_on', 'filtersactive', 'filtersstatus'],
       'notes': ['notes', 'comments', 'remarks', 'description'],
-      'augmentedCare': ['augmentedcare', 'augmented_care', 'specialcare', 'enhanced']
+      'augmentedCare': ['augmentedcare', 'augmented_care', 'specialcare', 'enhanced'],
+      'needFlushing': ['needflushing', 'need_flushing', 'need_flushing*', 'needflushing*'],
+      'filterType': ['filtertype', 'filter_type', 'filter_type*']
     };
 
     // Find matching field for this header
@@ -58,6 +60,12 @@ function createHeaderMapping(headers: string[]): { [key: string]: number } {
   });
 
   return mapping;
+}
+
+// Add robust boolean parsing helper
+function parseBoolField(val: string | undefined): boolean {
+  if (!val) return false;
+  return ['YES', 'TRUE', '1', 'Y'].includes(val.trim().toUpperCase());
 }
 
 export async function POST(request: NextRequest) {
@@ -151,7 +159,8 @@ export async function POST(request: NextRequest) {
         const room = String(roomRaw).trim();
         
         const filterNeededRaw = values[headerMapping.filterNeeded] || '';
-        const filterNeededValue = String(filterNeededRaw).trim().toLowerCase();
+        // Use robust boolean parsing
+        const filterNeeded = parseBoolField(filterNeededRaw);
 
         // Validate Asset Barcode
         if (!assetBarcode || assetBarcode === 'null' || assetBarcode === 'undefined') {
@@ -168,15 +177,12 @@ export async function POST(request: NextRequest) {
         }
 
         // Validate Filter Needed
-        if (!filterNeededValue) {
+        if (filterNeededRaw.trim() === '') {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Filter Needed is required (use YES/NO)`);
           continue;
         }
 
-        // Parse filterNeeded
-        const filterNeeded = ['true', 'yes', '1', 'y'].includes(filterNeededValue);
-        
         // Validate filterInstalledOn if filterNeeded is true
         const filterInstalledOnRaw = values[headerMapping.filterInstalledOn] || '';
         const filterInstalledOnValue = String(filterInstalledOnRaw).trim();
@@ -214,20 +220,30 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Parse new fields
+        const needFlushingRaw = headerMapping.needFlushing !== undefined ? values[headerMapping.needFlushing] : '';
+        const filterType = headerMapping.filterType !== undefined ? String(values[headerMapping.filterType] || '').trim() : '';
+        const filtersOnRaw = headerMapping.filtersOn !== undefined ? values[headerMapping.filtersOn] : '';
+        const augmentedCareRaw = headerMapping.augmentedCare !== undefined ? values[headerMapping.augmentedCare] : '';
+
         // Build asset object with validated required fields
         const asset: any = {
           assetBarcode,
           room,
           filterNeeded,
           createdBy: 'bulk-upload',
-          modifiedBy: 'bulk-upload'
+          modifiedBy: 'bulk-upload',
+          needFlushing: parseBoolField(needFlushingRaw),
+          filterType,
+          filtersOn: parseBoolField(filtersOnRaw),
+          augmentedCare: parseBoolField(augmentedCareRaw)
         };
 
         // Add optional fields using header mapping
         const optionalFields = [
           'primaryIdentifier', 'secondaryIdentifier', 'assetType', 'status',
           'wing', 'wingInShort', 'floor', 'floorInWords', 'roomNo', 'roomName',
-          'filtersOn', 'notes', 'augmentedCare'
+          'notes'
         ];
 
         optionalFields.forEach(fieldName => {
@@ -237,7 +253,7 @@ export async function POST(request: NextRequest) {
               
               // Handle special field types
               if (fieldName === 'filtersOn' || fieldName === 'augmentedCare') {
-                asset[fieldName] = ['true', 'yes', '1', 'y'].includes(value.toLowerCase());
+                asset[fieldName] = parseBoolField(value);
               } else {
                 asset[fieldName] = value;
               }
@@ -327,6 +343,8 @@ export async function GET() {
       'roomNo',             // Optional
       'roomName',           // Optional
       'filtersOn',          // Optional
+      'needFlushing',       // Optional
+      'filterType',         // Optional
       'notes',              // Optional
       'augmentedCare'       // Optional
     ];
@@ -347,7 +365,9 @@ export async function GET() {
       'Ground',           // floorInWords (optional)
       '101',              // roomNo (optional)
       'Staff Room',       // roomName (optional)
-      'NO',               // filtersOn (optional)
+      'YES',              // filtersOn (optional)
+      'NO',               // needFlushing (optional)
+      'Standard',         // filterType (optional)
       'Sample notes',     // notes (optional)
       'NO'                // augmentedCare (optional)
     ];
