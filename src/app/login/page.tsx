@@ -22,7 +22,7 @@ import {
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useDisclosure } from '@mantine/hooks';
-import { IconAlertCircle, IconCheck, IconLock, IconUser, IconMail } from '@tabler/icons-react';
+import { IconAlertCircle, IconCheck, IconLock, IconUser, IconMail, IconInfoCircle } from '@tabler/icons-react';
 import CognitoAuthService from '@/lib/cognito';
 
 interface LoginForm {
@@ -69,6 +69,9 @@ export default function LoginPage() {
       router.push('/');
     }
   }, [router]);
+
+  // Check if we're in development mode
+  const isDevelopmentMode = CognitoAuthService.isDevelopmentMode();
 
   // Login form
   const loginForm = useForm<LoginForm>({
@@ -368,6 +371,19 @@ export default function LoginPage() {
           Sign In
         </Title>
 
+        {isDevelopmentMode && (
+          <Alert icon={<IconInfoCircle size={16} />} color="blue" mb="md">
+            <Text size="sm" fw={500} mb="xs">Development Mode</Text>
+            <Text size="xs">
+              AWS Cognito is not configured. Use these test credentials:
+            </Text>
+            <Text size="xs" mt="xs">
+              • Username: <strong>admin</strong> / Password: <strong>password123</strong><br />
+              • Username: <strong>user</strong> / Password: <strong>password123</strong>
+            </Text>
+          </Alert>
+        )}
+
         {error && (
           <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md">
             {error}
@@ -401,10 +417,24 @@ export default function LoginPage() {
         <Divider my="md" />
 
         <Group justify="space-between" mt="md">
-          <Anchor size="sm" onClick={openSignUpModal}>
+          <Anchor 
+            size="sm" 
+            onClick={isDevelopmentMode ? undefined : openSignUpModal}
+            style={{ 
+              color: isDevelopmentMode ? 'var(--mantine-color-gray-5)' : undefined,
+              cursor: isDevelopmentMode ? 'not-allowed' : 'pointer'
+            }}
+          >
             Create account
           </Anchor>
-          <Anchor size="sm" onClick={openForgotPasswordModal}>
+          <Anchor 
+            size="sm" 
+            onClick={isDevelopmentMode ? undefined : openForgotPasswordModal}
+            style={{ 
+              color: isDevelopmentMode ? 'var(--mantine-color-gray-5)' : undefined,
+              cursor: isDevelopmentMode ? 'not-allowed' : 'pointer'
+            }}
+          >
             Forgot password?
           </Anchor>
         </Group>

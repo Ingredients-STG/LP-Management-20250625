@@ -22,14 +22,21 @@ const REGION = process.env.NEXT_PUBLIC_AWS_REGION || 'eu-west-2';
 const USER_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '';
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '';
 
-// Create Cognito client
-const cognitoClient = new CognitoIdentityProviderClient({
-  region: REGION,
-  credentials: {
-    accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
-  },
-});
+// Check if we're in development mode (missing Cognito config)
+const isDevelopmentMode = !USER_POOL_ID || !CLIENT_ID;
+
+// Create Cognito client only if we have proper configuration
+let cognitoClient: CognitoIdentityProviderClient | null = null;
+
+if (!isDevelopmentMode) {
+  cognitoClient = new CognitoIdentityProviderClient({
+    region: REGION,
+    credentials: {
+      accessKeyId: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY || '',
+    },
+  });
+}
 
 export interface AuthUser {
   username: string;
@@ -53,8 +60,63 @@ export interface AuthResult {
 }
 
 export class CognitoAuthService {
+  // Development mode mock users
+  private static mockUsers = [
+    {
+      username: 'admin',
+      password: 'password123',
+      email: 'admin@sgwst.nhs.uk',
+      name: 'SGWST Admin',
+    },
+    {
+      username: 'user',
+      password: 'password123',
+      email: 'user@sgwst.nhs.uk',
+      name: 'SGWST User',
+    },
+  ];
+
+  // Development mode sign in
+  private static mockSignIn(username: string, password: string): AuthResult {
+    const user = this.mockUsers.find(u => 
+      (u.username === username || u.email === username) && u.password === password
+    );
+
+    if (user) {
+      const mockUser: AuthUser = {
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        sub: `mock-${user.username}`,
+        accessToken: `mock-access-token-${Date.now()}`,
+        refreshToken: `mock-refresh-token-${Date.now()}`,
+        idToken: `mock-id-token-${Date.now()}`,
+      };
+
+      this.storeTokens(mockUser);
+
+      return {
+        success: true,
+        user: mockUser,
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Invalid username or password',
+    };
+  }
+
   // Sign in user
   static async signIn(username: string, password: string): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      console.log('🔧 Development Mode: Using mock authentication');
+      console.log('Available mock users:', this.mockUsers.map(u => ({ username: u.username, email: u.email })));
+      return this.mockSignIn(username, password);
+    }
+
+    // Production mode with Cognito
     try {
       const command = new InitiateAuthCommand({
         AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
@@ -65,7 +127,7 @@ export class CognitoAuthService {
         },
       });
 
-      const response = await cognitoClient.send(command);
+      const response = await cognitoClient!.send(command);
 
       if (response.ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
         return {
@@ -119,6 +181,14 @@ export class CognitoAuthService {
     newPassword: string,
     session: string
   ): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'New password setting not available in development mode',
+      };
+    }
+
     try {
       const command = new RespondToAuthChallengeCommand({
         ClientId: CLIENT_ID,
@@ -130,7 +200,7 @@ export class CognitoAuthService {
         },
       });
 
-      const response = await cognitoClient.send(command);
+      const response = await cognitoClient!.send(command);
 
       if (response.AuthenticationResult) {
         const userInfo = await this.getUserInfo(response.AuthenticationResult.AccessToken!);
@@ -175,6 +245,14 @@ export class CognitoAuthService {
     email: string,
     name?: string
   ): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Sign up not available in development mode. Use mock credentials: admin/password123 or user/password123',
+      };
+    }
+
     try {
       const userAttributes = [
         {
@@ -197,7 +275,7 @@ export class CognitoAuthService {
         UserAttributes: userAttributes,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
@@ -213,6 +291,14 @@ export class CognitoAuthService {
 
   // Confirm sign up with verification code
   static async confirmSignUp(username: string, code: string): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Email verification not available in development mode',
+      };
+    }
+
     try {
       const command = new ConfirmSignUpCommand({
         ClientId: CLIENT_ID,
@@ -220,7 +306,7 @@ export class CognitoAuthService {
         ConfirmationCode: code,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
@@ -236,13 +322,21 @@ export class CognitoAuthService {
 
   // Resend confirmation code
   static async resendConfirmationCode(username: string): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Email verification not available in development mode',
+      };
+    }
+
     try {
       const command = new ResendConfirmationCodeCommand({
         ClientId: CLIENT_ID,
         Username: username,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
@@ -258,13 +352,21 @@ export class CognitoAuthService {
 
   // Forgot password
   static async forgotPassword(username: string): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Password reset not available in development mode',
+      };
+    }
+
     try {
       const command = new ForgotPasswordCommand({
         ClientId: CLIENT_ID,
         Username: username,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
@@ -284,6 +386,14 @@ export class CognitoAuthService {
     code: string,
     newPassword: string
   ): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Password reset not available in development mode',
+      };
+    }
+
     try {
       const command = new ConfirmForgotPasswordCommand({
         ClientId: CLIENT_ID,
@@ -292,7 +402,7 @@ export class CognitoAuthService {
         Password: newPassword,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
@@ -308,21 +418,33 @@ export class CognitoAuthService {
 
   // Get current user info
   static async getUserInfo(accessToken: string) {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        Username: 'mock-user',
+        UserAttributes: [
+          { Name: 'email', Value: 'admin@sgwst.nhs.uk' },
+          { Name: 'name', Value: 'SGWST Admin' },
+          { Name: 'sub', Value: 'mock-sub' },
+        ],
+      };
+    }
+
     const command = new GetUserCommand({
       AccessToken: accessToken,
     });
 
-    return await cognitoClient.send(command);
+    return await cognitoClient!.send(command);
   }
 
   // Sign out user
   static async signOut(accessToken?: string): Promise<void> {
     try {
-      if (accessToken) {
+      if (!isDevelopmentMode && accessToken) {
         const command = new GlobalSignOutCommand({
           AccessToken: accessToken,
         });
-        await cognitoClient.send(command);
+        await cognitoClient!.send(command);
       }
     } catch (error) {
       console.error('Sign out error:', error);
@@ -378,12 +500,25 @@ export class CognitoAuthService {
     return this.getStoredUser();
   }
 
+  // Check if we're in development mode
+  static isDevelopmentMode(): boolean {
+    return isDevelopmentMode;
+  }
+
   // Change password
   static async changePassword(
     accessToken: string,
     oldPassword: string,
     newPassword: string
   ): Promise<AuthResult> {
+    // Development mode
+    if (isDevelopmentMode) {
+      return {
+        success: false,
+        error: 'Password change not available in development mode',
+      };
+    }
+
     try {
       const command = new ChangePasswordCommand({
         AccessToken: accessToken,
@@ -391,7 +526,7 @@ export class CognitoAuthService {
         ProposedPassword: newPassword,
       });
 
-      await cognitoClient.send(command);
+      await cognitoClient!.send(command);
 
       return {
         success: true,
