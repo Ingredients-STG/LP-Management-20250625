@@ -46,6 +46,8 @@ export interface Asset {
   filtersOn: boolean;
   filterExpiryDate: string;
   filterInstalledOn: string;
+  filterType: string;
+  needFlushing: boolean;
   notes: string;
   augmentedCare: boolean;
   created: string;
