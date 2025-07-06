@@ -1508,7 +1508,23 @@ export default function HomePage() {
     
     return [
       // Main row
-      <Table.Tr key={asset.assetBarcode}>
+      <Table.Tr 
+        key={asset.assetBarcode}
+        style={{
+          backgroundColor: (() => {
+            const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+              asset.needFlushing : 
+              asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+            return needsFlushing ? 'rgba(255, 0, 0, 0.05)' : undefined;
+          })(),
+          borderLeft: (() => {
+            const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+              asset.needFlushing : 
+              asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+            return needsFlushing ? '3px solid red' : undefined;
+          })()
+        }}
+      >
         <Table.Td>
           <Tooltip label={isExpanded ? "Collapse Details" : "View Details"}>
             <ActionIcon
@@ -1547,41 +1563,58 @@ export default function HomePage() {
           <Text size="sm">{asset.assetType}</Text>
         </Table.Td>
         <Table.Td>
-          {(() => {
-            if (typeof asset.filterNeeded === 'boolean') {
-              return asset.filterNeeded ? (
-                <Group gap="xs">
-                  <IconClock size={14} color="orange" />
-                  <Text size="sm" c="orange">Needed</Text>
-                </Group>
-              ) : (
-                <Group gap="xs">
-                  <IconCheck size={14} color="green" />
-                  <Text size="sm" c="green">Good</Text>
-                </Group>
-              );
-            }
-            const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-            return filterNeededStr === 'yes' || filterNeededStr === 'true' ? (
-              <Group gap="xs">
-                <IconClock size={14} color="orange" />
-                <Text size="sm" c="orange">Needed</Text>
-              </Group>
-            ) : (
-              <Group gap="xs">
-                <IconCheck size={14} color="green" />
-                <Text size="sm" c="green">Good</Text>
-              </Group>
-            );
-          })()}
-        </Table.Td>
-        <Table.Td>
           <Group gap="xs">
             <IconCalendar size={14} />
-            <Text size="sm" c="dimmed">
-              {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
+            <Text size="sm">
+              {(() => { 
+                const d = safeDate(asset.filterInstalledOn); 
+                return d ? d.toLocaleDateString('en-GB') : 'Not installed'; 
+              })()}
             </Text>
           </Group>
+        </Table.Td>
+        <Table.Td>
+          <Stack gap="xs">
+            <Group gap="xs" align="center">
+              {(() => {
+                const expiryStatus = getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn);
+                return (
+                  <>
+                    <Badge 
+                      color={expiryStatus.color} 
+                      variant="light" 
+                      size="xs"
+                    >
+                      {expiryStatus.text}
+                    </Badge>
+                    <Text size="sm" c="dimmed">
+                      {(() => { 
+                        const d = safeDate(asset.filterExpiryDate); 
+                        return d ? d.toLocaleDateString('en-GB') : 'N/A'; 
+                      })()}
+                    </Text>
+                  </>
+                );
+              })()}
+            </Group>
+            {/* Need Flushing Alert */}
+            {(() => {
+              const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+                asset.needFlushing : 
+                asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+              
+              return needsFlushing ? (
+                <Badge 
+                  color="red" 
+                  variant="filled" 
+                  size="xs"
+                  leftSection={<IconAlertTriangle size={10} />}
+                >
+                  NEEDS FLUSHING
+                </Badge>
+              ) : null;
+            })()}
+          </Stack>
         </Table.Td>
       </Table.Tr>,
       
@@ -2199,8 +2232,8 @@ export default function HomePage() {
                       <Table.Th>Status</Table.Th>
                       <Table.Th>Location</Table.Th>
                       <Table.Th>Type</Table.Th>
-                      <Table.Th>Filter Status</Table.Th>
-                      <Table.Th>Last Updated</Table.Th>
+                      <Table.Th>Installed</Table.Th>
+                      <Table.Th>Filter Expiry</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -2232,7 +2265,21 @@ export default function HomePage() {
                       padding="sm" 
                       radius="md" 
                       withBorder
-                      style={{ cursor: 'pointer' }}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: (() => {
+                          const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+                            asset.needFlushing : 
+                            asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+                          return needsFlushing ? 'rgba(255, 0, 0, 0.05)' : undefined;
+                        })(),
+                        borderLeft: (() => {
+                          const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+                            asset.needFlushing : 
+                            asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+                          return needsFlushing ? '3px solid red' : undefined;
+                        })()
+                      }}
                       onClick={() => {
                         setSelectedAsset(asset);
                         openViewModal();
@@ -2254,30 +2301,60 @@ export default function HomePage() {
                             <Text size="xs" c="dimmed">Type</Text>
                             <Text size="sm">{asset.assetType}</Text>
                           </div>
-                          <div>
-                            <Text size="xs" c="dimmed">Filter Status</Text>
-                            {(() => {
-                              if (typeof asset.filterNeeded === 'boolean') {
-                                return asset.filterNeeded ? (
-                                  <Text size="sm" c="orange">Needed</Text>
-                                ) : (
-                                  <Text size="sm" c="green">Good</Text>
-                                );
-                              }
-                              const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-                              return filterNeededStr === 'yes' || filterNeededStr === 'true' ? (
-                                <Text size="sm" c="orange">Needed</Text>
-                              ) : (
-                                <Text size="sm" c="green">Good</Text>
-                              );
-                            })()}
-                          </div>
+                                                      <div>
+                              <Text size="xs" c="dimmed">Installed</Text>
+                              <Text size="sm">
+                                {(() => { 
+                                  const d = safeDate(asset.filterInstalledOn); 
+                                  return d ? d.toLocaleDateString('en-GB') : 'Not installed'; 
+                                })()}
+                              </Text>
+                            </div>
                         </Group>
                         
                         <Group justify="space-between" align="center">
-                          <Text size="xs" c="dimmed">
-                            Updated: {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
-                          </Text>
+                          <Stack gap="xs" style={{ flex: 1 }}>
+                            <Group gap="xs">
+                              <Text size="xs" c="dimmed">Filter Expiry:</Text>
+                              {(() => {
+                                const expiryStatus = getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn);
+                                return (
+                                  <>
+                                    <Badge 
+                                      color={expiryStatus.color} 
+                                      variant="light" 
+                                      size="xs"
+                                    >
+                                      {expiryStatus.text}
+                                    </Badge>
+                                    <Text size="xs" c="dimmed">
+                                      {(() => { 
+                                        const d = safeDate(asset.filterExpiryDate); 
+                                        return d ? d.toLocaleDateString('en-GB') : 'N/A'; 
+                                      })()}
+                                    </Text>
+                                  </>
+                                );
+                              })()}
+                            </Group>
+                            {/* Need Flushing Alert for Mobile */}
+                            {(() => {
+                              const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+                                asset.needFlushing : 
+                                asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+                              
+                              return needsFlushing ? (
+                                <Badge 
+                                  color="red" 
+                                  variant="filled" 
+                                  size="xs"
+                                  leftSection={<IconAlertTriangle size={10} />}
+                                >
+                                  NEEDS FLUSHING
+                                </Badge>
+                              ) : null;
+                            })()}
+                          </Stack>
                           <Group gap="xs">
                             <ActionIcon
                               variant="light"
