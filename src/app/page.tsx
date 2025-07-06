@@ -1443,28 +1443,40 @@ export default function HomePage() {
                           variant="filled"
                           color="yellow"
                           onClick={() => {
-                            setSelectedAsset(asset);
-                            form.setValues({
-                              assetBarcode: asset.assetBarcode,
-                              primaryIdentifier: asset.primaryIdentifier,
-                              secondaryIdentifier: asset.secondaryIdentifier,
-                              assetType: asset.assetType,
-                              status: asset.status,
-                              wing: asset.wing,
-                              wingInShort: asset.wingInShort,
-                              room: asset.room,
-                              floor: asset.floor,
-                              floorInWords: asset.floorInWords,
-                              roomNo: asset.roomNo,
-                              roomName: asset.roomName,
-                              filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
-                              filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
-                              filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
-                              filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
-                              notes: asset.notes,
-                              augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
-                            });
-                            openEditModal();
+                            try {
+                              setSelectedAsset(asset);
+                              form.setValues({
+                                assetBarcode: asset.assetBarcode || '',
+                                primaryIdentifier: asset.primaryIdentifier || '',
+                                secondaryIdentifier: asset.secondaryIdentifier || '',
+                                assetType: asset.assetType || '',
+                                status: asset.status || 'ACTIVE',
+                                wing: asset.wing || '',
+                                wingInShort: asset.wingInShort || '',
+                                room: asset.room || '',
+                                floor: asset.floor || '',
+                                floorInWords: asset.floorInWords || '',
+                                roomNo: asset.roomNo || '',
+                                roomName: asset.roomName || '',
+                                filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
+                                filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
+                                filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
+                                filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
+                                filterType: asset.filterType || '',
+                                notes: asset.notes || '',
+                                augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
+                              });
+                              openEditModal();
+                            } catch (error) {
+                              console.error('Error setting form values:', error);
+                              notifications.show({
+                                title: 'Error',
+                                message: 'Failed to load asset data for editing',
+                                color: 'red',
+                                icon: <IconX size={16} />,
+                              });
+                            }
                           }}
                         >
                           <IconEdit size={16} />
@@ -2070,30 +2082,40 @@ export default function HomePage() {
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedAsset(asset);
-                                form.setValues({
-                                  assetBarcode: asset.assetBarcode,
-                                  primaryIdentifier: asset.primaryIdentifier,
-                                  secondaryIdentifier: asset.secondaryIdentifier,
-                                  assetType: asset.assetType,
-                                  status: asset.status,
-                                  wing: asset.wing,
-                                  wingInShort: asset.wingInShort,
-                                  room: asset.room,
-                                  floor: asset.floor,
-                                  floorInWords: asset.floorInWords,
-                                  roomNo: asset.roomNo,
-                                  roomName: asset.roomName,
-                                  filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
-                                  filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
-                                  filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
-                                  filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
-                                  needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
-                                  filterType: asset.filterType,
-                                  notes: asset.notes,
-                                  augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
-                                });
-                                openEditModal();
+                                try {
+                                  setSelectedAsset(asset);
+                                  form.setValues({
+                                    assetBarcode: asset.assetBarcode || '',
+                                    primaryIdentifier: asset.primaryIdentifier || '',
+                                    secondaryIdentifier: asset.secondaryIdentifier || '',
+                                    assetType: asset.assetType || '',
+                                    status: asset.status || 'ACTIVE',
+                                    wing: asset.wing || '',
+                                    wingInShort: asset.wingInShort || '',
+                                    room: asset.room || '',
+                                    floor: asset.floor || '',
+                                    floorInWords: asset.floorInWords || '',
+                                    roomNo: asset.roomNo || '',
+                                    roomName: asset.roomName || '',
+                                    filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
+                                    filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
+                                    filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
+                                    filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                    needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
+                                    filterType: asset.filterType || '',
+                                    notes: asset.notes || '',
+                                    augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
+                                  });
+                                  openEditModal();
+                                } catch (error) {
+                                  console.error('Error setting form values:', error);
+                                  notifications.show({
+                                    title: 'Error',
+                                    message: 'Failed to load asset data for editing',
+                                    color: 'red',
+                                    icon: <IconX size={16} />,
+                                  });
+                                }
                               }}
                             >
                               <IconEdit size={14} />
@@ -3525,30 +3547,40 @@ export default function HomePage() {
               </Button>
               <Button
                 onClick={() => {
-                  closeViewModal();
-                  form.setValues({
-                    assetBarcode: selectedAsset.assetBarcode,
-                    primaryIdentifier: selectedAsset.primaryIdentifier,
-                    secondaryIdentifier: selectedAsset.secondaryIdentifier,
-                    assetType: selectedAsset.assetType,
-                    status: selectedAsset.status,
-                    wing: selectedAsset.wing,
-                    wingInShort: selectedAsset.wingInShort,
-                    room: selectedAsset.room,
-                    floor: selectedAsset.floor,
-                    floorInWords: selectedAsset.floorInWords,
-                    roomNo: selectedAsset.roomNo,
-                    roomName: selectedAsset.roomName,
-                    filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true',
-                    filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
-                    filterExpiryDate: selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate) : null,
-                    filterInstalledOn: selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn) : null,
-                    needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true',
-                    filterType: selectedAsset.filterType || '',
-                    notes: selectedAsset.notes,
-                    augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
-                  });
-                  openEditModal();
+                  try {
+                    closeViewModal();
+                    form.setValues({
+                      assetBarcode: selectedAsset.assetBarcode || '',
+                      primaryIdentifier: selectedAsset.primaryIdentifier || '',
+                      secondaryIdentifier: selectedAsset.secondaryIdentifier || '',
+                      assetType: selectedAsset.assetType || '',
+                      status: selectedAsset.status || 'ACTIVE',
+                      wing: selectedAsset.wing || '',
+                      wingInShort: selectedAsset.wingInShort || '',
+                      room: selectedAsset.room || '',
+                      floor: selectedAsset.floor || '',
+                      floorInWords: selectedAsset.floorInWords || '',
+                      roomNo: selectedAsset.roomNo || '',
+                      roomName: selectedAsset.roomName || '',
+                      filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true',
+                      filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
+                      filterExpiryDate: selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate) : null,
+                      filterInstalledOn: selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn) : null,
+                      needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true',
+                      filterType: selectedAsset.filterType || '',
+                      notes: selectedAsset.notes || '',
+                      augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
+                    });
+                    openEditModal();
+                  } catch (error) {
+                    console.error('Error setting form values:', error);
+                    notifications.show({
+                      title: 'Error',
+                      message: 'Failed to load asset data for editing',
+                      color: 'red',
+                      icon: <IconX size={16} />,
+                    });
+                  }
                 }}
               >
                 Edit Asset
