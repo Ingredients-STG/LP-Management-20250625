@@ -912,14 +912,26 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // Only filter by search term - other filters are disabled
-    setFilteredAssets(assets.filter(asset =>
-      searchTerm ? Object.values(asset).some(value =>
+    // Filter by search term and active filters
+    setFilteredAssets(assets.filter(asset => {
+      // Search term filter
+      const matchesSearch = searchTerm ? Object.values(asset).some(value =>
         value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      ) : true
-    ));
+      ) : true;
+      
+      // Status filter
+      const matchesStatus = statusFilter ? asset.status === statusFilter : true;
+      
+      // Type filter
+      const matchesType = typeFilter ? asset.assetType === typeFilter : true;
+      
+      // Wing filter
+      const matchesWing = wingFilter ? asset.wing === wingFilter : true;
+      
+      return matchesSearch && matchesStatus && matchesType && matchesWing;
+    }));
     setCurrentPage(1);
-  }, [assets, searchTerm]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
 
   // Auto-calculate Filter Expiry Date when Filter Installed On changes (Add/Edit UI only)
   useEffect(() => {
@@ -1828,38 +1840,25 @@ export default function HomePage() {
 
           {/* Mobile-optimized filter layout */}
           <Stack gap="xs" hiddenFrom="md" className="mobile-filter-stack">
-            <Group gap="xs" grow>
-              <TextInput
-                placeholder="Search assets..."
-                leftSection={<IconSearch size={16} />}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="sm"
-                styles={{
-                  input: {
-                    fontSize: '16px',
-                  },
-                }}
-              />
-              <ActionIcon
-                variant="light"
-                color="blue"
-                size="lg"
-                onClick={startBarcodeScanner}
-                title="Scan barcode"
-                style={{ flexShrink: 0 }}
-              >
-                <IconScan size={18} />
-              </ActionIcon>
-            </Group>
+            <TextInput
+              placeholder="Search assets..."
+              leftSection={<IconSearch size={16} />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              size="sm"
+              styles={{
+                input: {
+                  fontSize: '16px',
+                },
+              }}
+            />
             <Group gap="xs" grow>
               <Select
-                placeholder="Status (Coming Soon)"
-                data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
+                placeholder="Filter by Status"
+                data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
                 value={statusFilter}
                 onChange={(value) => setStatusFilter(value || '')}
                 clearable
-                disabled
                 size="sm"
                 styles={{
                   input: {
@@ -1868,12 +1867,11 @@ export default function HomePage() {
                 }}
               />
               <Select
-                placeholder="Type (Coming Soon)"
+                placeholder="Filter by Type"
                 data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value || '')}
                 clearable
-                disabled
                 size="sm"
                 styles={{
                   input: {
@@ -1883,12 +1881,11 @@ export default function HomePage() {
               />
             </Group>
             <Select
-              placeholder="Wing (Coming Soon)"
+              placeholder="Filter by Wing"
               data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
               value={wingFilter}
               onChange={(value) => setWingFilter(value || '')}
               clearable
-              disabled
               size="sm"
               styles={{
                 input: {
@@ -1901,54 +1898,38 @@ export default function HomePage() {
           {/* Desktop filter layout */}
           <Grid visibleFrom="md">
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Group gap="xs">
-                <TextInput
-                  placeholder="Search assets..."
-                  leftSection={<IconSearch size={16} />}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ flex: 1 }}
-                />
-                <ActionIcon
-                  variant="light"
-                  color="blue"
-                  size="lg"
-                  onClick={startBarcodeScanner}
-                  hiddenFrom="md"
-                  title="Scan barcode"
-                >
-                  <IconScan size={18} />
-                </ActionIcon>
-              </Group>
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Status (Coming Soon)"
-                data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value || '')}
-                clearable
-                disabled
+              <TextInput
+                placeholder="Search assets..."
+                leftSection={<IconSearch size={16} />}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <Select
-                placeholder="Type (Coming Soon)"
+                placeholder="Filter by Status"
+                data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
+                value={statusFilter}
+                onChange={(value) => setStatusFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by Type"
                 data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value || '')}
                 clearable
-                disabled
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <Select
-                placeholder="Wing (Coming Soon)"
+                placeholder="Filter by Wing"
                 data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
                 value={wingFilter}
                 onChange={(value) => setWingFilter(value || '')}
                 clearable
-                disabled
               />
             </Grid.Col>
           </Grid>
