@@ -859,54 +859,7 @@ export default function HomePage() {
     return expiry;
   };
 
-  // Helper function to recalculate filter expiry for existing assets
-  const recalculateFilterExpiry = async (asset: Asset) => {
-    if (!asset.filterInstalledOn) {
-      notifications.show({
-        title: 'Cannot Recalculate',
-        message: 'No filter installation date found for this asset',
-        color: 'orange',
-      });
-      return;
-    }
 
-    try {
-      const installedDate = new Date(asset.filterInstalledOn);
-      const newExpiryDate = calculateFilterExpiry(installedDate);
-      
-      // Update the asset
-      const response = await fetch(`/api/assets/${asset.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...asset,
-          filterExpiryDate: newExpiryDate.toISOString(),
-        }),
-      });
-
-      if (response.ok) {
-        notifications.show({
-          title: 'Success',
-          message: `Filter expiry recalculated: ${newExpiryDate.toLocaleDateString('en-GB')}`,
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-        fetchData(); // Refresh the data
-      } else {
-        throw new Error('Failed to update asset');
-      }
-    } catch (error) {
-      console.error('Error recalculating filter expiry:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to recalculate filter expiry',
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
-    }
-  };
 
   // Helper function to check filter expiry status
   const getFilterExpiryStatus = (expiryDate: string | null) => {
@@ -1714,23 +1667,9 @@ export default function HomePage() {
                         </Grid.Col>
                         <Grid.Col span={6}>
                           <div>
-                            <Group gap="xs" align="center">
-                              <Text size="sm" fw={500}>
-                                {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
-                              </Text>
-                              {asset.filterInstalledOn && (
-                                <Tooltip label="Recalculate expiry date based on installation date">
-                                  <ActionIcon
-                                    size="xs"
-                                    variant="light"
-                                    color="blue"
-                                    onClick={() => recalculateFilterExpiry(asset)}
-                                  >
-                                    <IconRefresh size={12} />
-                                  </ActionIcon>
-                                </Tooltip>
-                              )}
-                            </Group>
+                            <Text size="sm" fw={500}>
+                              {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
+                            </Text>
                             {asset.filterExpiryDate && (
                               <Badge 
                                 color={getFilterExpiryStatus(asset.filterExpiryDate).color} 
