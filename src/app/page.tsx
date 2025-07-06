@@ -162,6 +162,20 @@ function safeDate(val: any): Date | null {
 
 export default function HomePage() {
   const [opened, { toggle }] = useDisclosure();
+
+  // Handle unhandled promise rejections for Safari compatibility
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      event.preventDefault(); // Prevent the default browser behavior
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
@@ -965,9 +979,20 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    fetchData();
-    fetchAssetTypes();
-    fetchFilterTypes();
+    const initializeData = async () => {
+      try {
+        await Promise.all([
+          fetchData(),
+          fetchAssetTypes(),
+          fetchFilterTypes()
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        // Error handling is already done in individual functions
+      }
+    };
+    
+    initializeData();
   }, []);
 
   useEffect(() => {
@@ -1015,7 +1040,14 @@ export default function HomePage() {
     if (showAuditModal && selectedAssetAudit) {
       const asset = assets.find(a => a.assetBarcode === selectedAssetAudit);
       if (asset?.id) {
-        fetchAuditLogs(asset.id);
+        const loadAuditLogs = async () => {
+          try {
+            await fetchAuditLogs(asset.id!);
+          } catch (error) {
+            console.error('Error loading audit logs:', error);
+          }
+        };
+        loadAuditLogs();
       }
     }
   }, [showAuditModal, selectedAssetAudit, assets]);
@@ -1048,9 +1080,6 @@ export default function HomePage() {
       } else {
         throw new Error('Failed to fetch dashboard stats');
       }
-
-      // Fetch asset types
-      await fetchAssetTypes();
 
       notifications.show({
         title: 'Success',

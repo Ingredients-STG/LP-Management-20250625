@@ -4,10 +4,10 @@ import { DynamoDBService } from '@/lib/dynamodb';
 // GET /api/assets/[id] - Get asset by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     console.log('Fetching asset by ID:', id);
     
     const asset = await DynamoDBService.getAssetById(id);
@@ -45,10 +45,10 @@ export async function GET(
 // PUT /api/assets/[id] - Update asset
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     console.log('Updating asset in DynamoDB:', id, body);
     
@@ -81,10 +81,10 @@ export async function PUT(
 // DELETE /api/assets/[id] - Delete asset
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     console.log('Deleting asset from DynamoDB:', id);
     
     await DynamoDBService.deleteAsset(id);
