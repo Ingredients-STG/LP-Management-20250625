@@ -1138,8 +1138,6 @@ export default function HomePage() {
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
       };
 
-
-
       const response = await fetch('/api/assets', {
         method: 'POST',
         headers: {
@@ -1163,6 +1161,52 @@ export default function HomePage() {
         throw new Error(result.error || 'Failed to create asset');
       }
 
+      // Upload files if any are selected
+      let uploadedAttachments: any[] = [];
+      if (assetFiles.length > 0 && result.data.id) {
+        setIsUploadingFile(true);
+        try {
+          for (const file of assetFiles) {
+            const uploadResult = await handleFileUpload(file, result.data.id);
+            if (uploadResult) {
+              uploadedAttachments.push(uploadResult);
+            }
+          }
+          
+          // Update the asset with the uploaded attachments
+          if (uploadedAttachments.length > 0) {
+            const updateResponse = await fetch(`/api/assets/${result.data.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ...result.data,
+                attachments: uploadedAttachments,
+                modifiedBy: getCurrentUser(),
+              }),
+            });
+            
+            if (updateResponse.ok) {
+              const updateResult = await updateResponse.json();
+              if (updateResult.success) {
+                result.data = updateResult.data;
+              }
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error uploading files:', uploadError);
+          notifications.show({
+            title: 'Warning',
+            message: 'Asset created but some files failed to upload',
+            color: 'yellow',
+            icon: <IconX size={16} />,
+          });
+        } finally {
+          setIsUploadingFile(false);
+        }
+      }
+
       // Update local state with the new asset from DynamoDB
       setAssets(prev => [...prev, result.data]);
       
@@ -1170,6 +1214,7 @@ export default function HomePage() {
       await createAuditLogEntry(result.data, 'CREATE');
       
       form.reset();
+      setAssetFiles([]); // Clear uploaded files
       closeModal();
       
       notifications.show({
@@ -1228,11 +1273,35 @@ export default function HomePage() {
         expiryDate = calculateFilterExpiry(installedDateObj);
       }
 
+      // Upload new files if any are selected
+      let newAttachments: any[] = [];
+      if (assetFiles.length > 0) {
+        setIsUploadingFile(true);
+        try {
+          for (const file of assetFiles) {
+            const uploadResult = await handleFileUpload(file, selectedAsset.id);
+            if (uploadResult) {
+              newAttachments.push(uploadResult);
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error uploading files:', uploadError);
+          notifications.show({
+            title: 'Warning',
+            message: 'Some files failed to upload',
+            color: 'yellow',
+            icon: <IconX size={16} />,
+          });
+        } finally {
+          setIsUploadingFile(false);
+        }
+      }
+
       const updateData = {
         ...values,
         filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
-        attachments: selectedAsset?.attachments || [], // Include current attachments
+        attachments: [...(selectedAsset?.attachments || []), ...newAttachments], // Merge existing and new attachments
         modifiedBy: getCurrentUser(),
       };
 
@@ -1265,6 +1334,7 @@ export default function HomePage() {
       ));
       closeEditModal();
       setSelectedAsset(null);
+      setAssetFiles([]); // Clear uploaded files
       form.reset();
       notifications.show({
         title: "Success",
@@ -1565,6 +1635,7 @@ export default function HomePage() {
                                 notes: asset.notes || '',
                                 augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
                               });
+                              setAssetFiles([]);
                               openEditModal();
                             } catch (error) {
                               console.error('Error setting form values:', error);
@@ -1982,6 +2053,7 @@ export default function HomePage() {
                 variant="gradient"
                 onClick={() => {
                   form.reset();
+                  setAssetFiles([]);
                   openModal();
                 }}
                 size="md"
@@ -2249,6 +2321,7 @@ export default function HomePage() {
                                     notes: asset.notes || '',
                                     augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
                                   });
+                                  setAssetFiles([]);
                                   openEditModal();
                                 } catch (error) {
                                   console.error('Error setting form values:', error);
@@ -3081,11 +3154,57 @@ export default function HomePage() {
               />
             </div>
 
+            <Divider />
+
+            {/* File Attachments */}
+            <div>
+              <Title order={5} mb="sm">File Attachments</Title>
+              <Text size="sm" c="dimmed" mb="md">
+                Upload documents, images, or other files related to this asset.
+              </Text>
+              
+              <FileInput
+                label="Upload Files"
+                placeholder="Choose files to upload"
+                multiple
+                value={assetFiles}
+                onChange={setAssetFiles}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                leftSection={<IconUpload size={16} />}
+                description="Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, TXT"
+              />
+              
+              {assetFiles.length > 0 && (
+                <Stack gap="xs" mt="sm">
+                  <Text size="sm" fw={500}>Selected Files:</Text>
+                  {assetFiles.map((file, index) => (
+                    <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
+                      <Group gap="xs">
+                        <IconPaperclip size={14} />
+                        <Text size="sm">{file.name}</Text>
+                        <Text size="xs" c="dimmed">({Math.round(file.size / 1024)} KB)</Text>
+                      </Group>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => {
+                          setAssetFiles(prev => prev.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <IconX size={12} />
+                      </ActionIcon>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </div>
+
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeModal}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" loading={isUploadingFile}>
                 Add Asset
               </Button>
             </Group>
@@ -3337,11 +3456,121 @@ export default function HomePage() {
               />
             </div>
 
+            {/* File Attachments */}
+            <div>
+              <Title order={5} mb="sm">File Attachments</Title>
+              <Text size="sm" c="dimmed" mb="md">
+                Upload documents, images, or other files related to this asset.
+              </Text>
+              
+              <FileInput
+                label="Upload Files"
+                placeholder="Choose files to upload"
+                multiple
+                value={assetFiles}
+                onChange={setAssetFiles}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                leftSection={<IconUpload size={16} />}
+                description="Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, TXT"
+              />
+              
+              {assetFiles.length > 0 && (
+                <Stack gap="xs" mt="sm">
+                  <Text size="sm" fw={500}>Selected Files:</Text>
+                  {assetFiles.map((file, index) => (
+                    <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
+                      <Group gap="xs">
+                        <IconPaperclip size={14} />
+                        <Text size="sm">{file.name}</Text>
+                        <Text size="xs" c="dimmed">({Math.round(file.size / 1024)} KB)</Text>
+                      </Group>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => {
+                          setAssetFiles(prev => prev.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <IconX size={12} />
+                      </ActionIcon>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+
+              {/* Show existing attachments for edit mode */}
+              {selectedAsset && selectedAsset.attachments && selectedAsset.attachments.length > 0 && (
+                <div>
+                  <Text size="sm" fw={500} mt="md" mb="xs">Current Attachments:</Text>
+                  <Stack gap="xs">
+                    {selectedAsset.attachments.map((attachment, index) => (
+                      <Group key={index} justify="space-between" p="xs" bg="blue.0" style={{ borderRadius: '4px' }}>
+                        <Group gap="xs">
+                          <IconPaperclip size={14} />
+                          <Text size="sm">{attachment.fileName}</Text>
+                        </Group>
+                        <Group gap="xs">
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color="blue"
+                            onClick={() => window.open(attachment.s3Url, '_blank')}
+                            title="View file"
+                          >
+                            <IconEye size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color="green"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = attachment.s3Url;
+                              link.download = attachment.fileName;
+                              link.click();
+                            }}
+                            title="Download file"
+                          >
+                            <IconDownload size={12} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            variant="subtle"
+                            color="red"
+                            onClick={async () => {
+                              const success = await handleFileDelete(attachment.s3Url, attachment.fileName);
+                              if (success && selectedAsset) {
+                                // Update the selectedAsset to remove the deleted attachment
+                                const updatedAsset = {
+                                  ...selectedAsset,
+                                  attachments: selectedAsset.attachments?.filter(a => a.s3Url !== attachment.s3Url) || []
+                                };
+                                setSelectedAsset(updatedAsset);
+                                
+                                // Also update the assets list
+                                setAssets(prev => prev.map(asset => 
+                                  asset.id === selectedAsset.id ? updatedAsset : asset
+                                ));
+                              }
+                            }}
+                            title="Delete file"
+                          >
+                            <IconTrash size={12} />
+                          </ActionIcon>
+                        </Group>
+                      </Group>
+                    ))}
+                  </Stack>
+                </div>
+              )}
+            </div>
+
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeEditModal}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" loading={isUploadingFile}>
                 Update Asset
               </Button>
             </Group>
@@ -3607,6 +3836,7 @@ export default function HomePage() {
                       notes: selectedAsset.notes || '',
                       augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
                     });
+                    setAssetFiles([]);
                     openEditModal();
                   } catch (error) {
                     console.error('Error setting form values:', error);
