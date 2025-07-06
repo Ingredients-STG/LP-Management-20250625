@@ -1352,13 +1352,98 @@ export default function HomePage() {
       });
     }
   };
+  // Handle removing filter from asset
+  const handleRemoveFilter = (asset: Asset) => {
+    modals.openConfirmModal({
+      title: 'Remove Filter',
+      children: (
+        <Text size="sm">
+          Are you sure you want to remove the filter from asset <strong>{asset.primaryIdentifier}</strong>? 
+          This will reset all filter-related information including:
+          <br />• Filter Needed
+          <br />• Filters On
+          <br />• Filter Installation Date
+          <br />• Filter Expiry Date
+          <br />• Filter Type
+          <br /><br />
+          This action will be logged in the audit trail.
+        </Text>
+      ),
+      labels: { confirm: 'Remove Filter', cancel: 'Cancel' },
+      confirmProps: { color: 'orange' },
+      onConfirm: async () => {
+        try {
+          if (!asset.id) {
+            throw new Error('Asset ID is required for filter removal');
+          }
+
+          // Store old values for audit log
+          const oldAsset = { ...asset };
+
+          // Create updated asset with filter fields reset
+          const updatedAssetData = {
+            ...asset,
+            filterNeeded: false,
+            filtersOn: false,
+            filterInstalledOn: '',
+            filterExpiryDate: '',
+            filterType: '',
+            modifiedBy: getCurrentUser(),
+          };
+
+          const response = await fetch(`/api/assets/${asset.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedAssetData),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to remove filter');
+          }
+
+          const result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to remove filter');
+          }
+
+          // Create audit log entry for filter removal
+          await createAuditLogEntry(result.data, 'UPDATE', oldAsset);
+        
+          // Update local state
+          setAssets(prev => prev.map(a => 
+            a.id === asset.id ? result.data : a
+          ));
+          
+          notifications.show({
+            title: 'Success',
+            message: 'Filter removed successfully!',
+            color: 'green',
+            icon: <IconCheck size={16} />,
+          });
+        } catch (error) {
+          console.error("Error removing filter:", error);
+          notifications.show({
+            title: 'Error',
+            message: `Failed to remove filter: ${error instanceof Error ? error.message : "Unknown error"}`,
+            color: 'red',
+            icon: <IconX size={16} />,
+          });
+        }
+      },
+    });
+  };
+
   const handleDeleteAsset = (asset: Asset) => {
     modals.openConfirmModal({
       title: 'Delete Asset',
       children: (
         <Text size="sm">
           Are you sure you want to delete asset <strong>{asset.primaryIdentifier}</strong>? 
-          This action cannot be undone.
+          This action cannot be undone and will also delete all associated files.
         </Text>
       ),
       labels: { confirm: 'Delete', cancel: 'Cancel' },
@@ -1369,7 +1454,17 @@ export default function HomePage() {
             throw new Error('Asset ID is required for deletion');
           }
 
-    
+          // Delete associated S3 files first
+          if (asset.attachments && asset.attachments.length > 0) {
+            for (const attachment of asset.attachments) {
+              try {
+                await handleFileDelete(attachment.s3Url, attachment.fileName);
+              } catch (fileError) {
+                console.warn(`Failed to delete file ${attachment.fileName}:`, fileError);
+                // Continue with asset deletion even if file deletion fails
+              }
+            }
+          }
 
           const response = await fetch(`/api/assets/${asset.id}`, {
             method: 'DELETE',
@@ -1397,7 +1492,7 @@ export default function HomePage() {
           
         notifications.show({
           title: 'Success',
-            message: 'Asset deleted successfully from DynamoDB!',
+            message: 'Asset and associated files deleted successfully!',
           color: 'green',
           icon: <IconCheck size={16} />,
         });
@@ -1839,6 +1934,20 @@ export default function HomePage() {
                         <Text size="sm" fw={500}>
                           {asset.filterType || 'N/A'}
                         </Text>
+                      </Group>
+                      
+                      {/* Remove Filter Button */}
+                      <Group justify="center" mt="md">
+                        <Button
+                          variant="outline"
+                          color="orange"
+                          size="xs"
+                          leftSection={<IconX size={14} />}
+                          onClick={() => handleRemoveFilter(asset)}
+                          disabled={!asset.filterNeeded && !asset.filtersOn && !asset.filterType}
+                        >
+                          Remove Filter
+                        </Button>
                       </Group>
                     </Stack>
                   </Grid.Col>
