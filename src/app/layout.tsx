@@ -11,6 +11,7 @@ import '@mantine/spotlight/styles.css';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { ModalsProvider } from '@mantine/modals';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,42 +40,44 @@ export default function RootLayout({
         <ColorSchemeScript defaultColorScheme="light" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
-        <MantineProvider
-          defaultColorScheme="light"
-          theme={{
-            primaryColor: 'blue',
-            fontFamily: 'var(--font-geist-sans)',
-            headings: {
+        <AuthProvider>
+          <MantineProvider
+            defaultColorScheme="light"
+            theme={{
+              primaryColor: 'blue',
               fontFamily: 'var(--font-geist-sans)',
-            },
-            colors: {
-              blue: [
-                '#e3f2fd',
-                '#bbdefb',
-                '#90caf9',
-                '#64b5f6',
-                '#42a5f5',
-                '#2196f3',
-                '#1e88e5',
-                '#1976d2',
-                '#1565c0',
-                '#0d47a1'
-              ],
-            },
-            radius: {
-              xs: '0.25rem',
-              sm: '0.5rem',
-              md: '0.75rem',
-              lg: '1rem',
-              xl: '1.5rem',
-            },
-          }}
-        >
-          <ModalsProvider>
-            <Notifications position="top-right" />
-            {children}
-          </ModalsProvider>
-        </MantineProvider>
+              headings: {
+                fontFamily: 'var(--font-geist-sans)',
+              },
+              colors: {
+                blue: [
+                  '#e3f2fd',
+                  '#bbdefb',
+                  '#90caf9',
+                  '#64b5f6',
+                  '#42a5f5',
+                  '#2196f3',
+                  '#1e88e5',
+                  '#1976d2',
+                  '#1565c0',
+                  '#0d47a1'
+                ],
+              },
+              radius: {
+                xs: '0.25rem',
+                sm: '0.5rem',
+                md: '0.75rem',
+                lg: '1rem',
+                xl: '1.5rem',
+              },
+            }}
+          >
+            <ModalsProvider>
+              <Notifications position="top-right" />
+              {children}
+            </ModalsProvider>
+          </MantineProvider>
+        </AuthProvider>
       </body>
     </html>
   );

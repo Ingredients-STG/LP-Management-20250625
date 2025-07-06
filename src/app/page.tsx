@@ -44,6 +44,8 @@ import { modals } from '@mantine/modals';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
 import {
@@ -85,6 +87,8 @@ import {
   IconInfoCircle,
   IconPaperclip,
   IconScan,
+  IconMenu2,
+  IconLogout,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -161,6 +165,7 @@ function safeDate(val: any): Date | null {
 }
 
 export default function HomePage() {
+  const { user, signOut } = useAuth();
   const [opened, { toggle }] = useDisclosure();
 
   // Handle unhandled promise rejections for Safari compatibility
@@ -2884,98 +2889,55 @@ export default function HomePage() {
     </Stack>
   );
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      notifications.show({
+        title: 'Signed out',
+        message: 'You have been successfully signed out.',
+        color: 'green',
+      });
+    } catch (error) {
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to sign out. Please try again.',
+        color: 'red',
+      });
+    }
+  };
+
   return (
-    <>
+    <ProtectedRoute>
       <AppShell
-        header={{ height: 70 }}
-        navbar={hideTabContainer ? undefined : { width: 280, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-        padding={0}
+        header={{ height: 60 }}
+        navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+        padding="md"
       >
         <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between" className="header-container">
-            <Group gap="xs">
-              <ActionIcon
-                onClick={toggle}
-                hiddenFrom="sm"
-                size="lg"
-                variant="subtle"
-              >
-                <IconHome size={18} />
+          <Group h="100%" px="md" justify="space-between">
+            <Group>
+              <ActionIcon variant="subtle" onClick={toggle} hiddenFrom="sm" size="sm">
+                <IconMenu2 size={18} />
               </ActionIcon>
-              <Group gap="xs">
-                <ThemeIcon color="blue" size={40} radius="md">
-                  <IconDroplet size={24} />
-                </ThemeIcon>
-                <div>
-                  <Title order={3} c="blue" style={{ fontSize: '1.1rem', lineHeight: 1.2 }}>
-                    <Text component="span" visibleFrom="sm">St Georges Water Safety Team</Text>
-                    <Text component="span" hiddenFrom="sm">SGWST</Text>
-                  </Title>
-                  <Text size="xs" c="dimmed">
-                    <Text component="span" visibleFrom="sm">Water Asset Management</Text>
-                    <Text component="span" hiddenFrom="sm">Asset Mgmt</Text>
-                  </Text>
-                </div>
-              </Group>
+              <Title order={3} c="blue">LP Management System</Title>
             </Group>
-
-            <Group gap="xs">
-              <ActionIcon
-                variant="subtle"
-                size="lg"
-                onClick={() => spotlight.open()}
-                visibleFrom="sm"
-              >
-                <IconSearch size={18} />
-              </ActionIcon>
-              <Tooltip label="Audit Trail">
-                <ActionIcon 
-                  variant="subtle" 
-                  size="lg"
-                  onClick={() => {
-                    fetchGlobalAuditLogs();
-                    openAuditDrawer();
-                  }}
-                >
-                  <IconHistory size={18} />
-                </ActionIcon>
-              </Tooltip>
-              <ActionIcon variant="subtle" size="lg">
-                <Indicator color="red" size={8}>
-                  <IconBell size={18} />
-                </Indicator>
-              </ActionIcon>
-              <Menu shadow="md" width={200}>
+            
+            <Group>
+              <Menu>
                 <Menu.Target>
-                  <ActionIcon variant="subtle" size="lg">
-                    <Avatar size={32} color="blue">
-                      <IconUser size={16} />
-                    </Avatar>
-                  </ActionIcon>
+                  <Button variant="subtle" leftSection={<IconUser size={16} />}>
+                    {user?.email || 'User'}
+                  </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
-                  <Menu.Item leftSection={<IconUser size={14} />}>
-                    Profile
-                  </Menu.Item>
-                  <Menu.Item leftSection={<IconSettings size={14} />}>
-                    Settings
-                  </Menu.Item>
-                  <Menu.Divider />
-                  <Menu.Item leftSection={<IconMail size={14} />}>
-                    Support
+                  <Menu.Item
+                    leftSection={<IconLogout size={16} />}
+                    onClick={handleSignOut}
+                  >
+                    Sign Out
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
-              <Tooltip label={hideTabContainer ? "Show Navigation" : "Hide Navigation"}>
-                <ActionIcon
-                  variant="subtle"
-                  size="lg"
-                  onClick={() => setHideTabContainer(!hideTabContainer)}
-                  hiddenFrom="sm"
-                >
-                  {hideTabContainer ? <IconChevronRight size={16} /> : <IconChevronDown size={16} />}
-                </ActionIcon>
-              </Tooltip>
             </Group>
           </Group>
         </AppShell.Header>
@@ -4333,6 +4295,6 @@ export default function HomePage() {
           placeholder: 'Search assets...',
         }}
       />
-    </>
+    </ProtectedRoute>
   );
 }
