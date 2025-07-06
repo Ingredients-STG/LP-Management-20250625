@@ -68,6 +68,41 @@ function parseBoolField(val: string | undefined): boolean {
   return ['YES', 'TRUE', '1', 'Y'].includes(val.trim().toUpperCase());
 }
 
+// Strict DD/MM/YYYY date parsing (copied from csv-upload)
+function parseExcelDate(value: any, rowNum?: number): { date?: string; error?: string } {
+  if (!value) return { date: undefined };
+  try {
+    if (typeof value === 'number') {
+      const epoch = new Date(Date.UTC(1899, 11, 30));
+      epoch.setDate(epoch.getDate() + value);
+      const day = String(epoch.getUTCDate()).padStart(2, '0');
+      const month = String(epoch.getUTCMonth() + 1).padStart(2, '0');
+      const year = epoch.getUTCFullYear();
+      if (year < 1900 || year > 2100) {
+        return { error: `Row ${rowNum}: Invalid date value. Please use DD/MM/YYYY format (e.g., 25/07/2025).` };
+      }
+      return { date: `${year}-${month}-${day}` };
+    } else if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+        const [day, month, year] = trimmed.split('/');
+        return { date: `${year}-${month}-${day}` };
+      }
+      // fallback to ISO or other formats
+      const d = new Date(trimmed);
+      if (!isNaN(d.getTime())) {
+        const isoMonth = String(d.getMonth() + 1).padStart(2, '0');
+        const isoDay = String(d.getDate()).padStart(2, '0');
+        return { date: `${d.getFullYear()}-${isoMonth}-${isoDay}` };
+      }
+      return { error: `Row ${rowNum}: Invalid date format ("${trimmed}"). Please use DD/MM/YYYY format.` };
+    }
+  } catch {
+    return { error: `Row ${rowNum}: Date parsing error. Please use DD/MM/YYYY format.` };
+  }
+  return { error: `Row ${rowNum}: Invalid date value. Please use DD/MM/YYYY format.` };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -225,7 +260,21 @@ export async function POST(request: NextRequest) {
         const filterType = headerMapping.filterType !== undefined ? String(values[headerMapping.filterType] || '').trim() : '';
         const filtersOnRaw = headerMapping.filtersOn !== undefined ? values[headerMapping.filtersOn] : '';
         const augmentedCareRaw = headerMapping.augmentedCare !== undefined ? values[headerMapping.augmentedCare] : '';
-
+        // Parse filterInstalledOn and filterExpiryDate using strict DD/MM/YYYY
+        const rawInstalled = headerMapping.filterInstalledOn !== undefined ? values[headerMapping.filterInstalledOn] : '';
+        const rawExpiry = headerMapping.filterExpiryDate !== undefined ? values[headerMapping.filterExpiryDate] : '';
+        const parsedInstalled = parseExcelDate(rawInstalled, rowNumber);
+        const parsedExpiry = parseExcelDate(rawExpiry, rowNumber);
+        if (parsedInstalled.error) {
+          results.failed++;
+          results.errors.push(parsedInstalled.error);
+          continue;
+        }
+        if (parsedExpiry.error) {
+          results.failed++;
+          results.errors.push(parsedExpiry.error);
+          continue;
+        }
         // Build asset object with validated required fields
         const asset: any = {
           assetBarcode,
@@ -236,7 +285,9 @@ export async function POST(request: NextRequest) {
           needFlushing: parseBoolField(needFlushingRaw),
           filterType,
           filtersOn: parseBoolField(filtersOnRaw),
-          augmentedCare: parseBoolField(augmentedCareRaw)
+          augmentedCare: parseBoolField(augmentedCareRaw),
+          filterInstalledOn: parsedInstalled.date || '',
+          filterExpiryDate: parsedExpiry.date || ''
         };
 
         // Add optional fields using header mapping
@@ -261,33 +312,7 @@ export async function POST(request: NextRequest) {
           }
         });
 
-        // Handle filterInstalledOn with date parsing and expiry calculation
-        if (filterInstalledOnValue) {
-          try {
-            const date = new Date(filterInstalledOnValue);
-            if (!isNaN(date.getTime())) {
-              asset.filterInstalledOn = date.toISOString();
-              
-              // Auto-calculate filterExpiryDate (90 days after installation)
-              const expiryDate = new Date(date);
-              expiryDate.setDate(expiryDate.getDate() + 90);
-              asset.filterExpiryDate = expiryDate.toISOString();
-            } else {
-              results.failed++;
-              results.errors.push(`Row ${rowNumber}: Invalid date format for Filter Installed On: ${filterInstalledOnValue}`);
-              continue;
-            }
-          } catch (error) {
-            results.failed++;
-            results.errors.push(`Row ${rowNumber}: Invalid date format for Filter Installed On: ${filterInstalledOnValue}`);
-            continue;
-          }
-        }
-
-        // Set default values for optional fields if not provided
-        if (!asset.status) asset.status = 'ACTIVE';
-        if (!asset.primaryIdentifier) asset.primaryIdentifier = assetBarcode;
-        if (asset.filterNeeded && !asset.hasOwnProperty('filtersOn')) asset.filtersOn = false;
+        // No filter logic is applied here; values are stored as provided in the CSV.
 
         // Save to DynamoDB
         const newAsset = await DynamoDBService.createAsset(asset);
