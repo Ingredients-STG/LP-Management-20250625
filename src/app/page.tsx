@@ -1678,104 +1678,106 @@ export default function HomePage() {
   }));
 
   const renderDashboard = () => (
-    <Stack gap="lg" className="dashboard-container">
-      {/* Stats Grid */}
-      <Grid gutter="md" className="dashboard-stats-grid" style={{ margin: 0, width: '100%' }}>
-        <Grid.Col span={12}>
-          <StatCard
-            title="Total Assets"
-            value={stats.totalAssets}
-            icon={<IconDroplet size={20} />}
-            color="blue"
-            description="All registered assets"
-            trend={2.5}
-          />
-        </Grid.Col>
-        <Grid.Col span={12}>
-          <StatCard
-            title="Active Assets"
-            value={stats.activeAssets}
-            icon={<IconCheck size={20} />}
-            color="green"
-            description="Currently operational"
-            trend={5.2}
-          />
-        </Grid.Col>
-        <Grid.Col span={12}>
-          <StatCard
-            title="Under Maintenance"
-            value={stats.maintenanceAssets}
-            icon={<IconAlertTriangle size={20} />}
-            color="yellow"
-            description="Requires attention"
-            trend={-1.2}
-          />
-        </Grid.Col>
-        <Grid.Col span={12}>
-          <StatCard
-            title="Filters Needed"
-            value={stats.filtersNeeded}
-            icon={<IconFilter size={20} />}
-            color="red"
-            description="Filter replacement due"
-            trend={0.8}
-          />
-        </Grid.Col>
-      </Grid>
+    <div className="dashboard-outer-container">
+      <Stack gap="lg" className="dashboard-container">
+        {/* Stats Grid */}
+        <Grid gutter="md" className="dashboard-stats-grid">
+          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
+            <StatCard
+              title="Total Assets"
+              value={stats.totalAssets}
+              icon={<IconDroplet size={20} />}
+              color="blue"
+              description="All registered assets"
+              trend={2.5}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
+            <StatCard
+              title="Active Assets"
+              value={stats.activeAssets}
+              icon={<IconCheck size={20} />}
+              color="green"
+              description="Currently operational"
+              trend={5.2}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
+            <StatCard
+              title="Under Maintenance"
+              value={stats.maintenanceAssets}
+              icon={<IconAlertTriangle size={20} />}
+              color="yellow"
+              description="Requires attention"
+              trend={-1.2}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, sm: 6, md: 6, lg: 3 }}>
+            <StatCard
+              title="Filters Needed"
+              value={stats.filtersNeeded}
+              icon={<IconFilter size={20} />}
+              color="red"
+              description="Filter replacement due"
+              trend={0.8}
+            />
+          </Grid.Col>
+        </Grid>
 
-      {/* Charts */}
-      <Grid gutter="md" className="dashboard-charts-grid">
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Asset Types Distribution</Title>
-            {typeChartData.length > 0 && (
-              <BarChart
-                h={300}
-                data={typeChartData}
-                dataKey="type"
-                series={[{ name: 'count', color: 'blue.6' }]}
-              />
-            )}
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Status Overview</Title>
-            {statusChartData.length > 0 && (
-              <PieChart
-                h={300}
-                data={statusChartData}
-                withTooltip
-                tooltipDataSource="segment"
-              />
-            )}
-          </Card>
-        </Grid.Col>
-      </Grid>
+        {/* Charts */}
+        <Grid gutter="md" className="dashboard-charts-grid">
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Asset Types Distribution</Title>
+              {typeChartData.length > 0 && (
+                <BarChart
+                  h={300}
+                  data={typeChartData}
+                  dataKey="type"
+                  series={[{ name: 'count', color: 'blue.6' }]}
+                />
+              )}
+            </Card>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Status Overview</Title>
+              {statusChartData.length > 0 && (
+                <PieChart
+                  h={300}
+                  data={statusChartData}
+                  withTooltip
+                  tooltipDataSource="segment"
+                />
+              )}
+            </Card>
+          </Grid.Col>
+        </Grid>
 
-      {/* Recent Activity */}
-      <Card shadow="sm" padding="lg" radius="md" withBorder>
-        <Title order={4} mb="md">Recent Activity</Title>
-        <Stack gap="xs">
-          {assets.slice(0, 5).map((asset, index) => (
-            <Group key={index} justify="space-between" p="xs" style={{ borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-              <Group gap="sm">
-                <ThemeIcon color="blue" size={24} radius="md">
-                  <IconDroplet size={12} />
-                </ThemeIcon>
-                <div>
-                  <Text size="sm" fw={500}>{asset.primaryIdentifier}</Text>
-                  <Text size="xs" c="dimmed">Last modified by {asset.modifiedBy}</Text>
-                </div>
+        {/* Recent Activity */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Title order={4} mb="md">Recent Activity</Title>
+          <Stack gap="xs">
+            {assets.slice(0, 5).map((asset, index) => (
+              <Group key={index} justify="space-between" p="xs" style={{ borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
+                <Group gap="sm">
+                  <ThemeIcon color="blue" size={24} radius="md">
+                    <IconDroplet size={12} />
+                  </ThemeIcon>
+                  <div>
+                    <Text size="sm" fw={500}>{asset.primaryIdentifier}</Text>
+                    <Text size="xs" c="dimmed">Last modified by {asset.modifiedBy}</Text>
+                  </div>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
+                </Text>
               </Group>
-              <Text size="xs" c="dimmed">
-                {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
-              </Text>
-            </Group>
-          ))}
-        </Stack>
-      </Card>
-    </Stack>
+            ))}
+          </Stack>
+        </Card>
+      </Stack>
+    </div>
   );
 
   const renderAssets = () => (
@@ -1783,7 +1785,7 @@ export default function HomePage() {
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
-          <Group justify="space-between" wrap="wrap" gap="md" align="center">
+          <Group justify="space-between" wrap="wrap" gap="md" align="center" className="asset-action-bar">
             <Title order={3} style={{ marginBottom: 0 }}>Asset Management</Title>
             <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }} className="action-buttons-group">
               <Button
@@ -1791,37 +1793,43 @@ export default function HomePage() {
                 variant="light"
                 onClick={fetchData}
                 loading={loading}
-                size="sm"
-                px={{ base: "xs", md: "sm" }}
-                style={{ minHeight: '44px', flexShrink: 0 }}
+                size="md"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                 className="action-button"
               >
-                <Text visibleFrom="sm">Refresh</Text>
-                <Text hiddenFrom="sm" size="xs">Refresh</Text>
+                Refresh
               </Button>
               <Button
                 leftSection={<IconDownload size={16} />}
                 variant="outline"
                 onClick={exportData}
-                size="sm"
-                px={{ base: "xs", md: "sm" }}
-                style={{ minHeight: '44px', flexShrink: 0 }}
+                size="md"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                 className="action-button"
               >
-                <Text visibleFrom="sm">Export</Text>
-                <Text hiddenFrom="sm" size="xs">Export</Text>
+                Export
               </Button>
+              <ActionIcon
+                variant="light"
+                color="blue"
+                size="xl"
+                onClick={startBarcodeScanner}
+                title="Scan barcode"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                className="action-button scan-button"
+              >
+                <IconScan size={22} />
+              </ActionIcon>
               <Button
-                leftSection={<IconPlus size={16} />}
+                leftSection={<IconPlus size={18} />}
                 gradient={{ from: 'blue', to: 'cyan' }}
                 variant="gradient"
                 onClick={openModal}
-                size="sm"
-                px={{ base: "sm", md: "md" }}
-                style={{ minHeight: '44px', flexShrink: 0 }}
+                size="md"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                 className="action-button add-asset-button"
               >
-                <Text size="sm">Add Asset</Text>
+                Add Asset
               </Button>
             </Group>
           </Group>
