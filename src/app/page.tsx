@@ -147,6 +147,19 @@ interface AuditLogEntry {
   };
 }
 
+// Add a helper for safe date parsing
+function safeDate(val: any): Date | null {
+  if (!val) return null;
+  try {
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'string' && val.trim() !== '') {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+    }
+  } catch {}
+  return null;
+}
+
 export default function HomePage() {
   const [opened, { toggle }] = useDisclosure();
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -1515,8 +1528,8 @@ export default function HomePage() {
                                 roomName: asset.roomName || '',
                                 filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
                                 filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
-                                filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
-                                filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                filterExpiryDate: safeDate(asset.filterExpiryDate),
+                                filterInstalledOn: safeDate(asset.filterInstalledOn),
                                 needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
                                 filterType: asset.filterType || '',
                                 notes: asset.notes || '',
@@ -1665,7 +1678,7 @@ export default function HomePage() {
                         <Text size="sm">Filter Expiry:</Text>
                         <div style={{ textAlign: 'right' }}>
                           <Group gap="xs" justify="flex-end">
-                            {asset.filterExpiryDate && (
+                            {safeDate(asset.filterExpiryDate) && (
                               <Badge 
                                 color={getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).color} 
                                 variant="light" 
@@ -1676,7 +1689,7 @@ export default function HomePage() {
                               </Badge>
                             )}
                             <Text size="sm" fw={500}>
-                              {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
+                              {(() => { const d = safeDate(asset.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}
                             </Text>
                           </Group>
                         </div>
@@ -1684,7 +1697,7 @@ export default function HomePage() {
                       <Group justify="space-between">
                         <Text size="sm">Filter Installed:</Text>
                         <Text size="sm" fw={500}>
-                          {asset.filterInstalledOn ? new Date(asset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}
+                          {(() => { const d = safeDate(asset.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}
                         </Text>
                       </Group>
                       <Group justify="space-between">
@@ -1937,7 +1950,10 @@ export default function HomePage() {
                 leftSection={<IconPlus size={18} />}
                 gradient={{ from: 'blue', to: 'cyan' }}
                 variant="gradient"
-                onClick={openModal}
+                onClick={() => {
+                  form.reset();
+                  openModal();
+                }}
                 size="md"
                 style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                 className="action-button add-asset-button"
@@ -2196,8 +2212,8 @@ export default function HomePage() {
                                     roomName: asset.roomName || '',
                                     filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
                                     filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
-                                    filterExpiryDate: asset.filterExpiryDate ? new Date(asset.filterExpiryDate) : null,
-                                    filterInstalledOn: asset.filterInstalledOn ? new Date(asset.filterInstalledOn) : null,
+                                    filterExpiryDate: safeDate(asset.filterExpiryDate),
+                                    filterInstalledOn: safeDate(asset.filterInstalledOn),
                                     needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
                                     filterType: asset.filterType || '',
                                     notes: asset.notes || '',
@@ -2797,11 +2813,6 @@ export default function HomePage() {
         size="xl"
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
-        style={{
-          '@media (min-width: 768px)': {
-            fullScreen: false
-          }
-        }}
       >
         <form onSubmit={form.onSubmit(handleAddAsset)}>
           <Stack gap="lg">
@@ -3040,16 +3051,6 @@ export default function HomePage() {
               />
             </div>
 
-            <Grid.Col span={{ base: 12, sm: 12 }}>
-              <Textarea
-                label="Notes"
-                placeholder="Enter any notes or comments about this asset"
-                autosize
-                minRows={2}
-                {...form.getInputProps('notes')}
-              />
-            </Grid.Col>
-
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeModal}>
                 Cancel
@@ -3070,11 +3071,6 @@ export default function HomePage() {
         size="xl"
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
-        style={{
-          '@media (min-width: 768px)': {
-            fullScreen: false
-          }
-        }}
       >
         <form onSubmit={form.onSubmit(handleEditAsset)}>
           <Stack gap="lg">
@@ -3311,147 +3307,6 @@ export default function HomePage() {
               />
             </div>
 
-            <Grid.Col span={{ base: 12, sm: 12 }}>
-              <Textarea
-                label="Notes"
-                placeholder="Enter any notes or comments about this asset"
-                autosize
-                minRows={2}
-                {...form.getInputProps('notes')}
-              />
-            </Grid.Col>
-
-            <Divider />
-
-            {/* Attachments */}
-            <div>
-              <Title order={5} mb="sm">Attachments</Title>
-              
-              {/* Show existing attachments */}
-              {selectedAsset?.attachments && selectedAsset.attachments.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <Text size="sm" c="dimmed" mb="xs">Current Files:</Text>
-                  <Stack gap="xs">
-                    {selectedAsset.attachments.map((attachment, index) => (
-                      <Group key={index} justify="space-between" p="xs" bg="gray.0" style={{ borderRadius: '4px' }}>
-                        <Group gap="xs">
-                          <IconPaperclip size={16} />
-                          <Text size="sm">{attachment.fileName}</Text>
-                        </Group>
-                        <Group gap="xs">
-                          <ActionIcon
-                            size="sm"
-                            variant="light"
-                            color="blue"
-                            onClick={() => window.open(attachment.s3Url, '_blank')}
-                            title="View file"
-                          >
-                            <IconEye size={12} />
-                          </ActionIcon>
-                          <ActionIcon
-                            size="sm"
-                            variant="light"
-                            color="green"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = attachment.s3Url;
-                              link.download = attachment.fileName;
-                              link.click();
-                            }}
-                            title="Download file"
-                          >
-                            <IconDownload size={12} />
-                          </ActionIcon>
-                          <ActionIcon
-                            size="sm"
-                            variant="light"
-                            color="red"
-                            onClick={async () => {
-                              modals.openConfirmModal({
-                                title: 'Delete File',
-                                children: (
-                                  <Text size="sm">
-                                    Are you sure you want to delete <strong>{attachment.fileName}</strong>?
-                                    This action cannot be undone.
-                                  </Text>
-                                ),
-                                labels: { confirm: 'Delete', cancel: 'Cancel' },
-                                confirmProps: { color: 'red' },
-                                onConfirm: async () => {
-                                  const success = await handleFileDelete(attachment.s3Url, attachment.fileName);
-                                  if (success && selectedAsset) {
-                                    // Update the selected asset to remove the deleted attachment
-                                    const updatedAttachments = selectedAsset.attachments?.filter((_, i) => i !== index) || [];
-                                    setSelectedAsset({
-                                      ...selectedAsset,
-                                      attachments: updatedAttachments
-                                    });
-                                  }
-                                },
-                              });
-                            }}
-                            title="Delete file"
-                          >
-                            <IconTrash size={12} />
-                          </ActionIcon>
-                        </Group>
-                      </Group>
-                    ))}
-                  </Stack>
-                </div>
-              )}
-
-              {/* File upload input */}
-              <FileInput
-                label="Add New Files"
-                placeholder="Select files to upload (PDF, DOCX, JPG, PNG, etc.)"
-                multiple
-                accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.gif,.txt"
-                value={assetFiles}
-                onChange={setAssetFiles}
-                leftSection={<IconUpload size={16} />}
-              />
-
-              {assetFiles.length > 0 && (
-                <Group mt="sm" gap="xs">
-                  <Button
-                    size="sm"
-                    variant="light"
-                    loading={isUploadingFile}
-                    onClick={async () => {
-                      if (!selectedAsset?.id) return;
-                      
-                      const uploadPromises = assetFiles.map(file => handleFileUpload(file, selectedAsset.id!));
-                      const results = await Promise.all(uploadPromises);
-                      const successfulUploads = results.filter(result => result !== null);
-                      
-                      if (successfulUploads.length > 0) {
-                        // Update the selected asset with new attachments
-                        const updatedAttachments = [
-                          ...(selectedAsset.attachments || []),
-                          ...successfulUploads
-                        ];
-                        setSelectedAsset({
-                          ...selectedAsset,
-                          attachments: updatedAttachments
-                        });
-                        setAssetFiles([]); // Clear the file input
-                      }
-                    }}
-                  >
-                    Upload Files ({assetFiles.length})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAssetFiles([])}
-                  >
-                    Clear
-                  </Button>
-                </Group>
-              )}
-            </div>
-
             <Group justify="flex-end" mt="lg">
               <Button variant="outline" onClick={closeEditModal}>
                 Cancel
@@ -3472,11 +3327,6 @@ export default function HomePage() {
         size="lg"
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
-        style={{
-          '@media (min-width: 768px)': {
-            fullScreen: false
-          }
-        }}
       >
         {selectedAsset && (
           <Stack gap="lg">
@@ -3594,13 +3444,13 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Filter Installed On</Text>
-                  <Text size="sm">{selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                  <Text size="sm">{(() => { const d = safeDate(selectedAsset.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Filter Expiry</Text>
                   <div>
-                    <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
-                    {selectedAsset.filterExpiryDate && (
+                    <Text size="sm">{(() => { const d = safeDate(selectedAsset.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
+                    {safeDate(selectedAsset.filterExpiryDate) && (
                       <Badge 
                         color={getFilterExpiryStatus(selectedAsset.filterExpiryDate, selectedAsset.filterInstalledOn).color} 
                         variant="light" 
@@ -3720,8 +3570,8 @@ export default function HomePage() {
                       roomName: selectedAsset.roomName || '',
                       filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true',
                       filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
-                      filterExpiryDate: selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate) : null,
-                      filterInstalledOn: selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn) : null,
+                      filterExpiryDate: safeDate(selectedAsset.filterExpiryDate),
+                      filterInstalledOn: safeDate(selectedAsset.filterInstalledOn),
                       needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true',
                       filterType: selectedAsset.filterType || '',
                       notes: selectedAsset.notes || '',
@@ -3754,11 +3604,6 @@ export default function HomePage() {
         size="xl"
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
-        style={{
-          '@media (min-width: 768px)': {
-            fullScreen: false
-          }
-        }}
       >
         <Stack gap="md">
           {selectedAssetAudit && (

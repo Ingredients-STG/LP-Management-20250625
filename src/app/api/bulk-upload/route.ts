@@ -260,6 +260,11 @@ export async function POST(request: NextRequest) {
         const filterType = headerMapping.filterType !== undefined ? String(values[headerMapping.filterType] || '').trim() : '';
         const filtersOnRaw = headerMapping.filtersOn !== undefined ? values[headerMapping.filtersOn] : '';
         const augmentedCareRaw = headerMapping.augmentedCare !== undefined ? values[headerMapping.augmentedCare] : '';
+
+        // Parse boolean fields with debug logging
+        const filtersOnParsed = parseBoolField(filtersOnRaw);
+        console.log(`Row ${rowNumber}: filtersOnRaw="${filtersOnRaw}" -> filtersOnParsed=${filtersOnParsed}`);
+        
         // Parse filterInstalledOn and filterExpiryDate using strict DD/MM/YYYY
         const rawInstalled = headerMapping.filterInstalledOn !== undefined ? values[headerMapping.filterInstalledOn] : '';
         const rawExpiry = headerMapping.filterExpiryDate !== undefined ? values[headerMapping.filterExpiryDate] : '';
@@ -284,10 +289,10 @@ export async function POST(request: NextRequest) {
           modifiedBy: 'bulk-upload',
           needFlushing: parseBoolField(needFlushingRaw),
           filterType,
-          filtersOn: parseBoolField(filtersOnRaw),
+          filtersOn: filtersOnParsed,
           augmentedCare: parseBoolField(augmentedCareRaw),
-          filterInstalledOn: parsedInstalled.date || '',
-          filterExpiryDate: parsedExpiry.date || ''
+          filterInstalledOn: parsedInstalled.date || null,
+          filterExpiryDate: parsedExpiry.date || null
         };
 
         // Add optional fields using header mapping
