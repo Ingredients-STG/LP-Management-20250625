@@ -1,193 +1,164 @@
-# AWS Cognito Authentication Setup
-
-This document explains how to set up AWS Cognito authentication for the LP Management System.
+# AWS Cognito Setup Guide
 
 ## Prerequisites
+- AWS CLI installed and configured with your credentials
+- Node.js and npm installed
+- Your LP Management project ready
 
-- AWS Account with appropriate permissions
-- AWS CLI configured (optional but recommended)
-- Access to AWS Cognito service
+## Step 1: Install AWS CLI (if not already installed)
+```bash
+# macOS
+brew install awscli
 
-## Step 1: Create Cognito User Pool
-
-1. **Go to AWS Cognito Console**
-   - Navigate to the AWS Cognito service in your AWS console
-   - Select "User pools"
-
-2. **Create User Pool**
-   - Click "Create user pool"
-   - Choose "Email" as the sign-in option
-   - Configure the following settings:
-     - **User pool name**: `lp-management-users`
-     - **Alias attributes**: Email
-     - **Required attributes**: Email, Name
-     - **Password policy**: Default (minimum 8 characters)
-     - **MFA**: Optional (recommended for production)
-
-3. **Configure App Client**
-   - Create an app client with the following settings:
-     - **App client name**: `lp-management-client`
-     - **Generate client secret**: No (for web apps)
-     - **Enable username-password auth flow**: Yes
-     - **Enable admin auth flow**: Yes (for admin operations)
-
-## Step 2: Configure Environment Variables
-
-Create a `.env.local` file in the project root with the following variables:
-
-```env
-# AWS Configuration
-AWS_REGION=eu-west-2
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-
-# AWS Cognito Configuration
-NEXT_PUBLIC_AWS_REGION=eu-west-2
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=your-user-pool-id
-NEXT_PUBLIC_COGNITO_CLIENT_ID=your-client-id
-NEXT_PUBLIC_AWS_ACCESS_KEY_ID=your-access-key-id
-NEXT_PUBLIC_AWS_SECRET_ACCESS_KEY=your-secret-access-key
-
-# DynamoDB Configuration
-DYNAMODB_TABLE_NAME=water-tap-assets
-DYNAMODB_REGION=eu-west-2
-
-# S3 Configuration
-S3_BUCKET_NAME=asset-files-development
-S3_REGION=eu-west-2
+# Or download from: https://aws.amazon.com/cli/
 ```
 
-## Step 3: Create Initial Admin User
+## Step 2: Configure AWS CLI
+```bash
+aws configure
+# Enter your AWS Access Key ID
+# Enter your AWS Secret Access Key
+# Enter your default region (e.g., us-east-1)
+# Enter output format: json
+```
 
-You can create an initial admin user using the AWS CLI:
+## Step 3: Create Cognito User Pool
+
+Run these commands in your terminal:
 
 ```bash
-aws cognito-idp admin-create-user \
-    --user-pool-id your-user-pool-id \
-    --username admin \
-    --user-attributes Name=email,Value=admin@sgwst.nhs.uk Name=name,Value="SGWST Admin" \
-    --temporary-password TempPassword123! \
-    --message-action SUPPRESS
+# Create the User Pool
+aws cognito-idp create-user-pool \
+  --pool-name "LP-Management-Users" \
+  --policies "PasswordPolicy={MinimumLength=8,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=false}" \
+  --auto-verified-attributes email \
+  --username-attributes email \
+  --verification-message-template "DefaultEmailOption=CONFIRM_WITH_CODE" \
+  --mfa-configuration OFF \
+  --account-recovery-setting "RecoveryMechanisms=[{Name=verified_email,Priority=1}]" \
+  --admin-create-user-config "AllowAdminCreateUserOnly=false" \
+  --user-pool-tags "Project=LP-Management,Environment=Production"
 ```
 
-Or create users through the AWS Console:
-1. Go to your User Pool
-2. Click "Users" tab
-3. Click "Create user"
-4. Fill in the required information
+**Save the UserPoolId from the output - you'll need it for the next step!**
 
-## Step 4: Configure User Pool Settings
+## Step 4: Create User Pool Client
 
-### Password Policy
-- Minimum length: 8 characters
-- Require uppercase letters: Yes
-- Require lowercase letters: Yes
-- Require numbers: Yes
-- Require symbols: Optional
+Replace `YOUR_USER_POOL_ID` with the ID from Step 3:
 
-### Account Recovery
-- Enable "Email" for account recovery
-- Configure email settings if needed
+```bash
+# Create the User Pool Client
+aws cognito-idp create-user-pool-client \
+  --user-pool-id YOUR_USER_POOL_ID \
+  --client-name "LP-Management-Client" \
+  --generate-secret \
+  --explicit-auth-flows "ADMIN_NO_SRP_AUTH" "ALLOW_USER_PASSWORD_AUTH" "ALLOW_REFRESH_TOKEN_AUTH" \
+  --supported-identity-providers "COGNITO" \
+  --read-attributes "email" "email_verified" "given_name" "family_name" \
+  --write-attributes "email" "given_name" "family_name" \
+  --prevent-user-existence-errors "ENABLED"
+```
 
-### Email Configuration
-- Choose "Send email with Cognito" for development
-- For production, configure SES for better deliverability
+**Save the ClientId and ClientSecret from the output!**
 
-## Step 5: Test Authentication
+## Step 5: Create Admin User
 
-1. Start the development server:
-   ```bash
-   npm run dev
-   ```
+Replace `YOUR_USER_POOL_ID` and use your email:
 
-2. Navigate to `http://localhost:3000/login`
+```bash
+# Create admin user
+aws cognito-idp admin-create-user \
+  --user-pool-id YOUR_USER_POOL_ID \
+  --username admin \
+  --user-attributes Name=email,Value=your-email@example.com Name=email_verified,Value=true \
+  --temporary-password "TempPass123!" \
+  --message-action SUPPRESS
+```
 
-3. Try signing in with the admin user you created
+## Step 6: Update Environment Variables
 
-4. If it's the first login, you'll be prompted to set a new password
+Add these to your `.env.local` file:
 
-## Features Included
+```env
+# AWS Cognito Configuration
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=YOUR_USER_POOL_ID
+NEXT_PUBLIC_COGNITO_CLIENT_ID=YOUR_CLIENT_ID
+COGNITO_CLIENT_SECRET=YOUR_CLIENT_SECRET
+NEXT_PUBLIC_AWS_REGION=us-east-1
+```
 
-### Authentication Features
-- **Sign In**: Username/email and password authentication
-- **Sign Up**: New user registration with email verification
-- **Password Reset**: Forgot password functionality
-- **New Password**: Force password change on first login
-- **Sign Out**: Secure logout with token cleanup
+## Step 7: Test the Setup
 
-### Security Features
-- **Token Management**: Automatic token storage and validation
-- **Protected Routes**: Automatic redirection for unauthenticated users
-- **Session Management**: Persistent authentication across browser sessions
-- **Error Handling**: Comprehensive error handling for auth failures
+1. Start your development server:
+```bash
+npm run dev
+```
 
-### User Experience
-- **Responsive Design**: Works on desktop and mobile
-- **Loading States**: Visual feedback during authentication
-- **Form Validation**: Client-side validation for all forms
-- **Notifications**: Success/error messages for user actions
+2. Navigate to `http://localhost:3000`
+3. You should be redirected to the login page
+4. Try logging in with:
+   - Username: `admin`
+   - Password: `TempPass123!`
+5. You'll be prompted to set a new password
+
+## Step 8: Create Additional Users (Optional)
+
+```bash
+# Create regular user
+aws cognito-idp admin-create-user \
+  --user-pool-id YOUR_USER_POOL_ID \
+  --username user1 \
+  --user-attributes Name=email,Value=user1@example.com Name=email_verified,Value=true \
+  --temporary-password "TempPass123!" \
+  --message-action SUPPRESS
+```
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues:
 
-1. **"User does not exist" error**
-   - Ensure the user has been created in the Cognito User Pool
-   - Check that the username/email is correct
+1. **Invalid credentials**: Make sure AWS CLI is configured correctly
+2. **Region mismatch**: Ensure all commands use the same region
+3. **Permission denied**: Your AWS user needs Cognito permissions
 
-2. **"Invalid client" error**
-   - Verify the `NEXT_PUBLIC_COGNITO_CLIENT_ID` is correct
-   - Ensure the app client is properly configured
-
-3. **"Access denied" error**
-   - Check AWS credentials are correct
-   - Verify IAM permissions for Cognito operations
-
-4. **Email verification not working**
-   - Check email configuration in Cognito
-   - Verify SES settings if using custom email
-
-### Debug Mode
-
-Enable debug logging by adding to your `.env.local`:
-
-```env
-NEXT_PUBLIC_DEBUG_AUTH=true
+### Required AWS Permissions:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminInitiateAuth",
+        "cognito-idp:AdminRespondToAuthChallenge"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
 ```
 
-This will log authentication events to the browser console.
+## Alternative: One-Click Setup Script
+
+I can create a setup script that does all of this automatically. Would you like me to create that script for you?
 
 ## Production Considerations
 
-### Security
-- Use environment-specific User Pools
-- Enable MFA for admin users
-- Configure proper CORS settings
-- Use HTTPS in production
-- Implement proper session timeout
+1. **Security**: Never commit your `.env.local` file to git
+2. **Backup**: Save your User Pool ID and Client credentials securely
+3. **Monitoring**: Enable CloudWatch logs for Cognito
+4. **Scaling**: Consider using Cognito Identity Pools for additional features
 
-### Monitoring
-- Enable CloudWatch logging for Cognito
-- Monitor authentication metrics
-- Set up alerts for failed login attempts
+## Next Steps
 
-### Backup
-- Export user data regularly
-- Document recovery procedures
-- Test disaster recovery plans
+Once you have the Cognito setup complete:
+1. The app will automatically use real Cognito authentication
+2. Development mode will be disabled
+3. Users can sign up, sign in, and reset passwords
+4. All audit logs will use real user information
 
-## API Integration
-
-The authentication system automatically integrates with your existing API endpoints. The user information is available through:
-
-- `useAuth()` hook for React components
-- `getCurrentUser()` and `getCurrentUserEmail()` utility functions
-- Automatic user identification in audit logs
-
-## Support
-
-For issues or questions:
-1. Check the AWS Cognito documentation
-2. Review the troubleshooting section above
-3. Check the browser console for error messages
-4. Contact your AWS administrator for permissions issues 
+Let me know if you need help with any of these steps! 
