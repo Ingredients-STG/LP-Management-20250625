@@ -859,82 +859,9 @@ export default function HomePage() {
     return expiry;
   };
 
-
-
-  // Helper function to validate if expiry date matches installation date + 3 months
-  const isExpiryDateCorrect = (installedDate: string | null, expiryDate: string | null): boolean => {
-    if (!installedDate || !expiryDate) return true; // Can't validate if data is missing
-    
-    try {
-      const installed = new Date(installedDate);
-      const expiry = new Date(expiryDate);
-      const expectedExpiry = calculateFilterExpiry(installed);
-      
-      // Compare dates (ignoring time)
-      const expiryDateOnly = expiry.toISOString().split('T')[0];
-      const expectedDateOnly = expectedExpiry.toISOString().split('T')[0];
-      
-      return expiryDateOnly === expectedDateOnly;
-    } catch {
-      return true; // If parsing fails, assume it's correct to avoid errors
-    }
-  };
-
-  // Helper function to fix incorrect expiry date
-  const fixExpiryDate = async (asset: Asset) => {
-    if (!asset.filterInstalledOn) {
-      notifications.show({
-        title: 'Cannot Fix',
-        message: 'No installation date found for this asset',
-        color: 'orange',
-      });
-      return;
-    }
-
-    try {
-      const installedDate = new Date(asset.filterInstalledOn);
-      const correctExpiryDate = calculateFilterExpiry(installedDate);
-      // Only send updatable fields (exclude id, created, createdBy, attachments)
-      const { id, created, createdBy, attachments, ...updatableFields } = asset;
-      const response = await fetch(`/api/assets/${asset.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...updatableFields,
-          filterExpiryDate: correctExpiryDate.toISOString().split('T')[0],
-        }),
-      });
-
-      if (response.ok) {
-        notifications.show({
-          title: 'Success',
-          message: `Filter expiry corrected to ${correctExpiryDate.toLocaleDateString('en-GB')}`,
-          color: 'green',
-          icon: <IconCheck size={16} />,
-        });
-        fetchData(); // Refresh the data
-      } else {
-        throw new Error('Failed to update asset');
-      }
-    } catch (error) {
-      console.error('Error fixing expiry date:', error);
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to fix expiry date',
-        color: 'red',
-        icon: <IconX size={16} />,
-      });
-    }
-  };
-
   // Helper function to check filter expiry status
   const getFilterExpiryStatus = (expiryDate: string | null, installedDate?: string | null) => {
     if (!expiryDate) return { status: 'unknown', color: 'gray', text: 'N/A' };
-    
-    // Check if expiry date is correct based on installation date
-    const isCorrect = installedDate ? isExpiryDateCorrect(installedDate, expiryDate) : true;
     
     // Parse the date with explicit timezone handling to avoid timezone shifts
     const expiry = new Date(expiryDate.includes('T') ? expiryDate : expiryDate + 'T00:00:00.000Z');
@@ -944,17 +871,6 @@ export default function HomePage() {
     const todayUTC = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
     const daysUntilExpiry = Math.ceil((expiry.getTime() - todayUTC.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // If the expiry date is incorrect, show a warning
-    if (!isCorrect) {
-      return {
-        status: 'incorrect',
-        color: 'grape',
-        text: 'Date needs recalculation',
-        daysUntilExpiry,
-        isIncorrect: true
-      };
-    }
     
     if (daysUntilExpiry < 0) {
       return { 
@@ -1751,29 +1667,17 @@ export default function HomePage() {
                             <Text size="sm" fw={500}>
                               {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
                             </Text>
-                            {asset.filterExpiryDate && asset.filterInstalledOn && !isExpiryDateCorrect(asset.filterInstalledOn, asset.filterExpiryDate) && (
-                              <Tooltip label="Fix incorrect expiry date">
-                                <ActionIcon
-                                  size="xs"
-                                  variant="light"
-                                  color="grape"
-                                  onClick={() => fixExpiryDate(asset)}
-                                >
-                                  <IconAlertTriangle size={10} />
-                                </ActionIcon>
-                              </Tooltip>
+                            {asset.filterExpiryDate && asset.filterInstalledOn && (
+                              <Badge 
+                                color={getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).color} 
+                                variant="light" 
+                                size="xs"
+                                mt={4}
+                              >
+                                {getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).text}
+                              </Badge>
                             )}
                           </Group>
-                          {asset.filterExpiryDate && (
-                            <Badge 
-                              color={getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).color} 
-                              variant="light" 
-                              size="xs"
-                              mt={4}
-                            >
-                              {getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).text}
-                            </Badge>
-                          )}
                         </div>
                       </Group>
                       <Group justify="space-between">
