@@ -842,17 +842,18 @@ export default function HomePage() {
   const calculateFilterExpiry = (installedDate: Date): Date => {
     const expiry = new Date(installedDate);
     
+    // Get the original day of the month
+    const originalDay = installedDate.getDate();
+    
     // Add exactly 3 months
     expiry.setMonth(expiry.getMonth() + 3);
     
     // Handle edge cases where the day doesn't exist in the target month
-    // (e.g., Jan 31 + 3 months = Apr 31, which doesn't exist)
-    if (expiry.getDate() !== installedDate.getDate()) {
-      // The date was automatically adjusted by JavaScript
-      // Set to the first day of the next month
+    // Example: Nov 30 + 3 months = Feb 30 (doesn't exist) -> Mar 1
+    if (expiry.getDate() !== originalDay) {
+      // The date was automatically adjusted by JavaScript (e.g., Feb 30 -> Mar 2)
+      // Set to the 1st day of the next month as per your requirement
       expiry.setDate(1);
-      expiry.setMonth(expiry.getMonth() + 1);
-      expiry.setDate(0); // Go to last day of previous month
     }
     
     return expiry;
@@ -2867,6 +2868,13 @@ export default function HomePage() {
                     {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                   />
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Need Flushing"
+                    description="Asset requires flushing"
+                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
               </Grid>
     </div>
 
@@ -2933,21 +2941,19 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Group mt="md" mb="md" wrap="wrap">
-                <Checkbox
-                  label="Filter Needed"
-                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                />
-                <Checkbox
-                  label="Filters On"
-                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                />
-                <Checkbox
-                  label="Need Flushing"
-                  {...form.getInputProps('needFlushing', { type: 'checkbox' })}
-                />
-              </Group>
               <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Filter Needed"
+                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Filters On"
+                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
@@ -2958,8 +2964,17 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date"
-                    placeholder="Select filter expiry date"
+                    placeholder="Auto-calculated from installation date"
+                    readOnly
+                    disabled
                     {...form.getInputProps('filterExpiryDate')}
+                    styles={{
+                      input: {
+                        backgroundColor: '#f8f9fa',
+                        color: '#6c757d',
+                        cursor: 'not-allowed'
+                      }
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -3114,6 +3129,13 @@ export default function HomePage() {
                     {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
                   />
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Need Flushing"
+                    description="Asset requires flushing"
+                    {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
               </Grid>
             </div>
 
@@ -3180,21 +3202,19 @@ export default function HomePage() {
             {/* Filter Information */}
             <div>
               <Title order={5} mb="sm">Filter Information</Title>
-              <Group mt="md" mb="md" wrap="wrap">
-                <Checkbox
-                  label="Filter Needed"
-                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
-                />
-                <Checkbox
-                  label="Filters On"
-                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
-                />
-                <Checkbox
-                  label="Need Flushing"
-                  {...form.getInputProps('needFlushing', { type: 'checkbox' })}
-                />
-              </Group>
               <Grid>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Filter Needed"
+                    {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Filters On"
+                    {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Installed On"
@@ -3205,8 +3225,17 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <DateInput
                     label="Filter Expiry Date"
-                    placeholder="Select filter expiry date"
+                    placeholder="Auto-calculated from installation date"
+                    readOnly
+                    disabled
                     {...form.getInputProps('filterExpiryDate')}
+                    styles={{
+                      input: {
+                        backgroundColor: '#f8f9fa',
+                        color: '#6c757d',
+                        cursor: 'not-allowed'
+                      }
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
