@@ -894,15 +894,15 @@ export default function HomePage() {
     try {
       const installedDate = new Date(asset.filterInstalledOn);
       const correctExpiryDate = calculateFilterExpiry(installedDate);
-      
-      // Update the asset
+      // Only send updatable fields (exclude id, created, createdBy, attachments)
+      const { id, created, createdBy, attachments, ...updatableFields } = asset;
       const response = await fetch(`/api/assets/${asset.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...asset,
+          ...updatableFields,
           filterExpiryDate: correctExpiryDate.toISOString().split('T')[0],
         }),
       });
