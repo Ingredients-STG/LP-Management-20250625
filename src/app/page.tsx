@@ -1613,84 +1613,80 @@ export default function HomePage() {
                   <Grid.Col span={{ base: 12, sm: 6 }}>
                     <Stack gap="xs">
                       <Text size="sm" fw={600} c="dimmed">FILTER INFORMATION</Text>
-                      <Grid>
-                        <Grid.Col span={6}>
-                          <Text size="sm">Filter Needed:</Text>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <Badge 
-                            color={(() => {
-                              if (typeof asset.filterNeeded === 'boolean') {
-                                return asset.filterNeeded ? 'orange' : 'green';
-                              }
-                              const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-                              return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'orange' : 'green';
-                            })()} 
-                            variant="light" 
-                            size="sm"
-                          >
-                            {(() => {
-                              if (typeof asset.filterNeeded === 'boolean') {
-                                return asset.filterNeeded ? 'Yes' : 'No';
-                              }
-                              const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-                              return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'Yes' : 'No';
-                            })()}
-                          </Badge>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <Text size="sm">Filters On:</Text>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <Badge 
-                            color={(() => {
-                              if (typeof asset.filtersOn === 'boolean') {
-                                return asset.filtersOn ? 'green' : 'red';
-                              }
-                              const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
-                              return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'green' : 'red';
-                            })()} 
-                            variant="light" 
-                            size="sm"
-                          >
-                            {(() => {
-                              if (typeof asset.filtersOn === 'boolean') {
-                                return asset.filtersOn ? 'Yes' : 'No';
-                              }
-                              const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
-                              return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'Yes' : 'No';
-                            })()}
-                          </Badge>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <Text size="sm">Filter Expiry:</Text>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <div>
-                            <Text size="sm" fw={500}>
-                              {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
-                            </Text>
-                            {asset.filterExpiryDate && (
-                              <Badge 
-                                color={getFilterExpiryStatus(asset.filterExpiryDate).color} 
-                                variant="light" 
-                                size="xs"
-                                mt="xs"
-                              >
-                                {getFilterExpiryStatus(asset.filterExpiryDate).text}
-                              </Badge>
-                            )}
-                          </div>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
-                          <Text size="sm">Filter Installed:</Text>
-                        </Grid.Col>
-                        <Grid.Col span={6}>
+                      <Group justify="space-between">
+                        <Text size="sm">Filter Needed:</Text>
+                        <Badge 
+                          color={(() => {
+                            if (typeof asset.filterNeeded === 'boolean') {
+                              return asset.filterNeeded ? 'orange' : 'green';
+                            }
+                            const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
+                            return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'orange' : 'green';
+                          })()} 
+                          variant="light" 
+                          size="sm"
+                        >
+                          {(() => {
+                            if (typeof asset.filterNeeded === 'boolean') {
+                              return asset.filterNeeded ? 'Yes' : 'No';
+                            }
+                            const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
+                            return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'Yes' : 'No';
+                          })()}
+                        </Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text size="sm">Filters On:</Text>
+                        <Badge 
+                          color={(() => {
+                            if (typeof asset.filtersOn === 'boolean') {
+                              return asset.filtersOn ? 'green' : 'red';
+                            }
+                            const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
+                            return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'green' : 'red';
+                          })()} 
+                          variant="light" 
+                          size="sm"
+                        >
+                          {(() => {
+                            if (typeof asset.filtersOn === 'boolean') {
+                              return asset.filtersOn ? 'Yes' : 'No';
+                            }
+                            const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
+                            return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'Yes' : 'No';
+                          })()}
+                        </Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text size="sm">Filter Expiry:</Text>
+                        <div>
                           <Text size="sm" fw={500}>
-                            {asset.filterInstalledOn ? new Date(asset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}
+                            {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}
                           </Text>
-                        </Grid.Col>
-                      </Grid>
+                          {asset.filterExpiryDate && (
+                            <Badge 
+                              color={getFilterExpiryStatus(asset.filterExpiryDate).color} 
+                              variant="light" 
+                              size="xs"
+                              mt="xs"
+                            >
+                              {getFilterExpiryStatus(asset.filterExpiryDate).text}
+                            </Badge>
+                          )}
+                        </div>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text size="sm">Filter Installed:</Text>
+                        <Text size="sm" fw={500}>
+                          {asset.filterInstalledOn ? new Date(asset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}
+                        </Text>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text size="sm">Filter Type:</Text>
+                        <Text size="sm" fw={500}>
+                          {asset.filterType || 'N/A'}
+                        </Text>
+                      </Group>
                     </Stack>
                   </Grid.Col>
                   
