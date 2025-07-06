@@ -1721,34 +1721,30 @@ export default function HomePage() {
         </div>
 
         {/* Charts */}
-        <Grid gutter="md" className="dashboard-charts-grid">
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-              <Title order={4} mb="md">Asset Types Distribution</Title>
-              {typeChartData.length > 0 && (
-                <BarChart
-                  h={300}
-                  data={typeChartData}
-                  dataKey="type"
-                  series={[{ name: 'count', color: 'blue.6' }]}
-                />
-              )}
-            </Card>
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-              <Title order={4} mb="md">Status Overview</Title>
-              {statusChartData.length > 0 && (
-                <PieChart
-                  h={300}
-                  data={statusChartData}
-                  withTooltip
-                  tooltipDataSource="segment"
-                />
-              )}
-            </Card>
-          </Grid.Col>
-        </Grid>
+        <div className="dashboard-charts-row">
+          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+            <Title order={4} mb="md">Asset Types Distribution</Title>
+            {typeChartData.length > 0 && (
+              <BarChart
+                h={300}
+                data={typeChartData}
+                dataKey="type"
+                series={[{ name: 'count', color: 'blue.6' }]}
+              />
+            )}
+          </Card>
+          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+            <Title order={4} mb="md">Status Overview</Title>
+            {statusChartData.length > 0 && (
+              <PieChart
+                h={300}
+                data={statusChartData}
+                withTooltip
+                tooltipDataSource="segment"
+              />
+            )}
+          </Card>
+        </div>
 
         {/* Recent Activity */}
         <Card shadow="sm" padding="lg" radius="md" withBorder>
