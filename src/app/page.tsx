@@ -351,7 +351,7 @@ export default function HomePage() {
         },
         body: JSON.stringify({
       assetId: asset.id || '',
-          user: getCurrentUser(), // Get current user from authentication
+          user: user?.email || user?.username || 'Unknown User', // Get current user from authentication
           action,
           details: {
       assetBarcode: asset.assetBarcode,
@@ -1154,8 +1154,8 @@ export default function HomePage() {
         },
         body: JSON.stringify({
           ...assetData,
-          createdBy: getCurrentUser(),
-          modifiedBy: getCurrentUser(),
+          createdBy: user?.email || user?.username || 'Unknown User',
+          modifiedBy: user?.email || user?.username || 'Unknown User',
         }),
       });
 
@@ -1192,7 +1192,7 @@ export default function HomePage() {
               body: JSON.stringify({
                 ...result.data,
                 attachments: uploadedAttachments,
-                modifiedBy: getCurrentUser(),
+                modifiedBy: user?.email || user?.username || 'Unknown User',
               }),
             });
             
@@ -1311,7 +1311,7 @@ export default function HomePage() {
         filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
         attachments: [...(selectedAsset?.attachments || []), ...newAttachments], // Merge existing and new attachments
-        modifiedBy: getCurrentUser(),
+        modifiedBy: user?.email || user?.username || 'Unknown User',
       };
 
       const response = await fetch(`/api/assets/${selectedAsset.id}`, {
@@ -1397,7 +1397,7 @@ export default function HomePage() {
             filterInstalledOn: '',
             filterExpiryDate: '',
             filterType: '',
-            modifiedBy: getCurrentUser(),
+            modifiedBy: user?.email || user?.username || 'Unknown User',
           };
 
           const response = await fetch(`/api/assets/${asset.id}`, {

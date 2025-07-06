@@ -42,13 +42,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const session = await fetchAuthSession();
       
       if (currentUser && session.tokens) {
-        setUser({
+        const userData = {
           username: currentUser.username,
           email: currentUser.signInDetails?.loginId
-        });
+        };
+        setUser(userData);
+        // Store user info in localStorage for getCurrentUser() function
+        localStorage.setItem('currentUser', JSON.stringify(userData));
       }
     } catch (error) {
       console.log('No authenticated user');
+      // Clear user data from localStorage if not authenticated
+      localStorage.removeItem('currentUser');
     } finally {
       setIsLoading(false);
     }
@@ -70,6 +75,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await signOut();
       setUser(null);
+      // Clear user data from localStorage on sign out
+      localStorage.removeItem('currentUser');
     } catch (error) {
       console.error('Sign out error:', error);
       throw error;

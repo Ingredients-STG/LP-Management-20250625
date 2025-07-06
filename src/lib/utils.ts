@@ -252,13 +252,34 @@ export const formatTimestamp = (date: Date | string): string => {
 
 // User identification utilities
 export const getCurrentUser = (): string => {
-  // TODO: Implement Cognito user identification
-  // For now, return a descriptive user name for SGWST team
-  return 'SGWST Admin';
+  // This function should be called from components that have access to auth context
+  // For server-side operations, we'll need to pass the user info explicitly
+  if (typeof window !== 'undefined') {
+    // Try to get user from localStorage if available
+    try {
+      const userData = localStorage.getItem('currentUser');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.email || user.username || 'Unknown User';
+      }
+    } catch (error) {
+      console.warn('Error reading user from localStorage:', error);
+    }
+  }
+  return 'System User';
 };
 
 export const getCurrentUserEmail = (): string => {
-  // TODO: Implement Cognito user email retrieval
-  // For now, return a placeholder for SGWST team
-  return 'admin@sgwst.nhs.uk';
+  if (typeof window !== 'undefined') {
+    try {
+      const userData = localStorage.getItem('currentUser');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.email || 'unknown@system.local';
+      }
+    } catch (error) {
+      console.warn('Error reading user email from localStorage:', error);
+    }
+  }
+  return 'system@local';
 }; 
