@@ -858,6 +858,45 @@ export default function HomePage() {
     return expiry;
   };
 
+  // Helper function to check filter expiry status
+  const getFilterExpiryStatus = (expiryDate: string | null) => {
+    if (!expiryDate) return { status: 'unknown', color: 'gray', text: 'N/A' };
+    
+    const expiry = new Date(expiryDate);
+    const today = new Date();
+    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) {
+      return { 
+        status: 'expired', 
+        color: 'red', 
+        text: `Expired ${Math.abs(daysUntilExpiry)} days ago`,
+        daysUntilExpiry 
+      };
+    } else if (daysUntilExpiry <= 7) {
+      return { 
+        status: 'expiring-soon', 
+        color: 'orange', 
+        text: `Expires in ${daysUntilExpiry} days`,
+        daysUntilExpiry 
+      };
+    } else if (daysUntilExpiry <= 30) {
+      return { 
+        status: 'expiring-month', 
+        color: 'yellow', 
+        text: `Expires in ${daysUntilExpiry} days`,
+        daysUntilExpiry 
+      };
+    } else {
+      return { 
+        status: 'good', 
+        color: 'green', 
+        text: `Expires in ${daysUntilExpiry} days`,
+        daysUntilExpiry 
+      };
+    }
+  };
+
   // Form for adding/editing assets
   const form = useForm<{
     assetBarcode: string;
@@ -1617,9 +1656,21 @@ export default function HomePage() {
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm">Filter Expiry:</Text>
-                        <Text size="sm" fw={500}>
-                          {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString() : 'N/A'}
-                        </Text>
+                        <div>
+                          <Text size="sm" fw={500}>
+                            {asset.filterExpiryDate ? new Date(asset.filterExpiryDate).toLocaleDateString() : 'N/A'}
+                          </Text>
+                          {asset.filterExpiryDate && (
+                            <Badge 
+                              color={getFilterExpiryStatus(asset.filterExpiryDate).color} 
+                              variant="light" 
+                              size="xs"
+                              mt="xs"
+                            >
+                              {getFilterExpiryStatus(asset.filterExpiryDate).text}
+                            </Badge>
+                          )}
+                        </div>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm">Filter Installed:</Text>
@@ -1652,6 +1703,28 @@ export default function HomePage() {
                             }
                             const augmentedCareStr = asset.augmentedCare?.toString().toLowerCase();
                             return augmentedCareStr === 'yes' || augmentedCareStr === 'true' ? 'Yes' : 'No';
+                          })()}
+                        </Badge>
+                      </Group>
+                      <Group justify="space-between">
+                        <Text size="sm">Need Flushing:</Text>
+                        <Badge 
+                          color={(() => {
+                            if (typeof asset.needFlushing === 'boolean') {
+                              return asset.needFlushing ? 'orange' : 'gray';
+                            }
+                            const needFlushingStr = asset.needFlushing?.toString().toLowerCase();
+                            return needFlushingStr === 'yes' || needFlushingStr === 'true' ? 'orange' : 'gray';
+                          })()} 
+                          variant="light" 
+                          size="sm"
+                        >
+                          {(() => {
+                            if (typeof asset.needFlushing === 'boolean') {
+                              return asset.needFlushing ? 'Yes' : 'No';
+                            }
+                            const needFlushingStr = asset.needFlushing?.toString().toLowerCase();
+                            return needFlushingStr === 'yes' || needFlushingStr === 'true' ? 'Yes' : 'No';
                           })()}
                         </Badge>
                       </Group>
@@ -3380,6 +3453,16 @@ export default function HomePage() {
                     {(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="sm" c="dimmed">Need Flushing</Text>
+                  <Badge 
+                    color={(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'orange' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
               </Grid>
             </div>
 
@@ -3451,19 +3534,20 @@ export default function HomePage() {
                   <Text size="sm">{selectedAsset.filterInstalledOn ? new Date(selectedAsset.filterInstalledOn).toLocaleDateString('en-GB') : 'N/A'}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filter Expiry Date</Text>
-                  <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
-                </Grid.Col>
-
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Need Flushing</Text>
-                  <Badge 
-                    color={(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'orange' : 'gray'} 
-                    variant="light" 
-                    size="sm"
-                  >
-                    {(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'Yes' : 'No'}
-                  </Badge>
+                  <Text size="sm" c="dimmed">Filter Expiry</Text>
+                  <div>
+                    <Text size="sm">{selectedAsset.filterExpiryDate ? new Date(selectedAsset.filterExpiryDate).toLocaleDateString('en-GB') : 'N/A'}</Text>
+                    {selectedAsset.filterExpiryDate && (
+                      <Badge 
+                        color={getFilterExpiryStatus(selectedAsset.filterExpiryDate).color} 
+                        variant="light" 
+                        size="xs"
+                        mt="xs"
+                      >
+                        {getFilterExpiryStatus(selectedAsset.filterExpiryDate).text}
+                      </Badge>
+                    )}
+                  </div>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Filter Type</Text>
