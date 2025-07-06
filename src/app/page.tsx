@@ -1155,13 +1155,9 @@ export default function HomePage() {
       // Helper function to safely convert date to ISO string
       const formatDateForAPI = (dateValue: any) => {
         if (!dateValue) return '';
-        
-        // If it's already a Date object, use it directly
         if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
           return dateValue.toISOString().split('T')[0];
         }
-        
-        // If it's a string in DD/MM/YYYY format, parse it
         if (typeof dateValue === 'string' && dateValue.includes('/')) {
           const [day, month, year] = dateValue.split('/');
           const parsedDate = new Date(`${year}-${month}-${day}`);
@@ -1169,25 +1165,33 @@ export default function HomePage() {
             return parsedDate.toISOString().split('T')[0];
           }
         }
-        
-        // Try to parse as a regular date string
         const parsedDate = new Date(dateValue);
         if (!isNaN(parsedDate.getTime())) {
           return parsedDate.toISOString().split('T')[0];
         }
-        
         return '';
       };
 
+      // Always recalculate expiry date from installed date
+      let installedDateObj = values.filterInstalledOn;
+      if (typeof installedDateObj === 'string' && installedDateObj.includes('/')) {
+        const [day, month, year] = installedDateObj.split('/');
+        installedDateObj = new Date(`${year}-${month}-${day}`);
+      } else if (typeof installedDateObj === 'string') {
+        installedDateObj = new Date(installedDateObj);
+      }
+      let expiryDate = null;
+      if (installedDateObj instanceof Date && !isNaN(installedDateObj.getTime())) {
+        expiryDate = calculateFilterExpiry(installedDateObj);
+      }
+
       const updateData = {
         ...values,
-        filterExpiryDate: formatDateForAPI(values.filterExpiryDate),
+        filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
         attachments: selectedAsset?.attachments || [], // Include current attachments
         modifiedBy: getCurrentUser(),
       };
-
-
 
       const response = await fetch(`/api/assets/${selectedAsset.id}`, {
         method: 'PUT',
@@ -1203,7 +1207,6 @@ export default function HomePage() {
       }
 
       const result = await response.json();
-      
       if (!result.success) {
         throw new Error(result.error || 'Failed to update asset');
       }
@@ -1217,11 +1220,9 @@ export default function HomePage() {
       setAssets(prev => prev.map(asset => 
         asset.id === selectedAsset?.id ? result.data : asset
       ));
-      
       closeEditModal();
       setSelectedAsset(null);
       form.reset();
-      
       notifications.show({
         title: "Success",
         message: "Asset updated successfully in DynamoDB!",
