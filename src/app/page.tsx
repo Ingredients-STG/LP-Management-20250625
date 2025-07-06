@@ -939,6 +939,7 @@ export default function HomePage() {
     notes: string;
     augmentedCare: boolean;
   }>({
+    mode: 'uncontrolled',
     initialValues: {
       assetBarcode: '',
       primaryIdentifier: '',

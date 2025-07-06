@@ -9,6 +9,7 @@ interface BulkUploadResult {
   errors: string[];
   duplicateBarcodes: string[];
   newAssetTypes: string[];
+  newFilterTypes: string[];
 }
 
 // Header normalization function
@@ -43,7 +44,7 @@ function createHeaderMapping(headers: string[]): { [key: string]: number } {
       'floorInWords': ['floorinwords', 'floor_in_words', 'floorwords', 'levelwords'],
       'roomNo': ['roomno', 'room_no', 'roomnumber', 'room_number'],
       'roomName': ['roomname', 'room_name', 'roomtitle', 'room_title'],
-      'filtersOn': ['filtersonn', 'filters_on', 'filtersactive', 'filtersstatus'],
+      'filtersOn': ['filterson', 'filters_on', 'filtersactive', 'filtersstatus'],
       'notes': ['notes', 'comments', 'remarks', 'description'],
       'augmentedCare': ['augmentedcare', 'augmented_care', 'specialcare', 'enhanced'],
       'needFlushing': ['needflushing', 'need_flushing', 'need_flushing*', 'needflushing*'],
@@ -181,7 +182,8 @@ export async function POST(request: NextRequest) {
       failed: 0,
       errors: [],
       duplicateBarcodes: [],
-      newAssetTypes: []
+      newAssetTypes: [],
+      newFilterTypes: []
     };
 
     // Process each data row
@@ -262,6 +264,46 @@ export async function POST(request: NextRequest) {
         // Parse new fields
         const needFlushingRaw = headerMapping.needFlushing !== undefined ? values[headerMapping.needFlushing] : '';
         const filterType = headerMapping.filterType !== undefined ? String(values[headerMapping.filterType] || '').trim() : '';
+        
+        // Auto-create filter type if provided and doesn't exist
+        if (filterType) {
+          try {
+            // Import the DynamoDB client and commands directly
+            const { DynamoDBDocumentClient, PutCommand } = await import('@aws-sdk/lib-dynamodb');
+            const { DynamoDBClient } = await import('@aws-sdk/client-dynamodb');
+            
+            const client = new DynamoDBClient({
+              region: process.env.AMPLIFY_AWS_REGION || 'eu-west-2',
+              credentials: {
+                accessKeyId: process.env.AMPLIFY_ACCESS_KEY_ID || '',
+                secretAccessKey: process.env.AMPLIFY_SECRET_ACCESS_KEY || '',
+              },
+            });
+            const ddbClient = DynamoDBDocumentClient.from(client);
+            
+            const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            await ddbClient.send(new PutCommand({
+              TableName: 'FilterTypes',
+              Item: {
+                typeId,
+                label: filterType,
+                createdAt: new Date().toISOString(),
+                createdBy: 'bulk-upload'
+              },
+              ConditionExpression: 'attribute_not_exists(#label)',
+              ExpressionAttributeNames: { '#label': 'label' }
+            }));
+            
+            console.log(`Auto-created filter type: ${filterType}`);
+            results.newFilterTypes.push(filterType);
+          } catch (error: any) {
+            if (error.name !== 'ConditionalCheckFailedException') {
+              console.warn(`Failed to create filter type ${filterType}:`, error);
+            }
+            // ConditionalCheckFailedException means it already exists, which is fine
+          }
+        }
         const filtersOnRaw = headerMapping.filtersOn !== undefined ? values[headerMapping.filtersOn] : '';
         const augmentedCareRaw = headerMapping.augmentedCare !== undefined ? values[headerMapping.augmentedCare] : '';
 
@@ -356,7 +398,8 @@ export async function POST(request: NextRequest) {
         failed: results.failed,
         errors: results.errors.slice(0, 20), // Show up to 20 errors
         duplicateBarcodes: [...new Set(results.duplicateBarcodes)], // Remove duplicates
-        newAssetTypes: [...new Set(results.newAssetTypes)] // Remove duplicates
+        newAssetTypes: [...new Set(results.newAssetTypes)], // Remove duplicates
+        newFilterTypes: [...new Set(results.newFilterTypes)] // Remove duplicates
       }
     });
 
@@ -389,7 +432,7 @@ export async function GET() {
       'roomName',           // Optional
       'filtersOn',          // Optional
       'needFlushing',       // Optional
-      'filterType',         // Optional
+      'filterType',         // Optional - will auto-create if new
       'notes',              // Optional
       'augmentedCare'       // Optional
     ];

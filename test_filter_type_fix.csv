@@ -1,0 +1,2 @@
+assetBarcode*,room*,filterNeeded*,filterInstalledOn,assetType,primaryIdentifier,secondaryIdentifier,status,wing,wingInShort,floor,floorInWords,roomNo,roomName,filtersOn,needFlushing,filterType,notes,augmentedCare
+TEST002,Room 102,YES,01/10/2024,Water Tap,TAP002,SEC002,ACTIVE,North Wing,NW,Ground Floor,Ground,102,Test Room,YES,NO,t-safe,Test asset with t-safe filter type,NO 
