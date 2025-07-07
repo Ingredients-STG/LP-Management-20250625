@@ -139,17 +139,12 @@
 
 /* ✅ COMPREHENSIVE RESPONSIVE UI OVERHAUL */
 
-/* Header username button mobile optimization */
+/* Header username button mobile optimization - removed truncation */
 @media screen and (max-width: 480px) {
-  /* Compact username display in mobile header */
+  /* Allow full username display in mobile header */
   .mantine-Button-root[data-variant="subtle"] {
-    max-width: 120px !important;
     padding: 0.25rem 0.5rem !important;
-  }
-  
-  .mantine-Button-root[data-variant="subtle"] .mantine-Text-root {
-    max-width: 80px !important;
-    font-size: 0.75rem !important;
+    font-size: 0.875rem !important;
   }
 }
 

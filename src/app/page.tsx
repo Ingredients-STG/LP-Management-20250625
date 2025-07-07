@@ -1061,6 +1061,13 @@ export default function HomePage() {
     }
   }, [showAuditModal, selectedAssetAudit, assets]);
 
+  // Fetch global audit logs when audit drawer opens
+  useEffect(() => {
+    if (showAuditDrawer) {
+      fetchGlobalAuditLogs();
+    }
+  }, [showAuditDrawer]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -2213,17 +2220,6 @@ export default function HomePage() {
               >
                 Export
               </Button>
-              <Button
-                leftSection={<IconHistory size={16} />}
-                variant="outline"
-                color="blue"
-                onClick={openAuditDrawer}
-                size="md"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button"
-              >
-                Audit Log
-              </Button>
               <ActionIcon
                 variant="light"
                 color="blue"
@@ -2962,20 +2958,27 @@ export default function HomePage() {
               <Title order={3} c="blue">LP Management System</Title>
             </Group>
             
-            <Group>
+            <Group gap="xs">
+              <ActionIcon
+                variant="light"
+                color="blue"
+                size="lg"
+                onClick={openAuditDrawer}
+                title="System Audit Trail"
+              >
+                <IconHistory size={18} />
+              </ActionIcon>
               <Menu>
                 <Menu.Target>
                   <Button 
                     variant="subtle" 
                     leftSection={<IconUser size={16} />}
                     style={{ 
-                      maxWidth: '200px',
-                      overflow: 'hidden'
+                      minWidth: 'fit-content',
+                      maxWidth: 'none'
                     }}
                   >
-                    <Text truncate style={{ maxWidth: '150px' }}>
-                      {user?.email || 'User'}
-                    </Text>
+                    {user?.email || 'User'}
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -4199,43 +4202,9 @@ export default function HomePage() {
 
           <ScrollArea h="calc(100vh - 200px)">
             <Stack gap="sm">
-              {/* Mock Data - Replace with real data when backend is ready */}
-              {[
-                {
-                  id: '1',
-                  action: 'CREATE',
-                  timestamp: new Date().toISOString(),
-                  user: 'john.doe@sgwst.nhs.uk',
-                  assetBarcode: 'ASSET-001',
-                  assetName: 'Water Tap - Room 101',
-                  changes: [
-                    { field: 'status', oldValue: null, newValue: 'ACTIVE' },
-                    { field: 'filterNeeded', oldValue: null, newValue: true },
-                  ]
-                },
-                {
-                  id: '2',
-                  action: 'UPDATE',
-                  timestamp: new Date(Date.now() - 3600000).toISOString(),
-                  user: 'jane.smith@sgwst.nhs.uk',
-                  assetBarcode: 'ASSET-002',
-                  assetName: 'Water Cooler - Reception',
-                  changes: [
-                    { field: 'filterExpiryDate', oldValue: '2024-12-01', newValue: '2025-03-01' },
-                    { field: 'filtersOn', oldValue: false, newValue: true },
-                  ]
-                },
-                {
-                  id: '3',
-                  action: 'DELETE',
-                  timestamp: new Date(Date.now() - 7200000).toISOString(),
-                  user: 'admin@sgwst.nhs.uk',
-                  assetBarcode: 'ASSET-003',
-                  assetName: 'Old Water Tap - Room 205',
-                  changes: []
-                },
-              ].map((entry, index) => (
-                <Card key={entry.id} shadow="sm" padding="md" radius="md" withBorder>
+              {/* Real data from DynamoDB */}
+              {globalAuditLog.map((entry, index) => (
+                <Card key={`${entry.assetId}-${entry.timestamp}-${index}`} shadow="sm" padding="md" radius="md" withBorder>
                   <Stack gap="xs">
                     <Group justify="space-between">
                       <Group gap="xs">
@@ -4249,7 +4218,7 @@ export default function HomePage() {
                           {entry.action}
                         </Badge>
                         <Text size="sm" fw={500}>
-                          {entry.assetName}
+                          {entry.details?.assetName || 'Unknown Asset'}
                         </Text>
                       </Group>
                       <Text size="xs" c="dimmed">
@@ -4259,16 +4228,16 @@ export default function HomePage() {
                     
                     <Group gap="xs">
                       <Text size="xs" c="dimmed">Asset:</Text>
-                      <Text size="xs" fw={500}>{entry.assetBarcode}</Text>
+                      <Text size="xs" fw={500}>{entry.details?.assetBarcode || 'Unknown'}</Text>
                       <Text size="xs" c="dimmed">•</Text>
                       <Text size="xs" c="dimmed">by {entry.user}</Text>
                     </Group>
 
-                    {entry.changes && entry.changes.length > 0 && (
+                    {entry.details?.changes && entry.details.changes.length > 0 && (
                       <div>
                         <Text size="xs" fw={500} mb="xs" c="dimmed">Changes:</Text>
                         <Stack gap="xs">
-                          {entry.changes.map((change: any, changeIndex: number) => (
+                          {entry.details.changes.map((change: any, changeIndex: number) => (
                             <Paper key={changeIndex} p="xs" bg="gray.0" radius="sm">
                               <Group justify="space-between" wrap="nowrap">
                                 <Text size="xs" fw={500} style={{ minWidth: '80px' }}>
