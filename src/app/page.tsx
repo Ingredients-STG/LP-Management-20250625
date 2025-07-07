@@ -2950,21 +2950,25 @@ export default function HomePage() {
         padding="md"
       >
         <AppShell.Header>
-          <Group h="100%" px="md" justify="space-between">
-            <Group>
+          <Group h="100%" px="md" justify="space-between" className="main-header">
+            <Group className="header-left-section" style={{ flex: 1, minWidth: 0 }}>
               <ActionIcon variant="subtle" onClick={toggle} hiddenFrom="sm" size="sm">
                 <IconMenu2 size={18} />
               </ActionIcon>
-              <Title order={3} c="blue">LP Management System</Title>
+              <div className="title-section">
+                <Title order={3} c="blue" className="main-title">Water Safety Management</Title>
+                <Text size="sm" c="dimmed" className="subtitle">St Georges University Hospital</Text>
+              </div>
             </Group>
             
-            <Group gap="xs">
+            <Group gap="xs" className="header-right-section">
               <ActionIcon
                 variant="light"
                 color="blue"
                 size="lg"
                 onClick={openAuditDrawer}
                 title="System Audit Trail"
+                className="audit-icon"
               >
                 <IconHistory size={18} />
               </ActionIcon>
@@ -2973,12 +2977,13 @@ export default function HomePage() {
                   <Button 
                     variant="subtle" 
                     leftSection={<IconUser size={16} />}
+                    className="username-button"
                     style={{ 
                       minWidth: 'fit-content',
                       maxWidth: 'none'
                     }}
                   >
-                    {user?.email || 'User'}
+                    <span className="username-text">{user?.email || 'User'}</span>
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
@@ -3001,7 +3006,10 @@ export default function HomePage() {
                 variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
                 leftSection={<IconDashboard size={16} />}
                 justify="start"
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => {
+                  setActiveTab('dashboard');
+                  if (opened) toggle(); // Close mobile menu after selection
+                }}
               >
                 Dashboard
               </Button>
@@ -3009,7 +3017,10 @@ export default function HomePage() {
                 variant={activeTab === 'assets' ? 'filled' : 'subtle'}
                 leftSection={<IconDroplet size={16} />}
                 justify="start"
-                onClick={() => setActiveTab('assets')}
+                onClick={() => {
+                  setActiveTab('assets');
+                  if (opened) toggle(); // Close mobile menu after selection
+                }}
               >
                 Assets
               </Button>
@@ -3017,7 +3028,10 @@ export default function HomePage() {
                 variant={activeTab === 'reports' ? 'filled' : 'subtle'}
                 leftSection={<IconReport size={16} />}
                 justify="start"
-                onClick={() => setActiveTab('reports')}
+                onClick={() => {
+                  setActiveTab('reports');
+                  if (opened) toggle(); // Close mobile menu after selection
+                }}
               >
                 Reports
               </Button>
@@ -3025,7 +3039,10 @@ export default function HomePage() {
                 variant={activeTab === 'settings' ? 'filled' : 'subtle'}
                 leftSection={<IconSettings size={16} />}
                 justify="start"
-                onClick={() => setActiveTab('settings')}
+                onClick={() => {
+                  setActiveTab('settings');
+                  if (opened) toggle(); // Close mobile menu after selection
+                }}
               >
                 Settings
               </Button>
