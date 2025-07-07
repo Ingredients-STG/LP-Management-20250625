@@ -1140,10 +1140,17 @@ export default function HomePage() {
         return '';
       };
 
+      // Ensure filter expiry date is calculated if filter installed date is provided
+      let finalFilterExpiryDate = values.filterExpiryDate;
+      if (values.filterInstalledOn && values.filterInstalledOn instanceof Date && !isNaN(values.filterInstalledOn.getTime())) {
+        // Always recalculate expiry date to ensure it's correct
+        finalFilterExpiryDate = calculateFilterExpiry(values.filterInstalledOn);
+      }
+
       const assetData = {
         ...values,
         assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
-        filterExpiryDate: formatDateForAPI(values.filterExpiryDate),
+        filterExpiryDate: formatDateForAPI(finalFilterExpiryDate),
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
       };
 
