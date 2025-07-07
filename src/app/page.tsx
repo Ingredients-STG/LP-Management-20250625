@@ -1142,9 +1142,17 @@ export default function HomePage() {
 
       // Ensure filter expiry date is calculated if filter installed date is provided
       let finalFilterExpiryDate = values.filterExpiryDate;
+      console.log('DEBUG - Add Asset Values:', {
+        filterInstalledOn: values.filterInstalledOn,
+        filterExpiryDate: values.filterExpiryDate,
+        filterInstalledOnType: typeof values.filterInstalledOn,
+        filterExpiryDateType: typeof values.filterExpiryDate
+      });
+      
       if (values.filterInstalledOn && values.filterInstalledOn instanceof Date && !isNaN(values.filterInstalledOn.getTime())) {
         // Always recalculate expiry date to ensure it's correct
         finalFilterExpiryDate = calculateFilterExpiry(values.filterInstalledOn);
+        console.log('DEBUG - Recalculated expiry date:', finalFilterExpiryDate);
       }
 
       const assetData = {
@@ -1153,6 +1161,12 @@ export default function HomePage() {
         filterExpiryDate: formatDateForAPI(finalFilterExpiryDate),
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
       };
+
+      console.log('DEBUG - Asset data being sent to API:', {
+        filterExpiryDate: assetData.filterExpiryDate,
+        filterInstalledOn: assetData.filterInstalledOn,
+        finalFilterExpiryDate: finalFilterExpiryDate
+      });
 
       const response = await fetch('/api/assets', {
         method: 'POST',
@@ -1172,6 +1186,12 @@ export default function HomePage() {
       }
 
       const result = await response.json();
+      
+      console.log('DEBUG - API Response:', {
+        success: result.success,
+        filterExpiryDate: result.data?.filterExpiryDate,
+        filterInstalledOn: result.data?.filterInstalledOn
+      });
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to create asset');
