@@ -139,6 +139,20 @@
 
 /* ✅ COMPREHENSIVE RESPONSIVE UI OVERHAUL */
 
+/* Header username button mobile optimization */
+@media screen and (max-width: 480px) {
+  /* Compact username display in mobile header */
+  .mantine-Button-root[data-variant="subtle"] {
+    max-width: 120px !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+  
+  .mantine-Button-root[data-variant="subtle"] .mantine-Text-root {
+    max-width: 80px !important;
+    font-size: 0.75rem !important;
+  }
+}
+
 /* 📱 MOBILE OPTIMIZATIONS (≤480px) */
 @media screen and (max-width: 480px) {
   /* Minimal padding for edge-to-edge design */

@@ -1142,12 +1142,6 @@ export default function HomePage() {
 
       // Ensure filter expiry date is calculated if filter installed date is provided
       let finalFilterExpiryDate = values.filterExpiryDate;
-      console.log('DEBUG - Add Asset Values:', {
-        filterInstalledOn: values.filterInstalledOn,
-        filterExpiryDate: values.filterExpiryDate,
-        filterInstalledOnType: typeof values.filterInstalledOn,
-        filterExpiryDateType: typeof values.filterExpiryDate
-      });
       
       // Handle both Date objects and date strings
       if (values.filterInstalledOn) {
@@ -1166,7 +1160,6 @@ export default function HomePage() {
         if (installedDate) {
           // Always recalculate expiry date to ensure it's correct
           finalFilterExpiryDate = calculateFilterExpiry(installedDate);
-          console.log('DEBUG - Recalculated expiry date:', finalFilterExpiryDate);
         }
       }
 
@@ -1177,11 +1170,7 @@ export default function HomePage() {
         filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
       };
 
-      console.log('DEBUG - Asset data being sent to API:', {
-        filterExpiryDate: assetData.filterExpiryDate,
-        filterInstalledOn: assetData.filterInstalledOn,
-        finalFilterExpiryDate: finalFilterExpiryDate
-      });
+
 
       const response = await fetch('/api/assets', {
         method: 'POST',
@@ -1201,12 +1190,6 @@ export default function HomePage() {
       }
 
       const result = await response.json();
-      
-      console.log('DEBUG - API Response:', {
-        success: result.success,
-        filterExpiryDate: result.data?.filterExpiryDate,
-        filterInstalledOn: result.data?.filterInstalledOn
-      });
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to create asset');
@@ -2230,6 +2213,17 @@ export default function HomePage() {
               >
                 Export
               </Button>
+              <Button
+                leftSection={<IconHistory size={16} />}
+                variant="outline"
+                color="blue"
+                onClick={openAuditDrawer}
+                size="md"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                className="action-button"
+              >
+                Audit Log
+              </Button>
               <ActionIcon
                 variant="light"
                 color="blue"
@@ -2971,8 +2965,17 @@ export default function HomePage() {
             <Group>
               <Menu>
                 <Menu.Target>
-                  <Button variant="subtle" leftSection={<IconUser size={16} />}>
-                    {user?.email || 'User'}
+                  <Button 
+                    variant="subtle" 
+                    leftSection={<IconUser size={16} />}
+                    style={{ 
+                      maxWidth: '200px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <Text truncate style={{ maxWidth: '150px' }}>
+                      {user?.email || 'User'}
+                    </Text>
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
