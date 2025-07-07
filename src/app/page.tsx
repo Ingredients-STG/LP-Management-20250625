@@ -1149,10 +1149,25 @@ export default function HomePage() {
         filterExpiryDateType: typeof values.filterExpiryDate
       });
       
-      if (values.filterInstalledOn && values.filterInstalledOn instanceof Date && !isNaN(values.filterInstalledOn.getTime())) {
-        // Always recalculate expiry date to ensure it's correct
-        finalFilterExpiryDate = calculateFilterExpiry(values.filterInstalledOn);
-        console.log('DEBUG - Recalculated expiry date:', finalFilterExpiryDate);
+      // Handle both Date objects and date strings
+      if (values.filterInstalledOn) {
+        let installedDate = null;
+        
+        if (values.filterInstalledOn instanceof Date && !isNaN(values.filterInstalledOn.getTime())) {
+          installedDate = values.filterInstalledOn;
+        } else if (typeof values.filterInstalledOn === 'string' && values.filterInstalledOn.trim() !== '') {
+          // Parse string date (could be YYYY-MM-DD or other formats)
+          installedDate = new Date(values.filterInstalledOn);
+          if (isNaN(installedDate.getTime())) {
+            installedDate = null;
+          }
+        }
+        
+        if (installedDate) {
+          // Always recalculate expiry date to ensure it's correct
+          finalFilterExpiryDate = calculateFilterExpiry(installedDate);
+          console.log('DEBUG - Recalculated expiry date:', finalFilterExpiryDate);
+        }
       }
 
       const assetData = {
