@@ -2639,6 +2639,145 @@ export default function HomePage() {
     </Stack>
   );
 
+  const handleSystemReset = () => {
+    modals.openConfirmModal({
+      title: (
+        <Group>
+          <IconAlertTriangle size={20} color="red" />
+          <Text fw={600} c="red">System Reset Confirmation</Text>
+        </Group>
+      ),
+      children: (
+        <Stack gap="md">
+          <Text size="sm">
+            You are about to permanently delete ALL data from the system:
+          </Text>
+          <Box pl="md">
+            <Text size="sm" c="red">• All assets ({assets.length} assets)</Text>
+            <Text size="sm" c="red">• All audit logs</Text>
+            <Text size="sm" c="red">• All uploaded files</Text>
+            <Text size="sm" c="red">• Asset types and filter types</Text>
+          </Box>
+          <Text size="sm" fw={500}>
+            This action CANNOT be undone. The system will be restored to its initial state with only default asset types and filter types.
+          </Text>
+          <Text size="sm" c="dimmed">
+            To confirm, please type: <Text span fw={600} c="red">RESET ALL DATA</Text>
+          </Text>
+        </Stack>
+      ),
+      labels: { confirm: 'I understand, reset system', cancel: 'Cancel' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => {
+        // Open a second modal for final confirmation with text input
+        modals.open({
+          title: (
+            <Group>
+              <IconAlertTriangle size={20} color="red" />
+              <Text fw={600} c="red">Final Confirmation Required</Text>
+            </Group>
+          ),
+          children: (
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              const confirmationText = formData.get('confirmation') as string;
+              
+              if (confirmationText === 'RESET ALL DATA') {
+                executeSystemReset();
+                modals.closeAll();
+              } else {
+                notifications.show({
+                  title: 'Invalid confirmation',
+                  message: 'Please type "RESET ALL DATA" exactly as shown.',
+                  color: 'red',
+                });
+              }
+            }}>
+              <Stack gap="md">
+                <Text size="sm">
+                  Type <Text span fw={600} c="red">RESET ALL DATA</Text> to confirm:
+                </Text>
+                <TextInput
+                  name="confirmation"
+                  placeholder="Type confirmation text here"
+                  required
+                  autoFocus
+                />
+                <Group justify="flex-end" gap="xs">
+                  <Button variant="outline" onClick={() => modals.closeAll()}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" color="red">
+                    Reset System
+                  </Button>
+                </Group>
+              </Stack>
+            </form>
+          ),
+          closeOnClickOutside: false,
+          closeOnEscape: false,
+        });
+      },
+    });
+  };
+
+  const executeSystemReset = async () => {
+    try {
+      setLoading(true);
+      
+      notifications.show({
+        id: 'system-reset',
+        title: 'System Reset in Progress',
+        message: 'Deleting all data... This may take a few moments.',
+        color: 'orange',
+        loading: true,
+        autoClose: false,
+      });
+
+      const response = await fetch('/api/reset-system', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmationText: 'RESET ALL DATA',
+          confirmed: true,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        notifications.update({
+          id: 'system-reset',
+          title: 'System Reset Completed',
+          message: `Successfully reset system. Deleted ${Object.values(result.data.tables).reduce((acc: number, table: any) => acc + table.deleted, 0)} database records and ${result.data.s3.deleted} files.`,
+          color: 'green',
+          loading: false,
+          autoClose: 5000,
+        });
+
+        // Refresh the page data
+        await fetchData();
+      } else {
+        throw new Error(result.error || 'Reset failed');
+      }
+    } catch (error) {
+      console.error('System reset error:', error);
+      notifications.update({
+        id: 'system-reset',
+        title: 'System Reset Failed',
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        color: 'red',
+        loading: false,
+        autoClose: 5000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderSettings = () => (
     <Stack gap="lg">
       <Title order={2}>Settings</Title>
@@ -2921,6 +3060,32 @@ export default function HomePage() {
             defaultValue="Dashboard"
           />
         </Stack>
+      </Card>
+
+      <Card shadow="sm" padding="lg" radius="md" withBorder style={{ borderColor: '#ff6b6b' }}>
+        <Title order={4} mb="md" c="red">
+          <Group>
+            <IconAlertTriangle size={20} />
+            Danger Zone
+          </Group>
+        </Title>
+        <Text size="sm" c="dimmed" mb="md">
+          This action will permanently delete all data from the system. This includes all assets, 
+          audit logs, and uploaded files. The database tables will remain but will be empty.
+        </Text>
+        <Text size="sm" c="red" mb="md" fw={500}>
+          ⚠️ This action cannot be undone. Please make sure you have backups if needed.
+        </Text>
+        
+        <Button
+          color="red"
+          variant="outline"
+          leftSection={<IconTrash size={16} />}
+          onClick={handleSystemReset}
+          size="sm"
+        >
+          Master Reset System
+        </Button>
       </Card>
     </Stack>
   );
