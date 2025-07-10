@@ -48,6 +48,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 import {
   IconDroplet,
   IconFilter,
@@ -89,6 +90,9 @@ import {
   IconScan,
   IconMenu2,
   IconLogout,
+  IconFileSpreadsheet,
+  IconBarcode,
+  IconFileReport,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -222,6 +226,11 @@ export default function HomePage() {
 
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
+  
+  // Bulk Update states
+  const [bulkUpdateFile, setBulkUpdateFile] = useState<File | null>(null);
+  const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
+  const [bulkUpdateResults, setBulkUpdateResults] = useState<any>(null);
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -790,18 +799,19 @@ export default function HomePage() {
   };
 
   // Download template
-  const downloadTemplate = async () => {
+  const downloadTemplate = async (format: 'csv' | 'excel' = 'csv') => {
     try {
-      const response = await fetch('/api/bulk-upload', {
-        method: 'GET',
-      });
+      const response = await fetch(`/api/bulk-upload?format=${format}`);
       
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'asset_template.csv';
+        
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `bulk-upload-template-${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+        
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -809,10 +819,12 @@ export default function HomePage() {
         
         notifications.show({
           title: 'Template Downloaded',
-          message: 'Asset template has been downloaded successfully',
+          message: `Bulk upload template (${format.toUpperCase()}) has been downloaded successfully`,
           color: 'green',
           icon: <IconCheck size={16} />,
         });
+      } else {
+        throw new Error('Failed to download template');
       }
     } catch (error) {
       console.error('Download error:', error);
@@ -822,6 +834,102 @@ export default function HomePage() {
         color: 'red',
         icon: <IconX size={16} />,
       });
+    }
+  };
+
+  // Bulk Update Functions
+  const downloadBulkUpdateTemplate = async (format: 'csv' | 'excel' = 'csv', includeData: boolean = false) => {
+    try {
+      const response = await fetch(`/api/bulk-update-template?format=${format}&includeData=${includeData}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        const dateStr = new Date().toISOString().split('T')[0];
+        const suffix = includeData ? 'with-data' : 'template';
+        a.download = `bulk-update-${suffix}-${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+        
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        notifications.show({
+          title: 'Template Downloaded',
+          message: `Bulk update ${includeData ? 'template with current data' : 'template'} has been downloaded successfully`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      } else {
+        throw new Error('Failed to download template');
+      }
+    } catch (error) {
+      console.error('Error downloading bulk update template:', error);
+      notifications.show({
+        title: 'Download Failed',
+        message: 'Failed to download bulk update template',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleBulkUpdate = async () => {
+    if (!bulkUpdateFile) {
+      notifications.show({
+        title: 'No File Selected',
+        message: 'Please select a file to upload',
+        color: 'orange',
+        icon: <IconExclamationMark size={16} />,
+      });
+      return;
+    }
+
+    setBulkUpdateLoading(true);
+    setBulkUpdateResults(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', bulkUpdateFile);
+
+      const response = await fetch('/api/bulk-update', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setBulkUpdateResults(result.results);
+        
+        // Show success notification
+        notifications.show({
+          title: 'Bulk Update Complete',
+          message: `Updated ${result.results.updated} assets successfully`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+
+        // Refresh data
+        await fetchData();
+        
+        // Clear file input
+        setBulkUpdateFile(null);
+      } else {
+        throw new Error(result.error || 'Bulk update failed');
+      }
+    } catch (error) {
+      console.error('Error during bulk update:', error);
+      notifications.show({
+        title: 'Bulk Update Failed',
+        message: error instanceof Error ? error.message : 'An error occurred during bulk update',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setBulkUpdateLoading(false);
     }
   };
 
@@ -843,6 +951,8 @@ export default function HomePage() {
       filtersOn: 'Filters On',
       filterExpiryDate: 'Filter Expiry Date',
       filterInstalledOn: 'Filter Installed On',
+      filterType: 'Filter Type',
+      needFlushing: 'Needs Flushing',
       notes: 'Notes',
       augmentedCare: 'Augmented Care',
       created: 'Created',
@@ -868,7 +978,16 @@ export default function HomePage() {
         return value;
       }
     }
-    return String(value);
+    // Handle YYYY-MM-DD date format
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      try {
+        const [year, month, day] = value.split('-');
+        return `${day}/${month}/${year}`;
+      } catch {
+        return value;
+      }
+    }
+    return String(value).trim();
   };
 
   /**
@@ -893,6 +1012,20 @@ export default function HomePage() {
     }
     
     return expiry;
+  };
+
+  // Field sanitization function
+  const sanitizeField = (value: any, fieldName: string): any => {
+    if (value === null || value === undefined) return value;
+    
+    const stringValue = String(value).trim();
+    
+    // Special handling for asset barcode - always uppercase
+    if (fieldName === 'assetBarcode') {
+      return stringValue.toUpperCase();
+    }
+    
+    return stringValue;
   };
 
   // Helper function to check filter expiry status
@@ -984,6 +1117,20 @@ export default function HomePage() {
       filterType: '',
       notes: '',
       augmentedCare: false,
+    },
+    validate: {
+      assetBarcode: (value) => {
+        if (!value || value.trim() === '') {
+          return 'Asset barcode is required';
+        }
+        return null;
+      },
+      primaryIdentifier: (value) => {
+        if (!value || value.trim() === '') {
+          return 'Primary identifier is required';
+        }
+        return null;
+      },
     },
   });
 
@@ -1120,6 +1267,12 @@ export default function HomePage() {
 
   const handleAddAsset = async (values: any) => {
     try {
+      // Sanitize all fields
+      const sanitizedValues = { ...values };
+      Object.keys(sanitizedValues).forEach(key => {
+        sanitizedValues[key] = sanitizeField(sanitizedValues[key], key);
+      });
+
       // Helper function to safely convert date to ISO string
       const formatDateForAPI = (dateValue: any) => {
         if (!dateValue) return '';
@@ -1148,17 +1301,17 @@ export default function HomePage() {
       };
 
       // Ensure filter expiry date is calculated if filter installed date is provided
-      let finalFilterExpiryDate = values.filterExpiryDate;
+      let finalFilterExpiryDate = sanitizedValues.filterExpiryDate;
       
       // Handle both Date objects and date strings
-      if (values.filterInstalledOn) {
+      if (sanitizedValues.filterInstalledOn) {
         let installedDate = null;
         
-        if (values.filterInstalledOn instanceof Date && !isNaN(values.filterInstalledOn.getTime())) {
-          installedDate = values.filterInstalledOn;
-        } else if (typeof values.filterInstalledOn === 'string' && values.filterInstalledOn.trim() !== '') {
+        if (sanitizedValues.filterInstalledOn instanceof Date && !isNaN(sanitizedValues.filterInstalledOn.getTime())) {
+          installedDate = sanitizedValues.filterInstalledOn;
+        } else if (typeof sanitizedValues.filterInstalledOn === 'string' && sanitizedValues.filterInstalledOn.trim() !== '') {
           // Parse string date (could be YYYY-MM-DD or other formats)
-          installedDate = new Date(values.filterInstalledOn);
+          installedDate = new Date(sanitizedValues.filterInstalledOn);
           if (isNaN(installedDate.getTime())) {
             installedDate = null;
           }
@@ -1171,10 +1324,9 @@ export default function HomePage() {
       }
 
       const assetData = {
-        ...values,
-        assetBarcode: values.assetBarcode || `AUTO-${Date.now()}`,
+        ...sanitizedValues,
         filterExpiryDate: formatDateForAPI(finalFilterExpiryDate),
-        filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
+        filterInstalledOn: formatDateForAPI(sanitizedValues.filterInstalledOn),
       };
 
 
@@ -1281,6 +1433,12 @@ export default function HomePage() {
         throw new Error('No asset selected for update');
       }
 
+      // Sanitize all fields
+      const sanitizedValues = { ...values };
+      Object.keys(sanitizedValues).forEach(key => {
+        sanitizedValues[key] = sanitizeField(sanitizedValues[key], key);
+      });
+
       // Helper function to safely convert date to ISO string
       const formatDateForAPI = (dateValue: any) => {
         if (!dateValue) return '';
@@ -1302,7 +1460,7 @@ export default function HomePage() {
       };
 
       // Always recalculate expiry date from installed date
-      let installedDateObj = values.filterInstalledOn;
+      let installedDateObj = sanitizedValues.filterInstalledOn;
       if (typeof installedDateObj === 'string' && installedDateObj.includes('/')) {
         const [day, month, year] = installedDateObj.split('/');
         installedDateObj = new Date(`${year}-${month}-${day}`);
@@ -1339,9 +1497,9 @@ export default function HomePage() {
       }
 
       const updateData = {
-        ...values,
+        ...sanitizedValues,
         filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
-        filterInstalledOn: formatDateForAPI(values.filterInstalledOn),
+        filterInstalledOn: formatDateForAPI(sanitizedValues.filterInstalledOn),
         attachments: [...(selectedAsset?.attachments || []), ...newAttachments], // Merge existing and new attachments
         modifiedBy: user?.email || user?.username || 'Unknown User',
       };
@@ -1565,26 +1723,135 @@ export default function HomePage() {
     });
   };
 
-  const exportData = () => {
-    const csvContent = [
-      Object.keys(filteredAssets[0] || {}).join(','),
-      ...filteredAssets.map(asset => Object.values(asset).join(','))
-    ].join('\n');
+  const exportData = (format: 'csv' | 'excel' = 'csv') => {
+    if (filteredAssets.length === 0) {
+      notifications.show({
+        title: 'No Data',
+        message: 'No assets to export',
+        color: 'orange',
+        icon: <IconExclamationMark size={16} />,
+      });
+      return;
+    }
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `assets-export-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      // Define all possible fields in the order we want them exported
+      const allFields = [
+        'assetBarcode',
+        'primaryIdentifier', 
+        'secondaryIdentifier',
+        'assetType',
+        'status',
+        'wing',
+        'wingInShort',
+        'room',
+        'floor',
+        'floorInWords',
+        'roomNo',
+        'roomName',
+        'filterNeeded',
+        'filtersOn',
+        'filterInstalledOn',
+        'filterExpiryDate',
+        'filterType',
+        'needFlushing',
+        'notes',
+        'augmentedCare',
+        'created',
+        'createdBy',
+        'modified',
+        'modifiedBy'
+      ];
 
-    notifications.show({
-      title: 'Success',
-      message: 'Data exported successfully!',
-      color: 'green',
-      icon: <IconDownload size={16} />,
-    });
+      // Create headers with user-friendly names
+      const headers = allFields.map(field => getFieldDisplayName(field));
+      
+      // Format data for export
+      const exportData = filteredAssets.map(asset => {
+        return allFields.map(field => {
+          const value = asset[field as keyof Asset];
+          const formattedValue = formatValue(value);
+          // Special handling for asset barcode - always uppercase and trimmed
+          if (field === 'assetBarcode') {
+            return formattedValue.toString().trim().toUpperCase();
+          }
+          return formattedValue;
+        });
+      });
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      
+      if (format === 'excel') {
+        // Create Excel workbook
+        const workbook = XLSX.utils.book_new();
+        
+        // Create worksheet data with headers
+        const worksheetData = [headers, ...exportData];
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        
+        // Set column widths for better readability
+        const columnWidths = headers.map(header => ({ 
+          width: Math.max(header.length, 15) 
+        }));
+        worksheet['!cols'] = columnWidths;
+        
+        // Add the worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+        
+        // Generate Excel file
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        const blob = new Blob([buffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `assets-export-${dateStr}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+      } else {
+        // Create CSV
+        const csvContent = [
+          headers.join(','),
+          ...exportData.map(row => 
+            row.map(cell => {
+              // Escape cells that contain commas, quotes, or newlines
+              const cellStr = String(cell);
+              if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                return `"${cellStr.replace(/"/g, '""')}"`;
+              }
+              return cellStr;
+            }).join(',')
+          )
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `assets-export-${dateStr}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      notifications.show({
+        title: 'Export Successful',
+        message: `${filteredAssets.length} assets exported as ${format.toUpperCase()}`,
+        color: 'green',
+        icon: <IconDownload size={16} />,
+      });
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      notifications.show({
+        title: 'Export Failed',
+        message: 'Failed to export data',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -2210,16 +2477,34 @@ export default function HomePage() {
               >
                 Refresh
               </Button>
-              <Button
-                leftSection={<IconDownload size={16} />}
-                variant="outline"
-                onClick={exportData}
-                size="md"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button"
-              >
-                Export
-              </Button>
+              <Menu shadow="md" width={200}>
+                <Menu.Target>
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    variant="outline"
+                    rightSection={<IconChevronDown size={16} />}
+                    size="md"
+                    style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                    className="action-button"
+                  >
+                    Export
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item
+                    leftSection={<IconFileText size={16} />}
+                    onClick={() => exportData('csv')}
+                  >
+                    Export as CSV
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconFileSpreadsheet size={16} />}
+                    onClick={() => exportData('excel')}
+                  >
+                    Export as Excel
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
               <ActionIcon
                 variant="light"
                 color="blue"
@@ -2778,15 +3063,20 @@ export default function HomePage() {
     }
   };
 
-  const renderSettings = () => (
+  const renderBulkUpdate = () => (
     <Stack gap="lg">
-      <Title order={2}>Settings</Title>
-      <Text c="dimmed">Configure your water asset management system.</Text>
+      <Title order={2}>Bulk Update Assets</Title>
+      <Text c="dimmed">Update multiple assets at once using a CSV or Excel file with your modifications.</Text>
       
       <Card shadow="sm" padding="lg" radius="md" withBorder>
-        <Title order={4} mb="md">Bulk Upload Assets</Title>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconFileSpreadsheet size={20} />
+            Download Template
+          </Group>
+        </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Upload multiple assets at once using a CSV or Excel file. Download the template to get started.
+          Download a template with all asset fields. You can choose to include current data or get an empty template.
         </Text>
         
         <Stack gap="md">
@@ -2794,13 +3084,276 @@ export default function HomePage() {
             <Button
               leftSection={<IconDownload size={16} />}
               variant="outline"
-              onClick={downloadTemplate}
+              onClick={() => downloadBulkUpdateTemplate('csv', false)}
               size="sm"
             >
-              <Text visibleFrom="sm">Download Template</Text>
-              <Text hiddenFrom="sm">Template</Text>
+              Empty Template (CSV)
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              onClick={() => downloadBulkUpdateTemplate('excel', false)}
+              size="sm"
+            >
+              Empty Template (Excel)
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="filled"
+              onClick={() => downloadBulkUpdateTemplate('csv', true)}
+              size="sm"
+            >
+              With Current Data (CSV)
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="filled"
+              onClick={() => downloadBulkUpdateTemplate('excel', true)}
+              size="sm"
+            >
+              With Current Data (Excel)
             </Button>
           </Group>
+          
+          <Text size="xs" c="dimmed">
+            <strong>Tip:</strong> Download "With Current Data" to get a pre-filled template with all your existing assets. 
+            You can then modify only the fields you want to update and upload the file back.
+          </Text>
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconUpload size={20} />
+            Upload Updated Data
+          </Group>
+        </Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Upload your modified CSV or Excel file to update assets. The system will identify assets by their barcode and update the provided fields.
+        </Text>
+        
+        <Stack gap="md">
+          <FileInput
+            label="Select CSV/Excel file"
+            placeholder="Choose file to upload"
+            value={bulkUpdateFile}
+            onChange={setBulkUpdateFile}
+            accept=".csv,.xlsx,.xls"
+            leftSection={<IconUpload size={16} />}
+          />
+          
+          <Group wrap="wrap" gap="xs">
+            <Button
+              leftSection={<IconUpload size={16} />}
+              onClick={handleBulkUpdate}
+              loading={bulkUpdateLoading}
+              disabled={!bulkUpdateFile}
+              size="sm"
+            >
+              Update Assets
+            </Button>
+            {bulkUpdateFile && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkUpdateFile(null);
+                  setBulkUpdateResults(null);
+                }}
+                size="sm"
+              >
+                Clear
+              </Button>
+            )}
+          </Group>
+          
+          {bulkUpdateResults && (
+            <Card withBorder p="md" bg="gray.0">
+              <Title order={5} mb="sm">Update Results</Title>
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text size="sm">Total Records:</Text>
+                  <Badge color="blue">{bulkUpdateResults.total}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Successfully Updated:</Text>
+                  <Badge color="green">{bulkUpdateResults.updated}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Assets Not Found:</Text>
+                  <Badge color="orange">{bulkUpdateResults.notFound}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Errors:</Text>
+                  <Badge color="red">{bulkUpdateResults.errors}</Badge>
+                </Group>
+                
+                {bulkUpdateResults.newAssetTypes && bulkUpdateResults.newAssetTypes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="green">Auto-Created Asset Types:</Text>
+                    <Group gap="xs">
+                      {bulkUpdateResults.newAssetTypes.map((type: string, index: number) => (
+                        <Badge key={index} color="green" variant="light" size="sm">
+                          {type}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
+                {bulkUpdateResults.newFilterTypes && bulkUpdateResults.newFilterTypes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="green">Auto-Created Filter Types:</Text>
+                    <Group gap="xs">
+                      {bulkUpdateResults.newFilterTypes.map((type: string, index: number) => (
+                        <Badge key={index} color="green" variant="light" size="sm">
+                          {type}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
+                {bulkUpdateResults.notFoundBarcodes && bulkUpdateResults.notFoundBarcodes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="orange">Assets Not Found (Barcodes):</Text>
+                    <Group gap="xs">
+                      {bulkUpdateResults.notFoundBarcodes.map((barcode: string, index: number) => (
+                        <Badge key={index} color="orange" variant="light" size="sm">
+                          {barcode}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
+                {bulkUpdateResults.errorDetails && bulkUpdateResults.errorDetails.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="red">Error Details:</Text>
+                    <Stack gap="xs">
+                      {bulkUpdateResults.errorDetails.map((error: string, index: number) => (
+                        <Text key={index} size="xs" c="red" bg="red.0" p="xs" style={{ borderRadius: 4 }}>
+                          {error}
+                        </Text>
+                      ))}
+                    </Stack>
+                  </div>
+                )}
+              </Stack>
+            </Card>
+          )}
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconInfoCircle size={20} />
+            How It Works
+          </Group>
+        </Title>
+        <Stack gap="md">
+          <div>
+            <Text size="sm" fw={500} mb="xs">1. Download Template</Text>
+            <Text size="xs" c="dimmed">
+              Download a template with all asset fields. Choose "With Current Data" to get pre-filled data that you can modify.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">2. Modify Data</Text>
+            <Text size="xs" c="dimmed">
+              Edit the CSV/Excel file with your changes. You only need to fill in the fields you want to update. 
+              The Asset Barcode column is required to identify each asset.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">3. Upload File</Text>
+            <Text size="xs" c="dimmed">
+              Upload your modified file. The system will identify assets by barcode and update only the provided fields.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">4. Review Results</Text>
+            <Text size="xs" c="dimmed">
+              Check the results to see how many assets were updated successfully and any errors that occurred.
+            </Text>
+          </div>
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconAlertTriangle size={20} />
+            Important Notes
+          </Group>
+        </Title>
+        <Stack gap="sm">
+          <Text size="xs" c="dimmed">
+            • <strong>Asset Barcode</strong> is required to identify each asset for updates
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Only fill in fields you want to update - empty fields will be ignored
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Date fields should be in DD/MM/YYYY format
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Boolean fields accept: TRUE/FALSE, YES/NO, 1/0
+          </Text>
+          <Text size="xs" c="dimmed">
+            • New Asset Types and Filter Types will be created automatically
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Assets with non-matching barcodes will be reported as "Not Found"
+          </Text>
+        </Stack>
+      </Card>
+    </Stack>
+  );
+
+  const renderSettings = () => (
+    <Stack gap="lg">
+      <Title order={2}>Settings</Title>
+      <Text c="dimmed">Configure your water asset management system.</Text>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconPlus size={20} />
+            Bulk Upload New Assets
+          </Group>
+        </Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Create multiple new assets at once using a CSV or Excel file. Download the template to get started with the correct format.
+        </Text>
+        
+        <Stack gap="md">
+          <Group wrap="wrap">
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              onClick={() => downloadTemplate('csv')}
+              size="sm"
+            >
+              Download Template (CSV)
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              onClick={() => downloadTemplate('excel')}
+              size="sm"
+            >
+              Download Template (Excel)
+            </Button>
+          </Group>
+          
+          <Text size="xs" c="dimmed">
+            <strong>Tip:</strong> Download the template (CSV or Excel) to see the exact format required for bulk uploading new assets.
+          </Text>
           
           <FileInput
             label="Select CSV/Excel file"
@@ -2819,8 +3372,7 @@ export default function HomePage() {
               disabled={!uploadFile}
               size="sm"
             >
-              <Text visibleFrom="sm">Upload Assets</Text>
-              <Text hiddenFrom="sm">Upload</Text>
+              Upload New Assets
             </Button>
             {uploadFile && (
               <Button
@@ -2845,7 +3397,7 @@ export default function HomePage() {
                   <Badge color="blue">{uploadResults.total}</Badge>
                 </Group>
                 <Group justify="space-between">
-                  <Text size="sm">Successfully Uploaded:</Text>
+                  <Text size="sm">Successfully Created:</Text>
                   <Badge color="green">{uploadResults.success}</Badge>
                 </Group>
                 <Group justify="space-between">
@@ -2881,7 +3433,7 @@ export default function HomePage() {
                 
                 {uploadResults.errors && uploadResults.errors.length > 0 && (
                   <div>
-                    <Text size="sm" fw={500} mt="md" mb="xs" c="red">Errors:</Text>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="red">Error Details:</Text>
                     <Stack gap="xs">
                       {uploadResults.errors.map((error: string, index: number) => (
                         <Text key={index} size="xs" c="red" bg="red.0" p="xs" style={{ borderRadius: 4 }}>
@@ -2894,6 +3446,73 @@ export default function HomePage() {
               </Stack>
             </Card>
           )}
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconInfoCircle size={20} />
+            Bulk Upload Guide
+          </Group>
+        </Title>
+        <Stack gap="md">
+          <div>
+            <Text size="sm" fw={500} mb="xs">1. Download Template</Text>
+            <Text size="xs" c="dimmed">
+              Download the CSV or Excel template to see the exact format and required fields for creating new assets.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">2. Fill Asset Data</Text>
+            <Text size="xs" c="dimmed">
+              Complete the template with your asset information. All required fields must be filled to create assets successfully.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">3. Upload File</Text>
+            <Text size="xs" c="dimmed">
+              Upload your completed CSV or Excel file. The system will create new assets and validate all data.
+            </Text>
+          </div>
+          
+          <div>
+            <Text size="sm" fw={500} mb="xs">4. Review Results</Text>
+            <Text size="xs" c="dimmed">
+              Check the results to see how many assets were created successfully and any errors that occurred.
+            </Text>
+          </div>
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconAlertTriangle size={20} />
+            Important Notes
+          </Group>
+        </Title>
+        <Stack gap="sm">
+          <Text size="xs" c="dimmed">
+            • <strong>Asset Barcode</strong> must be unique - duplicates will be rejected
+          </Text>
+          <Text size="xs" c="dimmed">
+            • <strong>Primary Identifier</strong> is required for all assets
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Date fields should be in DD/MM/YYYY format
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Boolean fields accept: TRUE/FALSE, YES/NO, 1/0
+          </Text>
+          <Text size="xs" c="dimmed">
+            • New Asset Types will be created automatically if they don't exist
+          </Text>
+          <Text size="xs" c="dimmed">
+            • Filter expiry dates are auto-calculated when installation date is provided
+          </Text>
         </Stack>
       </Card>
       
@@ -3201,6 +3820,17 @@ export default function HomePage() {
                 Reports
               </Button>
               <Button
+                variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
+                leftSection={<IconUpload size={16} />}
+                justify="start"
+                onClick={() => {
+                  setActiveTab('bulk-update');
+                  if (opened) toggle(); // Close mobile menu after selection
+                }}
+              >
+                Bulk Update
+              </Button>
+              <Button
                 variant={activeTab === 'settings' ? 'filled' : 'subtle'}
                 leftSection={<IconSettings size={16} />}
                 justify="start"
@@ -3286,6 +3916,7 @@ export default function HomePage() {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'assets' && renderAssets()}
             {activeTab === 'reports' && renderReports()}
+            {activeTab === 'bulk-update' && renderBulkUpdate()}
             {activeTab === 'settings' && renderSettings()}
           </div>
         </AppShell.Main>
@@ -3311,6 +3942,7 @@ export default function HomePage() {
                     label="Asset Barcode"
                     placeholder="Enter barcode"
                     inputMode="text"
+                    required
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>
@@ -3614,6 +4246,7 @@ export default function HomePage() {
                   <TextInput
                     label="Asset Barcode"
                     placeholder="Enter barcode"
+                    required
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>

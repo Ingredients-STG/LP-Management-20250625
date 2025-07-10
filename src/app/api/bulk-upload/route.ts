@@ -69,6 +69,20 @@ function parseBoolField(val: string | undefined): boolean {
   return ['YES', 'TRUE', '1', 'Y'].includes(val.trim().toUpperCase());
 }
 
+// Field sanitization function
+function sanitizeField(value: any, fieldName: string): any {
+  if (value === null || value === undefined) return value;
+  
+  const stringValue = String(value).trim();
+  
+  // Special handling for asset barcode - always uppercase
+  if (fieldName === 'assetBarcode') {
+    return stringValue.toUpperCase();
+  }
+  
+  return stringValue;
+}
+
 // Strict DD/MM/YYYY date parsing (copied from csv-upload)
 function parseExcelDate(value: any, rowNum?: number): { date?: string; error?: string } {
   if (!value) return { date: undefined };
@@ -194,10 +208,10 @@ export async function POST(request: NextRequest) {
       try {
         // Extract and validate required fields
         const assetBarcodeRaw = values[headerMapping.assetBarcode] || '';
-        const assetBarcode = String(assetBarcodeRaw).trim();
+        const assetBarcode = sanitizeField(assetBarcodeRaw, 'assetBarcode');
         
         const roomRaw = values[headerMapping.room] || '';
-        const room = String(roomRaw).trim();
+        const room = sanitizeField(roomRaw, 'room');
         
         const filterNeededRaw = values[headerMapping.filterNeeded] || '';
         // Use robust boolean parsing
@@ -361,7 +375,8 @@ export async function POST(request: NextRequest) {
 
         optionalFields.forEach(fieldName => {
           if (fieldName in headerMapping) {
-            const value = String(values[headerMapping[fieldName]] || '').trim();
+            const rawValue = values[headerMapping[fieldName]] || '';
+            const value = sanitizeField(rawValue, fieldName);
             if (value && value !== 'null' && value !== 'undefined') {
               
               // Handle special field types
@@ -412,9 +427,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Generate updated CSV template with only required fields marked
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get('format') || 'csv'; // csv or excel
+
+    // Generate template with only required fields marked
     const headers = [
       'assetBarcode*',      // Required
       'room*',              // Required  
@@ -442,7 +460,7 @@ export async function GET() {
       'B30674',           // assetBarcode* (required)
       'Room 101',         // room* (required)
       'YES',              // filterNeeded* (required - YES/NO)
-      '2024-10-01',       // filterInstalledOn (required if filterNeeded=YES)
+      '01/01/2024',       // filterInstalledOn (DD/MM/YYYY format)
       'Water Tap',        // assetType (optional - will auto-create)
       'TAP001',           // primaryIdentifier (optional)
       'SEC001',           // secondaryIdentifier (optional)
@@ -460,14 +478,45 @@ export async function GET() {
       'NO'                // augmentedCare (optional)
     ];
 
-    const csvContent = headers.join(',') + '\n' + sampleData.join(',');
+    if (format === 'excel') {
+      // Create Excel workbook
+      const workbook = XLSX.utils.book_new();
+      
+      // Create worksheet data
+      const worksheetData = [headers, sampleData];
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+      
+      // Set column widths for better readability
+      const columnWidths = headers.map(header => ({ width: Math.max(header.length, 15) }));
+      worksheet['!cols'] = columnWidths;
+      
+      // Add the worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+      
+      // Generate Excel file
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const filename = `bulk-upload-template-${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Length': buffer.length.toString(),
+        },
+      });
+    } else {
+      // Generate CSV
+      const csvContent = headers.join(',') + '\n' + sampleData.join(',');
+      const filename = `bulk-upload-template-${new Date().toISOString().split('T')[0]}.csv`;
 
-    return new NextResponse(csvContent, {
-      headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': 'attachment; filename="asset_bulk_upload_template.csv"'
-      }
-    });
+      return new NextResponse(csvContent, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="${filename}"`
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Template generation error:', error);

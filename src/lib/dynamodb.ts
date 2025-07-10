@@ -111,9 +111,39 @@ export class DynamoDBService {
     }
   }
 
+  // Check if asset barcode already exists
+  static async getAssetByBarcode(assetBarcode: string): Promise<Asset | null> {
+    try {
+      const command = new ScanCommand({
+        TableName: TABLE_NAME,
+        FilterExpression: 'assetBarcode = :barcode',
+        ExpressionAttributeValues: {
+          ':barcode': assetBarcode,
+        },
+      });
+      
+      const result = await dynamodb.send(command);
+      return result.Items && result.Items.length > 0 ? result.Items[0] as Asset : null;
+    } catch (error) {
+      console.error('Error checking asset barcode:', error);
+      throw error;
+    }
+  }
+
   // Create new asset
   static async createAsset(asset: Omit<Asset, 'id' | 'created' | 'modified'>): Promise<Asset> {
     try {
+      // Validate required fields
+      if (!asset.assetBarcode || asset.assetBarcode.trim() === '') {
+        throw new Error('Asset barcode is required');
+      }
+
+      // Check if asset barcode already exists
+      const existingAsset = await this.getAssetByBarcode(asset.assetBarcode);
+      if (existingAsset) {
+        throw new Error(`Asset with barcode "${asset.assetBarcode}" already exists`);
+      }
+
       const now = new Date().toISOString();
       const newAsset: Asset = {
         ...asset,
@@ -138,6 +168,18 @@ export class DynamoDBService {
   // Update existing asset
   static async updateAsset(id: string, updates: Partial<Asset>): Promise<Asset> {
     try {
+      // If asset barcode is being updated, check for duplicates
+      if (updates.assetBarcode) {
+        if (updates.assetBarcode.trim() === '') {
+          throw new Error('Asset barcode cannot be empty');
+        }
+        
+        const existingAsset = await this.getAssetByBarcode(updates.assetBarcode);
+        if (existingAsset && existingAsset.id !== id) {
+          throw new Error(`Asset with barcode "${updates.assetBarcode}" already exists`);
+        }
+      }
+
       const now = new Date().toISOString();
       const updateExpression = [];
       const expressionAttributeNames: { [key: string]: string } = {};
