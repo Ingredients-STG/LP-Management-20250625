@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs
+*.log
+server.log
+
+# test files
+test_*.csv
+sample_*_test.csv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# temporary files
+*.tmp
+*.temp
