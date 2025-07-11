@@ -54,12 +54,27 @@ export async function GET(request: NextRequest) {
     let assets: any[] = [];
     
     if (includeData) {
-      const scanCommand = new ScanCommand({
-        TableName: ASSETS_TABLE,
-      });
+      let lastEvaluatedKey: any = undefined;
       
-      const result = await ddbClient.send(scanCommand);
-      assets = result.Items || [];
+      do {
+        const scanCommand = new ScanCommand({
+          TableName: ASSETS_TABLE,
+          ExclusiveStartKey: lastEvaluatedKey,
+          Limit: 100 // Process in batches to avoid memory issues
+        });
+        
+        const result = await ddbClient.send(scanCommand);
+        
+        if (result.Items && result.Items.length > 0) {
+          assets.push(...result.Items);
+          console.log(`Fetched ${result.Items.length} assets for template (total so far: ${assets.length})`);
+        }
+        
+        lastEvaluatedKey = result.LastEvaluatedKey;
+        
+      } while (lastEvaluatedKey);
+      
+      console.log(`Total assets fetched for template: ${assets.length}`);
     }
 
     // Define all possible columns based on the asset schema

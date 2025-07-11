@@ -182,25 +182,57 @@ export async function POST(req: NextRequest) {
     };
 
     // Get existing assets to check for duplicates
-    const existingAssets = await ddbClient.send(new ScanCommand({
-      TableName: ASSETS_TABLE,
-      ProjectionExpression: 'assetBarcode'
-    }));
+    const existingBarcodes = new Set<string>();
+    let lastEvaluatedKey: any = undefined;
     
-    const existingBarcodes = new Set(
-      existingAssets.Items?.map(item => item.assetBarcode?.toLowerCase()) || []
-    );
+    do {
+      const scanCommand = new ScanCommand({
+        TableName: ASSETS_TABLE,
+        ProjectionExpression: 'assetBarcode',
+        ExclusiveStartKey: lastEvaluatedKey,
+        Limit: 100
+      });
+      
+      const result = await ddbClient.send(scanCommand);
+      
+      if (result.Items && result.Items.length > 0) {
+        result.Items.forEach(item => {
+          if (item.assetBarcode) {
+            existingBarcodes.add(item.assetBarcode.toLowerCase());
+          }
+        });
+      }
+      
+      lastEvaluatedKey = result.LastEvaluatedKey;
+      
+    } while (lastEvaluatedKey);
 
     // Get existing asset types
-    const existingAssetTypes = await ddbClient.send(new ScanCommand({
-      TableName: ASSET_TYPES_TABLE,
-      ProjectionExpression: '#label',
-      ExpressionAttributeNames: { '#label': 'label' }
-    }));
+    const existingTypeLabels = new Set<string>();
+    lastEvaluatedKey = undefined;
     
-    const existingTypeLabels = new Set(
-      existingAssetTypes.Items?.map(item => item.label) || []
-    );
+    do {
+      const scanCommand = new ScanCommand({
+        TableName: ASSET_TYPES_TABLE,
+        ProjectionExpression: '#label',
+        ExpressionAttributeNames: { '#label': 'label' },
+        ExclusiveStartKey: lastEvaluatedKey,
+        Limit: 100
+      });
+      
+      const result = await ddbClient.send(scanCommand);
+      
+      if (result.Items && result.Items.length > 0) {
+        result.Items.forEach(item => {
+          if (item.label) {
+            existingTypeLabels.add(item.label);
+          }
+        });
+      }
+      
+      lastEvaluatedKey = result.LastEvaluatedKey;
+      
+    } while (lastEvaluatedKey);
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];

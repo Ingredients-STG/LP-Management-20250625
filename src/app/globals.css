@@ -1084,6 +1084,168 @@ div.action-button {
   align-items: center;
 }
 
+/* Hamburger Navigation Improvements */
+.main-header {
+  position: relative;
+  z-index: 1000;
+}
+
+.header-left-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.main-title {
+  font-size: 1.1rem;
+  line-height: 1.2;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtitle {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 1rem;
+  }
+  
+  .subtitle {
+    font-size: 0.7rem;
+  }
+}
+
+/* Mobile Navigation Drawer */
+.mantine-Drawer-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Improved Tab Container */
+.tab-container-card {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: white;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.tab-container-card .mantine-ScrollArea-root {
+  overflow-x: auto;
+}
+
+/* Collapsible Navigation */
+.mantine-Collapse-root {
+  transition: all 0.2s ease;
+}
+
+/* Navigation expanded state */
+.nav-expanded {
+  margin-bottom: 1rem;
+}
+
+/* Sidebar collapsed state - more space for content */
+.mantine-AppShell-main {
+  transition: margin-left 0.3s ease;
+}
+
+/* When sidebar is collapsed, main content gets full width */
+.sidebar-collapsed .mantine-AppShell-main {
+  margin-left: 0 !important;
+}
+
+/* Responsive Navigation Buttons */
+.nav-button {
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.nav-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure all tabs are visible on mobile */
+@media (max-width: 640px) {
+  .tab-container-card .mantine-Group-root {
+    justify-content: flex-start !important;
+    gap: 0.5rem !important;
+  }
+  
+  .tab-container-card .mantine-Button-root {
+    min-width: 80px !important;
+    font-size: 0.8rem !important;
+    padding: 0.4rem 0.6rem !important;
+  }
+}
+
+/* Mobile-first responsive design */
+@media (max-width: 480px) {
+  .header-right-section {
+    gap: 0.25rem;
+  }
+  
+  .username-button {
+    max-width: 120px;
+  }
+  
+  .username-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Improved mobile table scrolling */
+.asset-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Better mobile form experience */
+@media (max-width: 768px) {
+  .mantine-Modal-content {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+  }
+  
+  .mantine-Modal-body {
+    padding: 1rem;
+  }
+}
+
+/* Accessibility improvements */
+.nav-button:focus {
+  outline: 2px solid #339af0;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+.main-shell {
+  transition: all 0.3s ease;
+}
+
+.responsive-container {
+  transition: all 0.3s ease;
+}
+
 .action-button, .scan-button {
   min-height: 44px !important;
   min-width: 44px !important;
@@ -1142,4 +1304,96 @@ div.action-button {
 .dashboard-charts-row .chart-card {
   width: 100%;
   max-width: 600px;
+}
+
+/* Modern Barcode Scanner Styles */
+#qr-reader {
+  width: 100% !important;
+  min-height: 400px !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+#qr-reader video {
+  border-radius: 8px !important;
+  object-fit: cover !important;
+}
+
+#qr-reader__camera_selection {
+  margin-bottom: 10px !important;
+}
+
+#qr-reader__camera_permission_button {
+  background: linear-gradient(45deg, #1976d2, #42a5f5) !important;
+  border: none !important;
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  color: white !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+#qr-reader__camera_permission_button:hover {
+  background: linear-gradient(45deg, #1565c0, #1976d2) !important;
+  transform: translateY(-2px) !important;
+}
+
+#qr-reader__dashboard_section {
+  padding: 16px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  margin-bottom: 16px !important;
+}
+
+#qr-reader__dashboard_section_csr {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  justify-content: center !important;
+}
+
+#qr-reader__dashboard_section_csr > button {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+#qr-reader__dashboard_section_csr > button:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+#qr-reader__scan_region {
+  border: 2px solid #00ff00 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+  #qr-reader {
+    min-height: 60vh !important;
+  }
+  
+  #qr-reader__dashboard_section {
+    padding: 12px !important;
+  }
+  
+  #qr-reader__dashboard_section_csr > button {
+    padding: 10px 16px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* Tablet specific styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #qr-reader {
+    min-height: 50vh !important;
+  }
 }

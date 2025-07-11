@@ -375,9 +375,12 @@ export async function POST(request: NextRequest) {
 
         optionalFields.forEach(fieldName => {
           if (fieldName in headerMapping) {
-            const rawValue = values[headerMapping[fieldName]] || '';
+            const rawValue = values[headerMapping[fieldName]];
             const value = sanitizeField(rawValue, fieldName);
-            if (value && value !== 'null' && value !== 'undefined') {
+            
+            // Check if value is meaningful (not null, undefined, empty string, or literal 'null'/'undefined')
+            // But allow "0" as a valid value
+            if (value !== null && value !== undefined && value !== '' && value !== 'null' && value !== 'undefined') {
               
               // Handle special field types
               if (fieldName === 'filtersOn' || fieldName === 'augmentedCare') {

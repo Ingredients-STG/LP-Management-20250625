@@ -39,35 +39,50 @@ async function clearTable(tableName: string, keySchema: { name: string; type: 'H
   try {
     console.log(`Clearing table: ${tableName}`);
     
-    // Scan to get all items
-    const scanCommand = new ScanCommand({
-      TableName: tableName,
-    });
+    let totalDeleted = 0;
+    let lastEvaluatedKey: any = undefined;
     
-    const result = await ddbClient.send(scanCommand);
-    
-    if (!result.Items || result.Items.length === 0) {
-      console.log(`Table ${tableName} is already empty`);
-      return { deleted: 0 };
-    }
-    
-    // Delete items in batches
-    const deletePromises = result.Items.map(item => {
-      const key: any = {};
-      keySchema.forEach(keyDef => {
-        key[keyDef.name] = item[keyDef.name];
+    do {
+      // Scan to get items with pagination
+      const scanCommand = new ScanCommand({
+        TableName: tableName,
+        ExclusiveStartKey: lastEvaluatedKey,
+        Limit: 100 // Process in smaller batches to avoid timeouts
       });
       
-      return ddbClient.send(new DeleteCommand({
-        TableName: tableName,
-        Key: key
-      }));
-    });
+      const result = await ddbClient.send(scanCommand);
+      
+      if (!result.Items || result.Items.length === 0) {
+        console.log(`No more items found in ${tableName}`);
+        break;
+      }
+      
+      console.log(`Found ${result.Items.length} items in ${tableName} (batch)`);
+      
+      // Delete items in batches
+      const deletePromises = result.Items.map(item => {
+        const key: any = {};
+        keySchema.forEach(keyDef => {
+          key[keyDef.name] = item[keyDef.name];
+        });
+        
+        return ddbClient.send(new DeleteCommand({
+          TableName: tableName,
+          Key: key
+        }));
+      });
+      
+      await Promise.all(deletePromises);
+      
+      totalDeleted += result.Items.length;
+      lastEvaluatedKey = result.LastEvaluatedKey;
+      
+      console.log(`Deleted ${result.Items.length} items from ${tableName} (total so far: ${totalDeleted})`);
+      
+    } while (lastEvaluatedKey);
     
-    await Promise.all(deletePromises);
-    
-    console.log(`Deleted ${result.Items.length} items from ${tableName}`);
-    return { deleted: result.Items.length };
+    console.log(`Completed clearing ${tableName}. Total deleted: ${totalDeleted}`);
+    return { deleted: totalDeleted };
     
   } catch (error) {
     console.error(`Error clearing table ${tableName}:`, error);

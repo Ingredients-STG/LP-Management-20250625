@@ -77,13 +77,29 @@ export class DynamoDBService {
     try {
       console.log('Fetching all assets from DynamoDB table:', TABLE_NAME);
       
-      const command = new ScanCommand({
-        TableName: TABLE_NAME,
-      });
+      const allAssets: Asset[] = [];
+      let lastEvaluatedKey: any = undefined;
       
-      const result = await dynamodb.send(command);
-      console.log(`Found ${result.Items?.length || 0} assets`);
-      return result.Items as Asset[] || [];
+      do {
+        const command = new ScanCommand({
+          TableName: TABLE_NAME,
+          ExclusiveStartKey: lastEvaluatedKey,
+          Limit: 100 // Process in batches to avoid memory issues
+        });
+        
+        const result = await dynamodb.send(command);
+        
+        if (result.Items && result.Items.length > 0) {
+          allAssets.push(...(result.Items as Asset[]));
+          console.log(`Fetched ${result.Items.length} assets (total so far: ${allAssets.length})`);
+        }
+        
+        lastEvaluatedKey = result.LastEvaluatedKey;
+        
+      } while (lastEvaluatedKey);
+      
+      console.log(`Found ${allAssets.length} total assets`);
+      return allAssets;
     } catch (error) {
       console.error('Error getting assets:', error);
       console.error('AWS Config:', {
@@ -410,15 +426,28 @@ export class DynamoDBService {
     try {
       await this.createAuditTableIfNotExists();
       
-      const command = new ScanCommand({
-        TableName: AUDIT_TABLE_NAME,
-      });
+      const allEntries: AuditLogEntry[] = [];
+      let lastEvaluatedKey: any = undefined;
+      
+      do {
+        const command = new ScanCommand({
+          TableName: AUDIT_TABLE_NAME,
+          ExclusiveStartKey: lastEvaluatedKey,
+          Limit: 100
+        });
 
-      const result = await dynamodb.send(command);
-      const entries = (result.Items as AuditLogEntry[]) || [];
+        const result = await dynamodb.send(command);
+        
+        if (result.Items && result.Items.length > 0) {
+          allEntries.push(...(result.Items as AuditLogEntry[]));
+        }
+        
+        lastEvaluatedKey = result.LastEvaluatedKey;
+        
+      } while (lastEvaluatedKey);
       
       // Sort by timestamp descending (newest first)
-      return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     } catch (error) {
       console.error('Error getting all audit entries:', error);
       throw error;
@@ -496,15 +525,28 @@ export class DynamoDBService {
     try {
       await this.createAssetTypesTableIfNotExists();
       
-      const command = new ScanCommand({
-        TableName: ASSET_TYPES_TABLE_NAME,
-      });
+      const allAssetTypes: AssetType[] = [];
+      let lastEvaluatedKey: any = undefined;
       
-      const result = await dynamodb.send(command);
-      const assetTypes = (result.Items as AssetType[]) || [];
+      do {
+        const command = new ScanCommand({
+          TableName: ASSET_TYPES_TABLE_NAME,
+          ExclusiveStartKey: lastEvaluatedKey,
+          Limit: 100
+        });
+        
+        const result = await dynamodb.send(command);
+        
+        if (result.Items && result.Items.length > 0) {
+          allAssetTypes.push(...(result.Items as AssetType[]));
+        }
+        
+        lastEvaluatedKey = result.LastEvaluatedKey;
+        
+      } while (lastEvaluatedKey);
       
       // Sort by label alphabetically
-      return assetTypes.sort((a, b) => a.label.localeCompare(b.label));
+      return allAssetTypes.sort((a, b) => a.label.localeCompare(b.label));
     } catch (error) {
       console.error('Error getting asset types:', error);
       throw error;

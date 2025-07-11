@@ -207,6 +207,7 @@ export default function HomePage() {
   const [wingFilter, setWingFilter] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [hideTabContainer, setHideTabContainer] = useLocalStorage({ key: 'hideTabContainer', defaultValue: false });
+  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
@@ -2166,11 +2167,11 @@ export default function HomePage() {
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm">Room No:</Text>
-                        <Text size="sm" fw={500}>{asset.roomNo || 'N/A'}</Text>
+                        <Text size="sm" fw={500}>{asset.roomNo !== null && asset.roomNo !== undefined && asset.roomNo !== '' ? asset.roomNo : 'N/A'}</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm">Floor:</Text>
-                        <Text size="sm" fw={500}>{asset.floor || 'N/A'}</Text>
+                        <Text size="sm" fw={500}>{asset.floor !== null && asset.floor !== undefined && asset.floor !== '' ? asset.floor : 'N/A'}</Text>
                       </Group>
                       <Group justify="space-between">
                         <Text size="sm">Floor (Words):</Text>
@@ -2513,6 +2514,7 @@ export default function HomePage() {
                 title="Scan barcode"
                 style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                 className="action-button scan-button"
+                hiddenFrom="lg"
               >
                 <IconScan size={22} />
               </ActionIcon>
@@ -3730,13 +3732,39 @@ export default function HomePage() {
     <ProtectedRoute>
       <AppShell
         header={{ height: 60 }}
-        navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !opened } }}
+        navbar={{ 
+          width: 300, 
+          breakpoint: 'sm', 
+          collapsed: { 
+            mobile: !opened,
+            desktop: sidebarCollapsed
+          } 
+        }}
         padding="md"
       >
         <AppShell.Header>
           <Group h="100%" px="md" justify="space-between" className="main-header">
             <Group className="header-left-section" style={{ flex: 1, minWidth: 0 }}>
-              <ActionIcon variant="subtle" onClick={toggle} hiddenFrom="sm" size="sm">
+              <ActionIcon 
+                variant="subtle" 
+                onClick={toggle} 
+                hiddenFrom="sm" 
+                size="sm"
+                title="Toggle Mobile Menu"
+              >
+                <IconMenu2 size={18} />
+              </ActionIcon>
+              <ActionIcon 
+                variant="subtle" 
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+                visibleFrom="sm" 
+                size="sm"
+                title={sidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"}
+                style={{ 
+                  backgroundColor: sidebarCollapsed ? 'var(--mantine-color-blue-light)' : 'transparent',
+                  color: sidebarCollapsed ? 'var(--mantine-color-blue-6)' : 'inherit'
+                }}
+              >
                 <IconMenu2 size={18} />
               </ActionIcon>
               <div className="title-section">
@@ -3871,44 +3899,53 @@ export default function HomePage() {
               >
                 <ScrollArea>
                   <Group wrap="nowrap" gap="xs" justify="center">
-                  <Button
-                    variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                    leftSection={<IconDashboard size={16} />}
-                    onClick={() => setActiveTab('dashboard')}
-                    size="sm"
+                    <Button
+                      variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+                      leftSection={<IconDashboard size={16} />}
+                      onClick={() => setActiveTab('dashboard')}
+                      size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
+                    >
                       <Text visibleFrom="sm">Dashboard</Text>
                       <Text hiddenFrom="sm">Dash</Text>
-                  </Button>
-                  <Button
-                    variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                    leftSection={<IconDroplet size={16} />}
-                    onClick={() => setActiveTab('assets')}
-                    size="sm"
+                    </Button>
+                    <Button
+                      variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+                      leftSection={<IconDroplet size={16} />}
+                      onClick={() => setActiveTab('assets')}
+                      size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Assets
-                  </Button>
-                  <Button
-                    variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                    leftSection={<IconReport size={16} />}
-                    onClick={() => setActiveTab('reports')}
-                    size="sm"
+                    >
+                      Assets
+                    </Button>
+                    <Button
+                      variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+                      leftSection={<IconReport size={16} />}
+                      onClick={() => setActiveTab('reports')}
+                      size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Reports
-                  </Button>
-                  <Button
-                    variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                    leftSection={<IconSettings size={16} />}
-                    onClick={() => setActiveTab('settings')}
-                    size="sm"
+                    >
+                      Reports
+                    </Button>
+                    <Button
+                      variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
+                      leftSection={<IconUpload size={16} />}
+                      onClick={() => setActiveTab('bulk-update')}
+                      size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Settings
-                  </Button>
-                </Group>
+                    >
+                      Bulk Update
+                    </Button>
+                    <Button
+                      variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+                      leftSection={<IconSettings size={16} />}
+                      onClick={() => setActiveTab('settings')}
+                      size="sm"
+                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
+                    >
+                      Settings
+                    </Button>
+                  </Group>
                 </ScrollArea>
               </Card>
             )}
@@ -4032,6 +4069,10 @@ export default function HomePage() {
                     label="Wing"
                     placeholder="Enter wing"
                     {...form.getInputProps('wing')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('wing', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4039,6 +4080,10 @@ export default function HomePage() {
                     label="Wing (Short)"
                     placeholder="Enter wing abbreviation"
                     {...form.getInputProps('wingInShort')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('wingInShort', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4046,6 +4091,10 @@ export default function HomePage() {
                     label="Room"
                     placeholder="Enter room"
                     {...form.getInputProps('room')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('room', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4335,6 +4384,10 @@ export default function HomePage() {
                     label="Wing"
                     placeholder="Enter wing"
                     {...form.getInputProps('wing')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('wing', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4342,6 +4395,10 @@ export default function HomePage() {
                     label="Wing (Short)"
                     placeholder="Enter wing abbreviation"
                     {...form.getInputProps('wingInShort')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('wingInShort', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4349,6 +4406,10 @@ export default function HomePage() {
                     label="Room"
                     placeholder="Enter room"
                     {...form.getInputProps('room')}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      form.setFieldValue('room', value);
+                    }}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -4692,11 +4753,11 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Room Number</Text>
-                  <Text size="sm">{selectedAsset.roomNo || 'N/A'}</Text>
+                  <Text size="sm">{selectedAsset.roomNo !== null && selectedAsset.roomNo !== undefined && selectedAsset.roomNo !== '' ? selectedAsset.roomNo : 'N/A'}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Floor</Text>
-                  <Text size="sm">{selectedAsset.floor || 'N/A'}</Text>
+                  <Text size="sm">{selectedAsset.floor !== null && selectedAsset.floor !== undefined && selectedAsset.floor !== '' ? selectedAsset.floor : 'N/A'}</Text>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Floor (In Words)</Text>
