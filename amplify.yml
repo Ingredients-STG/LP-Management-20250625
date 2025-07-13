@@ -18,11 +18,11 @@ frontend:
     build:
       commands:
         - echo "Creating .env.production file with environment variables..."
-        - env | grep -e AMPLIFY_ACCESS_KEY_ID >> .env.production
-        - env | grep -e AMPLIFY_SECRET_ACCESS_KEY >> .env.production
-        - env | grep -e AMPLIFY_AWS_REGION >> .env.production
+        - env | grep -e AMPLIFY_ACCESS_KEY_ID >> .env.production || echo "AMPLIFY_ACCESS_KEY_ID not found"
+        - env | grep -e AMPLIFY_SECRET_ACCESS_KEY >> .env.production || echo "AMPLIFY_SECRET_ACCESS_KEY not found"
+        - env | grep -e AMPLIFY_AWS_REGION >> .env.production || echo "AMPLIFY_AWS_REGION not found"
         - echo "Environment variables added to .env.production:"
-        - cat .env.production
+        - cat .env.production || echo "No environment variables found"
         - echo "Starting Next.js build..."
         - npm run build
         - echo "Build completed successfully"
@@ -31,6 +31,8 @@ frontend:
         - if [ -d ".next" ]; then echo "Found .next directory" && ls -la .next/; fi
         - if [ -d "out" ]; then echo "Found out directory" && ls -la out/; fi
         - if [ -d "build" ]; then echo "Found build directory" && ls -la build/; fi
+        - echo "Checking for API routes..."
+        - find .next -name "*.js" | grep -i api || echo "No API routes found in .next"
   artifacts:
     baseDirectory: .next
     files:

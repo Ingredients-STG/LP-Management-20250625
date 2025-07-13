@@ -38,36 +38,36 @@ interface DashboardStats {
   recentAssets: Asset[];
 }
 
-// API Configuration - supports both development and production
-const getApiBaseUrl = () => {
-  // For development, use local server
-  if (__DEV__) {
-    return 'http://192.168.8.200:3000/api';
-  }
-  
-  // For production, use Amplify app URL
-  return 'https://d25j5qt77sjegi.amplifyapp.com/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+// API Configuration - production only
+const API_BASE_URL = 'https://d25j5qt77sjegi.amplifyapp.com/api';
 
 // Debug function to test API connectivity
-const testApiConnection = async () => {
+const testApiConnection = async (url: string) => {
   try {
-    console.log('Testing API connection to:', API_BASE_URL);
-    const response = await fetch(`${API_BASE_URL}/assets`, {
+    console.log('Testing API connection to:', url);
+    const response = await fetch(`${url}/assets`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
     console.log('API Response status:', response.status);
-    console.log('API Response headers:', response.headers);
     return response.ok;
   } catch (error) {
     console.error('API Connection test failed:', error);
     return false;
   }
+};
+
+// Function to get working API URL
+const getWorkingApiUrl = async () => {
+  // Try production URL
+  if (await testApiConnection(API_BASE_URL)) {
+    console.log('Using production API URL');
+    return API_BASE_URL;
+  }
+  
+  throw new Error('Production API is not available. Please check the deployment status.');
 };
 
 export default function App() {
@@ -76,13 +76,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [apiUrl, setApiUrl] = useState<string>(API_BASE_URL);
 
   const fetchAssets = async () => {
     try {
       setError(null);
-      console.log('Fetching assets from:', `${API_BASE_URL}/assets`);
+      console.log('Fetching assets from:', `${apiUrl}/assets`);
       
-      const response = await fetch(`${API_BASE_URL}/assets`, {
+      const response = await fetch(`${apiUrl}/assets`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -110,9 +111,9 @@ export default function App() {
 
   const fetchDashboardStats = async () => {
     try {
-      console.log('Fetching dashboard stats from:', `${API_BASE_URL}/dashboard`);
+      console.log('Fetching dashboard stats from:', `${apiUrl}/dashboard`);
       
-      const response = await fetch(`${API_BASE_URL}/dashboard`, {
+      const response = await fetch(`${apiUrl}/dashboard`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -152,17 +153,19 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       console.log('App starting...');
-      console.log('API Base URL:', API_BASE_URL);
       console.log('Development mode:', __DEV__);
       
-      // Test API connection first
-      const isConnected = await testApiConnection();
-      console.log('API Connection test result:', isConnected);
-      
-      if (isConnected) {
+      try {
+        // Get working API URL
+        const workingUrl = await getWorkingApiUrl();
+        setApiUrl(workingUrl);
+        console.log('Using API URL:', workingUrl);
+        
+        // Load data with working URL
         await loadData();
-      } else {
-        setError('Unable to connect to the server. Please check your internet connection and try again.');
+      } catch (error) {
+        console.error('Failed to find working API:', error);
+        setError('Unable to connect to any server. Please check your internet connection and try again.');
         setLoading(false);
       }
     };
