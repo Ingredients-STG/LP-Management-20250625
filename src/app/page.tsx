@@ -3899,34 +3899,34 @@ export default function HomePage() {
               >
                 <ScrollArea>
                   <Group wrap="nowrap" gap="xs" justify="center">
-                    <Button
-                      variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                      leftSection={<IconDashboard size={16} />}
-                      onClick={() => setActiveTab('dashboard')}
-                      size="sm"
+                  <Button
+                    variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+                    leftSection={<IconDashboard size={16} />}
+                    onClick={() => setActiveTab('dashboard')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
+                  >
                       <Text visibleFrom="sm">Dashboard</Text>
                       <Text hiddenFrom="sm">Dash</Text>
-                    </Button>
-                    <Button
-                      variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                      leftSection={<IconDroplet size={16} />}
-                      onClick={() => setActiveTab('assets')}
-                      size="sm"
+                  </Button>
+                  <Button
+                    variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+                    leftSection={<IconDroplet size={16} />}
+                    onClick={() => setActiveTab('assets')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Assets
-                    </Button>
-                    <Button
-                      variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                      leftSection={<IconReport size={16} />}
-                      onClick={() => setActiveTab('reports')}
-                      size="sm"
+                  >
+                    Assets
+                  </Button>
+                  <Button
+                    variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+                    leftSection={<IconReport size={16} />}
+                    onClick={() => setActiveTab('reports')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Reports
-                    </Button>
+                  >
+                    Reports
+                  </Button>
                     <Button
                       variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
                       leftSection={<IconUpload size={16} />}
@@ -3936,16 +3936,16 @@ export default function HomePage() {
                     >
                       Bulk Update
                     </Button>
-                    <Button
-                      variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                      leftSection={<IconSettings size={16} />}
-                      onClick={() => setActiveTab('settings')}
-                      size="sm"
+                  <Button
+                    variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+                    leftSection={<IconSettings size={16} />}
+                    onClick={() => setActiveTab('settings')}
+                    size="sm"
                       style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Settings
-                    </Button>
-                  </Group>
+                  >
+                    Settings
+                  </Button>
+                </Group>
                 </ScrollArea>
               </Card>
             )}

@@ -44,36 +44,36 @@ async function clearTable(tableName: string, keySchema: { name: string; type: 'H
     
     do {
       // Scan to get items with pagination
-      const scanCommand = new ScanCommand({
-        TableName: tableName,
+    const scanCommand = new ScanCommand({
+      TableName: tableName,
         ExclusiveStartKey: lastEvaluatedKey,
         Limit: 100 // Process in smaller batches to avoid timeouts
-      });
-      
-      const result = await ddbClient.send(scanCommand);
-      
-      if (!result.Items || result.Items.length === 0) {
+    });
+    
+    const result = await ddbClient.send(scanCommand);
+    
+    if (!result.Items || result.Items.length === 0) {
         console.log(`No more items found in ${tableName}`);
         break;
-      }
+    }
       
       console.log(`Found ${result.Items.length} items in ${tableName} (batch)`);
-      
-      // Delete items in batches
-      const deletePromises = result.Items.map(item => {
-        const key: any = {};
-        keySchema.forEach(keyDef => {
-          key[keyDef.name] = item[keyDef.name];
-        });
-        
-        return ddbClient.send(new DeleteCommand({
-          TableName: tableName,
-          Key: key
-        }));
+    
+    // Delete items in batches
+    const deletePromises = result.Items.map(item => {
+      const key: any = {};
+      keySchema.forEach(keyDef => {
+        key[keyDef.name] = item[keyDef.name];
       });
       
-      await Promise.all(deletePromises);
-      
+      return ddbClient.send(new DeleteCommand({
+        TableName: tableName,
+        Key: key
+      }));
+    });
+    
+    await Promise.all(deletePromises);
+    
       totalDeleted += result.Items.length;
       lastEvaluatedKey = result.LastEvaluatedKey;
       

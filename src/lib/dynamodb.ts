@@ -81,13 +81,13 @@ export class DynamoDBService {
       let lastEvaluatedKey: any = undefined;
       
       do {
-        const command = new ScanCommand({
-          TableName: TABLE_NAME,
+      const command = new ScanCommand({
+        TableName: TABLE_NAME,
           ExclusiveStartKey: lastEvaluatedKey,
           Limit: 100 // Process in batches to avoid memory issues
-        });
-        
-        const result = await dynamodb.send(command);
+      });
+      
+      const result = await dynamodb.send(command);
         
         if (result.Items && result.Items.length > 0) {
           allAssets.push(...(result.Items as Asset[]));
@@ -430,13 +430,13 @@ export class DynamoDBService {
       let lastEvaluatedKey: any = undefined;
       
       do {
-        const command = new ScanCommand({
-          TableName: AUDIT_TABLE_NAME,
+      const command = new ScanCommand({
+        TableName: AUDIT_TABLE_NAME,
           ExclusiveStartKey: lastEvaluatedKey,
           Limit: 100
-        });
+      });
 
-        const result = await dynamodb.send(command);
+      const result = await dynamodb.send(command);
         
         if (result.Items && result.Items.length > 0) {
           allEntries.push(...(result.Items as AuditLogEntry[]));
@@ -529,13 +529,13 @@ export class DynamoDBService {
       let lastEvaluatedKey: any = undefined;
       
       do {
-        const command = new ScanCommand({
-          TableName: ASSET_TYPES_TABLE_NAME,
+      const command = new ScanCommand({
+        TableName: ASSET_TYPES_TABLE_NAME,
           ExclusiveStartKey: lastEvaluatedKey,
           Limit: 100
-        });
-        
-        const result = await dynamodb.send(command);
+      });
+      
+      const result = await dynamodb.send(command);
         
         if (result.Items && result.Items.length > 0) {
           allAssetTypes.push(...(result.Items as AssetType[]));

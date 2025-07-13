@@ -57,13 +57,13 @@ export async function GET(request: NextRequest) {
       let lastEvaluatedKey: any = undefined;
       
       do {
-        const scanCommand = new ScanCommand({
-          TableName: ASSETS_TABLE,
+      const scanCommand = new ScanCommand({
+        TableName: ASSETS_TABLE,
           ExclusiveStartKey: lastEvaluatedKey,
           Limit: 100 // Process in batches to avoid memory issues
-        });
-        
-        const result = await ddbClient.send(scanCommand);
+      });
+      
+      const result = await ddbClient.send(scanCommand);
         
         if (result.Items && result.Items.length > 0) {
           assets.push(...result.Items);

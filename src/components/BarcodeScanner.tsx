@@ -48,7 +48,7 @@ export default function BarcodeScanner({ opened, onClose, onScan, onError }: Bar
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [torchEnabled, setTorchEnabled] = useState(false);
   const [scannerInitialized, setScannerInitialized] = useState(false);
-  
+
   // Media queries for responsive design
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isTablet = useMediaQuery('(max-width: 1024px) and (min-width: 769px)');
@@ -342,13 +342,13 @@ export default function BarcodeScanner({ opened, onClose, onScan, onError }: Bar
           {isScanning && !isInitializing && (
             <Box
               style={{
-                position: 'absolute',
+              position: 'absolute',
                 top: '16px',
                 left: '16px',
                 right: '16px',
                 zIndex: 50
-              }}
-            >
+            }}
+          >
               <Paper p="xs" withBorder bg="rgba(255, 255, 255, 0.9)">
                 <Group justify="space-between">
                   <Group gap="xs">
@@ -358,9 +358,9 @@ export default function BarcodeScanner({ opened, onClose, onScan, onError }: Bar
                   <Badge variant="light" color="green" size="xs">
                     Active
                   </Badge>
-                </Group>
+          </Group>
               </Paper>
-            </Box>
+        </Box>
           )}
         </Paper>
 
@@ -404,22 +404,22 @@ export default function BarcodeScanner({ opened, onClose, onScan, onError }: Bar
         </Paper>
 
         {/* Action Buttons */}
-        <Group justify="space-between">
-          <Button
-            variant="light"
-            color="gray"
-            onClick={handleClose}
-            leftSection={<IconX size={16} />}
-          >
-            Cancel
-          </Button>
-          
-          {lastScannedCode && (
+          <Group justify="space-between">
+            <Button
+              variant="light"
+              color="gray"
+              onClick={handleClose}
+              leftSection={<IconX size={16} />}
+            >
+              Cancel
+            </Button>
+            
+            {lastScannedCode && (
             <Badge color="green" variant="light" size="lg">
               Last: {lastScannedCode.substring(0, 10)}...
-            </Badge>
-          )}
-        </Group>
+              </Badge>
+            )}
+          </Group>
       </Stack>
     </Modal>
   );

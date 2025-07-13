@@ -187,12 +187,12 @@ export async function POST(req: NextRequest) {
     
     do {
       const scanCommand = new ScanCommand({
-        TableName: ASSETS_TABLE,
+      TableName: ASSETS_TABLE,
         ProjectionExpression: 'assetBarcode',
         ExclusiveStartKey: lastEvaluatedKey,
         Limit: 100
       });
-      
+    
       const result = await ddbClient.send(scanCommand);
       
       if (result.Items && result.Items.length > 0) {
@@ -213,13 +213,13 @@ export async function POST(req: NextRequest) {
     
     do {
       const scanCommand = new ScanCommand({
-        TableName: ASSET_TYPES_TABLE,
-        ProjectionExpression: '#label',
+      TableName: ASSET_TYPES_TABLE,
+      ProjectionExpression: '#label',
         ExpressionAttributeNames: { '#label': 'label' },
         ExclusiveStartKey: lastEvaluatedKey,
         Limit: 100
       });
-      
+    
       const result = await ddbClient.send(scanCommand);
       
       if (result.Items && result.Items.length > 0) {
