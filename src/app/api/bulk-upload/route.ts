@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
         total: results.total,
         success: results.success,
         failed: results.failed,
-        errors: results.errors.slice(0, 20), // Show up to 20 errors
+        errors: results.errors, // Return all errors, not just the first 20
         duplicateBarcodes: [...new Set(results.duplicateBarcodes)], // Remove duplicates
         newAssetTypes: [...new Set(results.newAssetTypes)], // Remove duplicates
         newFilterTypes: [...new Set(results.newFilterTypes)] // Remove duplicates
