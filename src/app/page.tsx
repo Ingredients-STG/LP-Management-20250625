@@ -35,7 +35,7 @@ import {
   FileInput,
   Drawer,
 } from '@mantine/core';
-import { DateInput } from '@mantine/dates';
+import { DateInput, DatePickerInput } from '@mantine/dates';
 import { BarChart, PieChart } from '@mantine/charts';
 import { Spotlight } from '@mantine/spotlight';
 import { useForm } from '@mantine/form';
@@ -216,6 +216,10 @@ export default function HomePage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [wingFilter, setWingFilter] = useState<string>('');
+  const [floorFilter, setFloorFilter] = useState<string>('');
+  const [filterTypeFilter, setFilterTypeFilter] = useState<string>('');
+  const [needFlushingFilter, setNeedFlushingFilter] = useState<string>('');
+  const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [hideTabContainer, setHideTabContainer] = useLocalStorage({ key: 'hideTabContainer', defaultValue: false });
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
@@ -1224,10 +1228,31 @@ export default function HomePage() {
       // Wing filter
       const matchesWing = wingFilter ? asset.wing === wingFilter : true;
       
-      return matchesSearch && matchesStatus && matchesType && matchesWing;
+      // Floor filter
+      const matchesFloor = floorFilter ? asset.floor === floorFilter : true;
+      
+      // Filter Type filter
+      const matchesFilterType = filterTypeFilter ? asset.filterType === filterTypeFilter : true;
+      
+      // Need Flushing filter
+      const matchesNeedFlushing = needFlushingFilter ? (
+        (typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true') === (needFlushingFilter === 'Yes')
+      ) : true;
+      
+      // Filter Expiry date range filter
+      let matchesFilterExpiry = true;
+      if (filterExpiryRange[0] && filterExpiryRange[1]) {
+        const expiryDate = safeDate(asset.filterExpiryDate);
+        if (expiryDate) {
+          matchesFilterExpiry = expiryDate >= filterExpiryRange[0]! && expiryDate <= filterExpiryRange[1]!;
+        } else {
+          matchesFilterExpiry = false;
+        }
+      }
+      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterExpiry;
     }));
     setCurrentPage(1);
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterExpiryRange]);
 
   // Track previous installed date to prevent infinite loops
   const prevInstalledDateRef = useRef<Date | null>(null);
@@ -2678,6 +2703,54 @@ export default function HomePage() {
                   },
                 }}
               />
+              <Select
+                placeholder="Filter by Floor"
+                data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
+                value={floorFilter}
+                onChange={value => setFloorFilter(value || '')}
+                clearable
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+              />
+              <Select
+                placeholder="Filter by Filter Type"
+                data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
+                value={filterTypeFilter}
+                onChange={value => setFilterTypeFilter(value || '')}
+                clearable
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+              />
+              <Select
+                placeholder="Need Flushing?"
+                data={['Yes', 'No']}
+                value={needFlushingFilter}
+                onChange={value => setNeedFlushingFilter(value || '')}
+                clearable
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+              />
+              <DatePickerInput
+                type="range"
+                placeholder="Filter Expiry Range"
+                value={filterExpiryRange}
+                onChange={(val) => {
+                  // Convert string values to Date objects if needed
+                  const toDate = (v: string | Date | null) => {
+                    if (!v) return null;
+                    if (v instanceof Date) return v;
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? null : d;
+                  };
+                  setFilterExpiryRange([
+                    toDate(val[0]),
+                    toDate(val[1])
+                  ]);
+                }}
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+                clearable
+              />
             </Group>
             <Select
               placeholder="Filter by Wing"
@@ -2719,6 +2792,53 @@ export default function HomePage() {
                 data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                 value={typeFilter}
                 onChange={(value) => setTypeFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by Floor"
+                data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
+                value={floorFilter}
+                onChange={value => setFloorFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Filter by Filter Type"
+                data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
+                value={filterTypeFilter}
+                onChange={value => setFilterTypeFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <Select
+                placeholder="Need Flushing?"
+                data={['Yes', 'No']}
+                value={needFlushingFilter}
+                onChange={value => setNeedFlushingFilter(value || '')}
+                clearable
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+              <DatePickerInput
+                type="range"
+                placeholder="Filter Expiry Range"
+                value={filterExpiryRange}
+                onChange={(val) => {
+                  const toDate = (v: string | Date | null) => {
+                    if (!v) return null;
+                    if (v instanceof Date) return v;
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? null : d;
+                  };
+                  setFilterExpiryRange([
+                    toDate(val[0]),
+                    toDate(val[1])
+                  ]);
+                }}
                 clearable
               />
             </Grid.Col>
