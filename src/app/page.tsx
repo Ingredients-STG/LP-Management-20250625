@@ -2931,22 +2931,22 @@ export default function HomePage() {
       title: (
         <Group>
           <IconAlertTriangle size={20} color="red" />
-          <Text fw={600} c="red">System Reset Confirmation</Text>
+          <Text fw={600} c="red">System Reset Options</Text>
         </Group>
       ),
       children: (
         <Stack gap="md">
           <Text size="sm">
-            You are about to permanently delete ALL data from the system:
+            Choose what to reset from the system:
           </Text>
           <Box pl="md">
-            <Text size="sm" c="red">• All assets ({assets.length} assets)</Text>
-            <Text size="sm" c="red">• All audit logs</Text>
-            <Text size="sm" c="red">• All uploaded files</Text>
-            <Text size="sm" c="red">• Asset types and filter types</Text>
+            <Text size="sm" c="red">• All assets ({assets.length} assets) - ALWAYS CLEARED</Text>
+            <Text size="sm" c="orange">• Audit logs (optional)</Text>
+            <Text size="sm" c="orange">• Asset types and filter types (optional)</Text>
+            <Text size="sm" c="orange">• All uploaded files (optional)</Text>
           </Box>
           <Text size="sm" fw={500}>
-            This action CANNOT be undone. The system will be restored to its initial state with only default asset types and filter types.
+            This action CANNOT be undone. The system will be restored to its initial state.
           </Text>
           <Text size="sm" c="dimmed">
             To confirm, please type: <Text span fw={600} c="red">RESET ALL DATA</Text>
@@ -2956,7 +2956,7 @@ export default function HomePage() {
       labels: { confirm: 'I understand, reset system', cancel: 'Cancel' },
       confirmProps: { color: 'red' },
       onConfirm: () => {
-        // Open a second modal for final confirmation with text input
+        // Open a second modal for final confirmation with text input and options
         modals.open({
           title: (
             <Group>
@@ -2969,9 +2969,18 @@ export default function HomePage() {
               e.preventDefault();
               const formData = new FormData(e.target as HTMLFormElement);
               const confirmationText = formData.get('confirmation') as string;
+              const clearAuditLogs = (formData.get('clearAuditLogs') as string) === 'true';
+              const clearAssetTypes = (formData.get('clearAssetTypes') as string) === 'true';
+              const clearS3Files = (formData.get('clearS3Files') as string) === 'true';
               
               if (confirmationText === 'RESET ALL DATA') {
-                executeSystemReset();
+                executeSystemReset({
+                  clearAuditLogs,
+                  clearAssetTypes,
+                  clearFilterTypes: clearAssetTypes, // Clear filter types if asset types are cleared
+                  clearS3Files,
+                  reseedDefaults: true
+                });
                 modals.closeAll();
               } else {
                 notifications.show({
@@ -2991,6 +3000,32 @@ export default function HomePage() {
                   required
                   autoFocus
                 />
+                
+                <Divider />
+                
+                <Text size="sm" fw={500}>Optional Reset Options:</Text>
+                
+                <Checkbox
+                  name="clearAuditLogs"
+                  value="true"
+                  defaultChecked
+                  label="Clear audit logs (recommended)"
+                />
+                
+                <Checkbox
+                  name="clearAssetTypes"
+                  value="true"
+                  defaultChecked={false}
+                  label="Clear asset types and filter types (will be reseeded with defaults)"
+                />
+                
+                <Checkbox
+                  name="clearS3Files"
+                  value="true"
+                  defaultChecked
+                  label="Clear uploaded files"
+                />
+                
                 <Group justify="flex-end" gap="xs">
                   <Button variant="outline" onClick={() => modals.closeAll()}>
                     Cancel
@@ -3009,14 +3044,20 @@ export default function HomePage() {
     });
   };
 
-  const executeSystemReset = async () => {
+  const executeSystemReset = async (resetOptions?: {
+    clearAuditLogs?: boolean;
+    clearAssetTypes?: boolean;
+    clearFilterTypes?: boolean;
+    clearS3Files?: boolean;
+    reseedDefaults?: boolean;
+  }) => {
     try {
       setLoading(true);
       
       notifications.show({
         id: 'system-reset',
         title: 'System Reset in Progress',
-        message: 'Deleting all data... This may take a few moments.',
+        message: 'Deleting data... This may take a few moments.',
         color: 'orange',
         loading: true,
         autoClose: false,
@@ -3030,16 +3071,27 @@ export default function HomePage() {
         body: JSON.stringify({
           confirmationText: 'RESET ALL DATA',
           confirmed: true,
+          resetOptions: {
+            clearAssets: true, // Always clear assets
+            clearAuditLogs: resetOptions?.clearAuditLogs ?? true,
+            clearAssetTypes: resetOptions?.clearAssetTypes ?? false,
+            clearFilterTypes: resetOptions?.clearFilterTypes ?? false,
+            clearS3Files: resetOptions?.clearS3Files ?? true,
+            reseedDefaults: resetOptions?.reseedDefaults ?? true,
+          },
         }),
       });
 
       const result = await response.json();
 
       if (result.success) {
+        const totalRecords = Object.values(result.data.tables).reduce((acc: number, table: any) => acc + (table.deleted || 0), 0);
+        const totalFiles = result.data.s3?.deleted || 0;
+        
         notifications.update({
           id: 'system-reset',
           title: 'System Reset Completed',
-          message: `Successfully reset system. Deleted ${Object.values(result.data.tables).reduce((acc: number, table: any) => acc + table.deleted, 0)} database records and ${result.data.s3.deleted} files.`,
+          message: `Successfully reset system. Deleted ${totalRecords} database records and ${totalFiles} files.`,
           color: 'green',
           loading: false,
           autoClose: 5000,

@@ -44,35 +44,35 @@ async function clearTable(tableName: string, keySchema: { name: string; type: 'H
     
     do {
       // Scan to get items with pagination
-    const scanCommand = new ScanCommand({
-      TableName: tableName,
+      const scanCommand = new ScanCommand({
+        TableName: tableName,
         ExclusiveStartKey: lastEvaluatedKey,
         Limit: 100 // Process in smaller batches to avoid timeouts
-    });
+      });
     
-    const result = await ddbClient.send(scanCommand);
+      const result = await ddbClient.send(scanCommand);
     
-    if (!result.Items || result.Items.length === 0) {
+      if (!result.Items || result.Items.length === 0) {
         console.log(`No more items found in ${tableName}`);
         break;
-    }
+      }
       
       console.log(`Found ${result.Items.length} items in ${tableName} (batch)`);
     
-    // Delete items in batches
-    const deletePromises = result.Items.map(item => {
-      const key: any = {};
-      keySchema.forEach(keyDef => {
-        key[keyDef.name] = item[keyDef.name];
-      });
+      // Delete items in batches
+      const deletePromises = result.Items.map(item => {
+        const key: any = {};
+        keySchema.forEach(keyDef => {
+          key[keyDef.name] = item[keyDef.name];
+        });
       
-      return ddbClient.send(new DeleteCommand({
-        TableName: tableName,
-        Key: key
-      }));
-    });
+        return ddbClient.send(new DeleteCommand({
+          TableName: tableName,
+          Key: key
+        }));
+      });
     
-    await Promise.all(deletePromises);
+      await Promise.all(deletePromises);
     
       totalDeleted += result.Items.length;
       lastEvaluatedKey = result.LastEvaluatedKey;
@@ -186,9 +186,9 @@ export async function POST(request: NextRequest) {
     
     console.log(`System reset initiated by user: ${userEmail}`);
     
-    // Parse request body for confirmation
+    // Parse request body for confirmation and reset options
     const body = await request.json();
-    const { confirmationText, confirmed } = body;
+    const { confirmationText, confirmed, resetOptions } = body;
     
     // Validate confirmation
     if (!confirmed || confirmationText !== 'RESET ALL DATA') {
@@ -198,51 +198,83 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
+    // Default reset options if not provided
+    const options = {
+      clearAssets: true,
+      clearAuditLogs: true,
+      clearAssetTypes: false,
+      clearFilterTypes: false,
+      clearS3Files: true,
+      reseedDefaults: true,
+      ...resetOptions
+    };
+    
     const resetResults = {
       tables: {} as Record<string, any>,
       s3: {} as any,
       reseeded: {} as any,
       timestamp: new Date().toISOString(),
-      initiatedBy: userEmail
+      initiatedBy: userEmail,
+      options
     };
     
-    // Clear all DynamoDB tables
-    console.log('Starting DynamoDB table cleanup...');
+    console.log('Starting targeted system reset with options:', options);
     
-    // Clear main assets table
-    resetResults.tables[TABLES.ASSETS] = await clearTable(TABLES.ASSETS, [
-      { name: 'id', type: 'HASH' }
-    ]);
+    // Clear main assets table (always clear this)
+    if (options.clearAssets) {
+      console.log('Clearing assets table...');
+      resetResults.tables[TABLES.ASSETS] = await clearTable(TABLES.ASSETS, [
+        { name: 'id', type: 'HASH' }
+      ]);
+    }
     
-    // Clear asset types table
-    resetResults.tables[TABLES.ASSET_TYPES] = await clearTable(TABLES.ASSET_TYPES, [
-      { name: 'typeId', type: 'HASH' }
-    ]);
+    // Clear audit logs (optional)
+    if (options.clearAuditLogs) {
+      console.log('Clearing audit logs table...');
+      resetResults.tables[TABLES.AUDIT_LOGS] = await clearTable(TABLES.AUDIT_LOGS, [
+        { name: 'assetId', type: 'HASH' },
+        { name: 'timestamp', type: 'RANGE' }
+      ]);
+    }
     
-    // Clear filter types table
-    resetResults.tables[TABLES.FILTER_TYPES] = await clearTable(TABLES.FILTER_TYPES, [
-      { name: 'typeId', type: 'HASH' }
-    ]);
+    // Clear asset types table (optional)
+    if (options.clearAssetTypes) {
+      console.log('Clearing asset types table...');
+      resetResults.tables[TABLES.ASSET_TYPES] = await clearTable(TABLES.ASSET_TYPES, [
+        { name: 'typeId', type: 'HASH' }
+      ]);
+    }
     
-    // Clear audit logs table
-    resetResults.tables[TABLES.AUDIT_LOGS] = await clearTable(TABLES.AUDIT_LOGS, [
-      { name: 'assetId', type: 'HASH' },
-      { name: 'timestamp', type: 'RANGE' }
-    ]);
+    // Clear filter types table (optional)
+    if (options.clearFilterTypes) {
+      console.log('Clearing filter types table...');
+      resetResults.tables[TABLES.FILTER_TYPES] = await clearTable(TABLES.FILTER_TYPES, [
+        { name: 'typeId', type: 'HASH' }
+      ]);
+    }
     
-    // Clear S3 bucket
-    console.log('Starting S3 bucket cleanup...');
-    resetResults.s3 = await clearS3Bucket();
+    // Clear S3 bucket (optional)
+    if (options.clearS3Files) {
+      console.log('Starting S3 bucket cleanup...');
+      resetResults.s3 = await clearS3Bucket();
+    }
     
-    // Reseed default data
-    console.log('Reseeding default data...');
-    resetResults.reseeded = await reseedDefaultData();
+    // Reseed default data (optional)
+    if (options.reseedDefaults) {
+      console.log('Reseeding default data...');
+      resetResults.reseeded = await reseedDefaultData();
+    }
     
-    console.log('System reset completed successfully:', resetResults);
+    // Calculate total records deleted
+    const totalRecordsDeleted = Object.values(resetResults.tables).reduce((total: number, table: any) => {
+      return total + (table.deleted || 0);
+    }, 0);
+    
+    console.log('Targeted system reset completed successfully:', resetResults);
     
     return NextResponse.json({
       success: true,
-      message: 'System reset completed successfully',
+      message: `System reset completed successfully. Deleted ${totalRecordsDeleted} database records and ${resetResults.s3.deleted || 0} files.`,
       data: resetResults
     });
     
