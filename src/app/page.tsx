@@ -24,6 +24,7 @@ import {
   Indicator,
   Modal,
   Select,
+  MultiSelect,
   Textarea,
   Checkbox,
   Pagination,
@@ -93,6 +94,7 @@ import {
   IconFileSpreadsheet,
   IconBarcode,
   IconFileReport,
+  IconChevronUp,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -213,12 +215,15 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   // Filter UI states (non-functional for now)
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [wingFilter, setWingFilter] = useState<string>('');
-  const [floorFilter, setFloorFilter] = useState<string>('');
-  const [filterTypeFilter, setFilterTypeFilter] = useState<string>('');
-  const [needFlushingFilter, setNeedFlushingFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [wingFilter, setWingFilter] = useState<string[]>([]);
+  const [floorFilter, setFloorFilter] = useState<string[]>([]);
+  const [filterTypeFilter, setFilterTypeFilter] = useState<string[]>([]);
+  const [needFlushingFilter, setNeedFlushingFilter] = useState<string[]>([]);
+  const [filterNeededFilter, setFilterNeededFilter] = useState<string[]>([]);
+  const [filtersOnFilter, setFiltersOnFilter] = useState<string[]>([]);
+  const [augmentedCareFilter, setAugmentedCareFilter] = useState<string[]>([]);
   const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [hideTabContainer, setHideTabContainer] = useLocalStorage({ key: 'hideTabContainer', defaultValue: false });
@@ -255,6 +260,8 @@ export default function HomePage() {
   const [bulkUpdateFile, setBulkUpdateFile] = useState<File | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [bulkUpdateResults, setBulkUpdateResults] = useState<any>(null);
+
+  const [filtersCollapsed, setFiltersCollapsed] = useLocalStorage({ key: 'filtersCollapsed', defaultValue: false });
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -1220,25 +1227,29 @@ export default function HomePage() {
       ) : true;
       
       // Status filter
-      const matchesStatus = statusFilter ? asset.status === statusFilter : true;
+      const matchesStatus = statusFilter.length > 0 ? statusFilter.includes(asset.status) : true;
       
       // Type filter
-      const matchesType = typeFilter ? asset.assetType === typeFilter : true;
+      const matchesType = typeFilter.length > 0 ? typeFilter.includes(asset.assetType) : true;
       
       // Wing filter
-      const matchesWing = wingFilter ? asset.wing === wingFilter : true;
+      const matchesWing = wingFilter.length > 0 ? wingFilter.includes(asset.wing) : true;
       
       // Floor filter
-      const matchesFloor = floorFilter ? asset.floor === floorFilter : true;
+      const matchesFloor = floorFilter.length > 0 ? floorFilter.includes(asset.floor) : true;
       
       // Filter Type filter
-      const matchesFilterType = filterTypeFilter ? asset.filterType === filterTypeFilter : true;
+      const matchesFilterType = filterTypeFilter.length > 0 ? filterTypeFilter.includes(asset.filterType) : true;
       
       // Need Flushing filter
-      const matchesNeedFlushing = needFlushingFilter ? (
-        (typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true') === (needFlushingFilter === 'Yes')
-      ) : true;
-      
+      const assetNeedFlushing = (typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true');
+      const matchesNeedFlushing = needFlushingFilter.length > 0 ? needFlushingFilter.includes(assetNeedFlushing ? 'Yes' : 'No') : true;
+      // Filter Needed filter
+      const assetFilterNeeded = (typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded?.toString().toLowerCase() === 'yes' || asset.filterNeeded?.toString().toLowerCase() === 'true');
+      const matchesFilterNeeded = filterNeededFilter.length > 0 ? filterNeededFilter.includes(assetFilterNeeded ? 'Yes' : 'No') : true;
+      // Filters On filter
+      const assetFiltersOn = (typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true');
+      const matchesFiltersOn = filtersOnFilter.length > 0 ? filtersOnFilter.includes(assetFiltersOn ? 'Yes' : 'No') : true;
       // Filter Expiry date range filter
       let matchesFilterExpiry = true;
       if (filterExpiryRange[0] && filterExpiryRange[1]) {
@@ -1249,10 +1260,13 @@ export default function HomePage() {
           matchesFilterExpiry = false;
         }
       }
-      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterExpiry;
+      // Augmented Care filter
+      const assetAugmentedCare = (typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare?.toString().toLowerCase() === 'yes' || asset.augmentedCare?.toString().toLowerCase() === 'true');
+      const matchesAugmentedCare = augmentedCareFilter.length > 0 ? augmentedCareFilter.includes(assetAugmentedCare ? 'Yes' : 'No') : true;
+      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry;
     }));
     setCurrentPage(1);
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterExpiryRange]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange]);
 
   // Track previous installed date to prevent infinite loops
   const prevInstalledDateRef = useRef<Date | null>(null);
@@ -2632,226 +2646,269 @@ export default function HomePage() {
                   </Menu.Item>
                 </Menu.Dropdown>
               </Menu>
-              <ActionIcon
-                variant="light"
-                color="blue"
-                size="xl"
-                onClick={startBarcodeScanner}
-                title="Scan barcode"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button scan-button"
-                hiddenFrom="lg"
-              >
-                <IconScan size={22} />
-              </ActionIcon>
               <Button
-                leftSection={<IconPlus size={18} />}
-                gradient={{ from: 'blue', to: 'cyan' }}
-                variant="gradient"
-                onClick={() => {
-                  form.reset();
-                  setAssetFiles([]);
-                  openModal();
-                }}
+                leftSection={filtersCollapsed ? <IconChevronDown size={16} /> : <IconChevronUp size={16} />}
+                variant="subtle"
+                color="blue"
                 size="md"
                 style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button add-asset-button"
+                onClick={() => setFiltersCollapsed((prev: boolean) => !prev)}
+              >
+                {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
+              </Button>
+              <Button
+                leftSection={<IconPlus size={16} />}
+                size="md"
+                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                className="action-button"
+                onClick={openModal}
               >
                 Add Asset
               </Button>
             </Group>
           </Group>
-
-          {/* Mobile-optimized filter layout */}
-          <Stack gap="xs" hiddenFrom="md" className="mobile-filter-stack">
-            <TextInput
-              placeholder="Search assets..."
-              leftSection={<IconSearch size={16} />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="sm"
-              styles={{
-                input: {
-                  fontSize: '16px',
-                },
-              }}
-            />
-            <Group gap="xs" grow>
-              <Select
-                placeholder="Filter by Status"
-                data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value || '')}
-                clearable
-                size="sm"
-                styles={{
-                  input: {
-                    fontSize: '16px',
-                  },
-                }}
-              />
-              <Select
-                placeholder="Filter by Type"
-                data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
-                value={typeFilter}
-                onChange={(value) => setTypeFilter(value || '')}
-                clearable
-                size="sm"
-                styles={{
-                  input: {
-                    fontSize: '16px',
-                  },
-                }}
-              />
-              <Select
-                placeholder="Filter by Floor"
-                data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
-                value={floorFilter}
-                onChange={value => setFloorFilter(value || '')}
-                clearable
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-              />
-              <Select
-                placeholder="Filter by Filter Type"
-                data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
-                value={filterTypeFilter}
-                onChange={value => setFilterTypeFilter(value || '')}
-                clearable
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-              />
-              <Select
-                placeholder="Need Flushing?"
-                data={['Yes', 'No']}
-                value={needFlushingFilter}
-                onChange={value => setNeedFlushingFilter(value || '')}
-                clearable
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-              />
-              <DatePickerInput
-                type="range"
-                placeholder="Filter Expiry Range"
-                value={filterExpiryRange}
-                onChange={(val) => {
-                  // Convert string values to Date objects if needed
-                  const toDate = (v: string | Date | null) => {
-                    if (!v) return null;
-                    if (v instanceof Date) return v;
-                    const d = new Date(v);
-                    return isNaN(d.getTime()) ? null : d;
-                  };
-                  setFilterExpiryRange([
-                    toDate(val[0]),
-                    toDate(val[1])
-                  ]);
-                }}
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-                clearable
-              />
-            </Group>
-            <Select
-              placeholder="Filter by Wing"
-              data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
-              value={wingFilter}
-              onChange={(value) => setWingFilter(value || '')}
-              clearable
-              size="sm"
-              styles={{
-                input: {
-                  fontSize: '16px',
-                },
-              }}
-            />
-          </Stack>
-
-          {/* Desktop filter layout */}
-          <Grid visibleFrom="md">
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <TextInput
-                placeholder="Search assets..."
-                leftSection={<IconSearch size={16} />}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Filter by Status"
-                data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Filter by Type"
-                data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
-                value={typeFilter}
-                onChange={(value) => setTypeFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Filter by Floor"
-                data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
-                value={floorFilter}
-                onChange={value => setFloorFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Filter by Filter Type"
-                data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
-                value={filterTypeFilter}
-                onChange={value => setFilterTypeFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Need Flushing?"
-                data={['Yes', 'No']}
-                value={needFlushingFilter}
-                onChange={value => setNeedFlushingFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <DatePickerInput
-                type="range"
-                placeholder="Filter Expiry Range"
-                value={filterExpiryRange}
-                onChange={(val) => {
-                  const toDate = (v: string | Date | null) => {
-                    if (!v) return null;
-                    if (v instanceof Date) return v;
-                    const d = new Date(v);
-                    return isNaN(d.getTime()) ? null : d;
-                  };
-                  setFilterExpiryRange([
-                    toDate(val[0]),
-                    toDate(val[1])
-                  ]);
-                }}
-                clearable
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-              <Select
-                placeholder="Filter by Wing"
-                data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
-                value={wingFilter}
-                onChange={(value) => setWingFilter(value || '')}
-                clearable
-              />
-            </Grid.Col>
-          </Grid>
+          {/* Search bar always visible */}
+          <TextInput
+            placeholder="Search assets..."
+            leftSection={<IconSearch size={16} />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="sm"
+            styles={{ input: { fontSize: '16px' } }}
+          />
+          {/* Collapsible filter panel */}
+          <Collapse in={!filtersCollapsed} transitionDuration={200}>
+            {/* Mobile filter stack */}
+            <Stack gap="xs" hiddenFrom="md" className="mobile-filter-stack">
+              <Group gap="xs" grow>
+                <MultiSelect
+                  placeholder="Filter by Status"
+                  data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filter by Type"
+                  data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filter by Floor"
+                  data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
+                  value={floorFilter}
+                  onChange={setFloorFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filter by Filter Type"
+                  data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
+                  value={filterTypeFilter}
+                  onChange={setFilterTypeFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Need Flushing?"
+                  data={['Yes', 'No']}
+                  value={needFlushingFilter}
+                  onChange={setNeedFlushingFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filter Needed?"
+                  data={['Yes', 'No']}
+                  value={filterNeededFilter}
+                  onChange={setFilterNeededFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filters On?"
+                  data={['Yes', 'No']}
+                  value={filtersOnFilter}
+                  onChange={setFiltersOnFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Augmented Care?"
+                  data={['Yes', 'No']}
+                  value={augmentedCareFilter}
+                  onChange={setAugmentedCareFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <DatePickerInput
+                  type="range"
+                  placeholder="Filter Expiry Range"
+                  value={filterExpiryRange}
+                  onChange={(val) => {
+                    const toDate = (v: string | Date | null) => {
+                      if (!v) return null;
+                      if (v instanceof Date) return v;
+                      const d = new Date(v);
+                      return isNaN(d.getTime()) ? null : d;
+                    };
+                    setFilterExpiryRange([
+                      toDate(val[0]),
+                      toDate(val[1])
+                    ]);
+                  }}
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                  clearable
+                />
+                <MultiSelect
+                  placeholder="Filter by Wing"
+                  data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
+                  value={wingFilter}
+                  onChange={setWingFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+              </Group>
+              <Group mt="xs" gap="xs">
+                <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters}>
+                  Clear Filters
+                </Button>
+              </Group>
+            </Stack>
+            {/* Desktop filter layout */}
+            <Grid visibleFrom="md">
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <TextInput
+                  placeholder="Search assets..."
+                  leftSection={<IconSearch size={16} />}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by Status"
+                  data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by Type"
+                  data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by Floor"
+                  data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
+                  value={floorFilter}
+                  onChange={setFloorFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by Filter Type"
+                  data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
+                  value={filterTypeFilter}
+                  onChange={setFilterTypeFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Need Flushing?"
+                  data={['Yes', 'No']}
+                  value={needFlushingFilter}
+                  onChange={setNeedFlushingFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter Needed?"
+                  data={['Yes', 'No']}
+                  value={filterNeededFilter}
+                  onChange={setFilterNeededFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filters On?"
+                  data={['Yes', 'No']}
+                  value={filtersOnFilter}
+                  onChange={setFiltersOnFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Augmented Care?"
+                  data={['Yes', 'No']}
+                  value={augmentedCareFilter}
+                  onChange={setAugmentedCareFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <DatePickerInput
+                  type="range"
+                  placeholder="Filter Expiry Range"
+                  value={filterExpiryRange}
+                  onChange={(val) => {
+                    const toDate = (v: string | Date | null) => {
+                      if (!v) return null;
+                      if (v instanceof Date) return v;
+                      const d = new Date(v);
+                      return isNaN(d.getTime()) ? null : d;
+                    };
+                    setFilterExpiryRange([
+                      toDate(val[0]),
+                      toDate(val[1])
+                    ]);
+                  }}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Filter by Wing"
+                  data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
+                  value={wingFilter}
+                  onChange={setWingFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <Group mt="xs" gap="xs">
+                  <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters}>
+                    Clear Filters
+                  </Button>
+                </Group>
+              </Grid.Col>
+            </Grid>
+          </Collapse>
         </Stack>
       </Card>
 
@@ -4004,6 +4061,21 @@ export default function HomePage() {
     const bTime = new Date(b.timestamp.split('Z')[0] + 'Z').getTime();
     return bTime - aTime;
   });
+
+  // Add a function to clear all filters
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setStatusFilter([]);
+    setTypeFilter([]);
+    setWingFilter([]);
+    setFloorFilter([]);
+    setFilterTypeFilter([]);
+    setNeedFlushingFilter([]);
+    setFilterNeededFilter([]);
+    setFiltersOnFilter([]);
+    setAugmentedCareFilter([]);
+    setFilterExpiryRange([null, null]);
+  };
 
   return (
     <ProtectedRoute>
