@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
+import { DynamoDBService } from '@/lib/dynamodb';
 
 // Configure DynamoDB client
 const client = new DynamoDBClient({
@@ -112,28 +113,33 @@ async function getAssetByBarcode(barcode: string) {
  */
 async function ensureAssetTypeExists(assetType: string) {
   if (!assetType) return;
-  
+  const normalizedAssetType = assetType.trim().toLowerCase();
   try {
-    const typeId = `asset-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    await ddbClient.send(new PutCommand({
+    // Check if already exists (case-insensitive)
+    const scanResult = await ddbClient.send(new ScanCommand({
       TableName: ASSET_TYPES_TABLE,
-      Item: {
-        typeId,
-        label: assetType,
-        createdAt: new Date().toISOString(),
-        createdBy: 'bulk-update'
-      },
-      ConditionExpression: 'attribute_not_exists(#label)',
-      ExpressionAttributeNames: { '#label': 'label' }
+      ProjectionExpression: '#label',
+      ExpressionAttributeNames: { '#label': 'label' },
     }));
-    
-    console.log(`Auto-created asset type: ${assetType}`);
+    const existingTypes = (scanResult.Items || []).map((item: any) => item.label?.toLowerCase());
+    if (!existingTypes.includes(normalizedAssetType)) {
+      const typeId = `asset-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await ddbClient.send(new PutCommand({
+        TableName: ASSET_TYPES_TABLE,
+        Item: {
+          typeId,
+          label: assetType.trim(),
+          createdAt: new Date().toISOString(),
+          createdBy: 'bulk-update'
+        },
+        ConditionExpression: 'attribute_not_exists(#label)',
+        ExpressionAttributeNames: { '#label': 'label' }
+      }));
+    }
   } catch (error: any) {
     if (error.name !== 'ConditionalCheckFailedException') {
       console.warn(`Failed to create asset type ${assetType}:`, error);
     }
-    // ConditionalCheckFailedException means it already exists, which is fine
   }
 }
 
@@ -142,28 +148,33 @@ async function ensureAssetTypeExists(assetType: string) {
  */
 async function ensureFilterTypeExists(filterType: string) {
   if (!filterType) return;
-  
+  const normalizedFilterType = filterType.trim().toLowerCase();
   try {
-    const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    await ddbClient.send(new PutCommand({
+    // Check if already exists (case-insensitive)
+    const scanResult = await ddbClient.send(new ScanCommand({
       TableName: FILTER_TYPES_TABLE,
-      Item: {
-        typeId,
-        label: filterType,
-        createdAt: new Date().toISOString(),
-        createdBy: 'bulk-update'
-      },
-      ConditionExpression: 'attribute_not_exists(#label)',
-      ExpressionAttributeNames: { '#label': 'label' }
+      ProjectionExpression: '#label',
+      ExpressionAttributeNames: { '#label': 'label' },
     }));
-    
-    console.log(`Auto-created filter type: ${filterType}`);
+    const existingTypes = (scanResult.Items || []).map((item: any) => item.label?.toLowerCase());
+    if (!existingTypes.includes(normalizedFilterType)) {
+      const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      await ddbClient.send(new PutCommand({
+        TableName: FILTER_TYPES_TABLE,
+        Item: {
+          typeId,
+          label: filterType.trim(),
+          createdAt: new Date().toISOString(),
+          createdBy: 'bulk-update'
+        },
+        ConditionExpression: 'attribute_not_exists(#label)',
+        ExpressionAttributeNames: { '#label': 'label' }
+      }));
+    }
   } catch (error: any) {
     if (error.name !== 'ConditionalCheckFailedException') {
       console.warn(`Failed to create filter type ${filterType}:`, error);
     }
-    // ConditionalCheckFailedException means it already exists, which is fine
   }
 }
 
@@ -273,13 +284,16 @@ export async function POST(req: NextRequest) {
       total: data.length,
       updated: 0,
       notFound: 0,
+      skipped: 0,
       errors: 0,
       errorDetails: [] as string[],
       notFoundBarcodes: [] as string[],
+      skippedBarcodes: [] as string[],
       newAssetTypes: [] as string[],
       newFilterTypes: [] as string[]
     };
 
+    const seenBarcodes = new Set<string>();
     const currentUser = getCurrentUser();
     const userEmail = typeof currentUser === 'string' ? currentUser : ((currentUser as any)?.email || 'unknown');
 
@@ -287,32 +301,32 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const rowNum = i + 2; // Excel row number (1-based + header row)
-      
       try {
         // Get barcode - this is required for identification
         const barcodeRaw = row['Asset Barcode'] || row['assetBarcode'] || row['barcode'];
-        
         if (!barcodeRaw) {
           results.errors++;
           results.errorDetails.push(`Row ${rowNum}: Missing asset barcode`);
           continue;
         }
-
         // Sanitize barcode (uppercase and trim)
         const barcode = sanitizeField(barcodeRaw, 'assetBarcode');
-
+        // Check for duplicate barcode in file
+        if (seenBarcodes.has(barcode)) {
+          results.skipped++;
+          results.skippedBarcodes.push(barcode);
+          continue;
+        }
+        seenBarcodes.add(barcode);
         // Check if asset exists
         const existingAsset = await getAssetByBarcode(barcode);
-        
         if (!existingAsset) {
           results.notFound++;
           results.notFoundBarcodes.push(barcode);
           continue;
         }
-
         // Parse and prepare update data
         const updateData: any = {};
-        
         // Map CSV/Excel columns to database fields
         const fieldMapping = {
           'Asset Type': 'assetType',
@@ -335,11 +349,9 @@ export async function POST(req: NextRequest) {
           'Notes': 'notes',
           'Augmented Care': 'augmentedCare'
         };
-
         // Process each field
         for (const [csvField, dbField] of Object.entries(fieldMapping)) {
           const value = row[csvField];
-          
           if (value !== undefined && value !== null && value !== '') {
             if (dbField === 'filterExpiryDate' || dbField === 'filterInstalledOn') {
               // Handle date fields
@@ -361,30 +373,21 @@ export async function POST(req: NextRequest) {
             }
           }
         }
-
         // Auto-calculate filter expiry date if filter installed date is provided but expiry date is not
         if (updateData.filterInstalledOn && !updateData.filterExpiryDate) {
           try {
             const installedDate = new Date(updateData.filterInstalledOn);
             const expiryDate = new Date(installedDate);
-            
-            // Add exactly 3 months
             expiryDate.setMonth(expiryDate.getMonth() + 3);
-            
-            // Handle edge cases where the day doesn't exist in the target month
             const originalDay = installedDate.getDate();
             if (expiryDate.getDate() !== originalDay) {
-              // The date was automatically adjusted by JavaScript (e.g., Feb 30 -> Mar 2)
-              // Set to the 1st day of the next month
               expiryDate.setDate(1);
             }
-            
             updateData.filterExpiryDate = expiryDate.toISOString().split('T')[0];
           } catch (error) {
             console.warn(`Failed to calculate filter expiry date for row ${rowNum}:`, error);
           }
         }
-
         // Auto-create asset type if provided
         if (updateData.assetType) {
           await ensureAssetTypeExists(updateData.assetType);
@@ -392,7 +395,6 @@ export async function POST(req: NextRequest) {
             results.newAssetTypes.push(updateData.assetType);
           }
         }
-
         // Auto-create filter type if provided
         if (updateData.filterType) {
           await ensureFilterTypeExists(updateData.filterType);
@@ -400,28 +402,47 @@ export async function POST(req: NextRequest) {
             results.newFilterTypes.push(updateData.filterType);
           }
         }
-
         // Update the asset
         const updateResult = await updateAsset(existingAsset, updateData, userEmail);
-        
         if (updateResult.updated) {
           results.updated++;
+          // Log audit entry for this update
+          try {
+            await DynamoDBService.logAssetAuditEntry({
+              assetId: existingAsset.id,
+              timestamp: new Date().toISOString(),
+              user: userEmail,
+              action: 'UPDATE',
+              details: { assetBarcode: barcode, assetName: updateData.primaryIdentifier || '', changes: [] }
+            });
+          } catch (auditError) {
+            console.warn(`Failed to log audit entry for asset ${barcode}:`, auditError);
+          }
         } else {
           results.errors++;
           results.errorDetails.push(`Row ${rowNum}: ${updateResult.reason || 'Update failed'}`);
         }
-
       } catch (error) {
         results.errors++;
         results.errorDetails.push(`Row ${rowNum}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         console.error(`Error processing row ${rowNum}:`, error);
       }
     }
-
     return NextResponse.json({
       success: true,
       message: 'Bulk update completed',
-      results: results
+      results: {
+        total: results.total,
+        updated: results.updated,
+        skipped: results.skipped,
+        notFound: results.notFound,
+        errors: results.errors,
+        errorDetails: results.errorDetails.slice(0, 20),
+        skippedBarcodes: results.skippedBarcodes,
+        notFoundBarcodes: results.notFoundBarcodes,
+        newAssetTypes: results.newAssetTypes,
+        newFilterTypes: results.newFilterTypes
+      }
     });
 
   } catch (error) {

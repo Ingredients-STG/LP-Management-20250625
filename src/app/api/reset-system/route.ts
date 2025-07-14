@@ -205,14 +205,12 @@ export async function POST(request: NextRequest) {
       clearAssetTypes: false,
       clearFilterTypes: false,
       clearS3Files: true,
-      reseedDefaults: true,
       ...resetOptions
     };
     
     const resetResults = {
       tables: {} as Record<string, any>,
       s3: {} as any,
-      reseeded: {} as any,
       timestamp: new Date().toISOString(),
       initiatedBy: userEmail,
       options
@@ -259,11 +257,8 @@ export async function POST(request: NextRequest) {
       resetResults.s3 = await clearS3Bucket();
     }
     
-    // Reseed default data (optional)
-    if (options.reseedDefaults) {
-      console.log('Reseeding default data...');
-      resetResults.reseeded = await reseedDefaultData();
-    }
+    // Do NOT reseed default data
+    // Tables will be left empty after reset
     
     // Calculate total records deleted
     const totalRecordsDeleted = Object.values(resetResults.tables).reduce((total: number, table: any) => {

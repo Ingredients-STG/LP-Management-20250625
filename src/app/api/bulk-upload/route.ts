@@ -171,14 +171,14 @@ export async function POST(request: NextRequest) {
     console.log('Raw headers:', rawHeaders);
     console.log('Header mapping:', headerMapping);
     
-    // Check for required field presence
-    const requiredFields = ['assetBarcode', 'room', 'filterNeeded'];
+    // Only assetBarcode is required
+    const requiredFields = ['assetBarcode'];
     const missingFields = requiredFields.filter(field => !(field in headerMapping));
     
     if (missingFields.length > 0) {
       return NextResponse.json({
         success: false,
-        error: `Missing required columns: ${missingFields.join(', ')}. Please ensure your file has columns for Asset Barcode, Room, and Filter Needed.`
+        error: `Missing required columns: ${missingFields.join(', ')}. Please ensure your file has a column for Asset Barcode.`
       }, { status: 400 });
     }
 
@@ -210,41 +210,10 @@ export async function POST(request: NextRequest) {
         const assetBarcodeRaw = values[headerMapping.assetBarcode] || '';
         const assetBarcode = sanitizeField(assetBarcodeRaw, 'assetBarcode');
         
-        const roomRaw = values[headerMapping.room] || '';
-        const room = sanitizeField(roomRaw, 'room');
-        
-        const filterNeededRaw = values[headerMapping.filterNeeded] || '';
-        // Use robust boolean parsing
-        const filterNeeded = parseBoolField(filterNeededRaw);
-
         // Validate Asset Barcode
         if (!assetBarcode || assetBarcode === 'null' || assetBarcode === 'undefined') {
           results.failed++;
           results.errors.push(`Row ${rowNumber}: Asset Barcode is required`);
-          continue;
-        }
-
-        // Validate Room
-        if (!room || room === 'null' || room === 'undefined') {
-          results.failed++;
-          results.errors.push(`Row ${rowNumber}: Room is required`);
-          continue;
-        }
-
-        // Validate Filter Needed
-        if (filterNeededRaw.trim() === '') {
-          results.failed++;
-          results.errors.push(`Row ${rowNumber}: Filter Needed is required (use YES/NO)`);
-          continue;
-        }
-
-        // Validate filterInstalledOn if filterNeeded is true
-        const filterInstalledOnRaw = values[headerMapping.filterInstalledOn] || '';
-        const filterInstalledOnValue = String(filterInstalledOnRaw).trim();
-        
-        if (filterNeeded && !filterInstalledOnValue) {
-          results.failed++;
-          results.errors.push(`Row ${rowNumber}: Filter Installed On date is required when Filter Needed is YES`);
           continue;
         }
 
@@ -261,11 +230,13 @@ export async function POST(request: NextRequest) {
         }
 
         // Get asset type for auto-creation
-        const assetTypeRaw = values[headerMapping.assetType] || '';
+        const assetTypeRaw = headerMapping.assetType !== undefined ? values[headerMapping.assetType] : '';
+        // Normalize assetType and filterType
         const assetTypeValue = String(assetTypeRaw).trim();
+        const normalizedAssetType = assetTypeValue ? assetTypeValue.toLowerCase() : '';
 
-        // Auto-create asset type if provided and doesn't exist
-        if (assetTypeValue && !existingTypeLabels.has(assetTypeValue)) {
+        // Auto-create asset type if provided and doesn't exist (case-insensitive)
+        if (normalizedAssetType && !Array.from(existingTypeLabels).map(t => t.toLowerCase()).includes(normalizedAssetType)) {
           try {
             await DynamoDBService.createAssetType(assetTypeValue, 'bulk-upload');
             existingTypeLabels.add(assetTypeValue);
@@ -275,17 +246,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Parse new fields
-        const needFlushingRaw = headerMapping.needFlushing !== undefined ? values[headerMapping.needFlushing] : '';
-        const filterType = headerMapping.filterType !== undefined ? String(values[headerMapping.filterType] || '').trim() : '';
-        
-        // Auto-create filter type if provided and doesn't exist
-        if (filterType) {
+        // Parse filterType and auto-create if new
+        const filterTypeRaw = headerMapping.filterType !== undefined ? values[headerMapping.filterType] : '';
+        const filterType = String(filterTypeRaw).trim();
+        const normalizedFilterType = filterType ? filterType.toLowerCase() : '';
+        if (normalizedFilterType) {
           try {
-            // Import the DynamoDB client and commands directly
             const { DynamoDBDocumentClient, PutCommand } = await import('@aws-sdk/lib-dynamodb');
             const { DynamoDBClient } = await import('@aws-sdk/client-dynamodb');
-            
             const client = new DynamoDBClient({
               region: process.env.AMPLIFY_AWS_REGION || 'eu-west-2',
               credentials: {
@@ -294,114 +262,69 @@ export async function POST(request: NextRequest) {
               },
             });
             const ddbClient = DynamoDBDocumentClient.from(client);
-            
-            const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            
-            await ddbClient.send(new PutCommand({
+            // Check if filter type already exists (case-insensitive)
+            const filterTypesResult = await ddbClient.send(new (await import('@aws-sdk/lib-dynamodb')).ScanCommand({
               TableName: 'FilterTypes',
-              Item: {
-                typeId,
-                label: filterType,
-                createdAt: new Date().toISOString(),
-                createdBy: 'bulk-upload'
-              },
-              ConditionExpression: 'attribute_not_exists(#label)',
-              ExpressionAttributeNames: { '#label': 'label' }
+              ProjectionExpression: '#label',
+              ExpressionAttributeNames: { '#label': 'label' },
             }));
-            
-            console.log(`Auto-created filter type: ${filterType}`);
-            results.newFilterTypes.push(filterType);
+            const existingFilterTypes = (filterTypesResult.Items || []).map((item: any) => item.label?.toLowerCase());
+            if (!existingFilterTypes.includes(normalizedFilterType)) {
+              const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+              await ddbClient.send(new PutCommand({
+                TableName: 'FilterTypes',
+                Item: {
+                  typeId,
+                  label: filterType,
+                  createdAt: new Date().toISOString(),
+                  createdBy: 'bulk-upload'
+                },
+                ConditionExpression: 'attribute_not_exists(#label)',
+                ExpressionAttributeNames: { '#label': 'label' }
+              }));
+              results.newFilterTypes.push(filterType);
+            }
           } catch (error: any) {
             if (error.name !== 'ConditionalCheckFailedException') {
               console.warn(`Failed to create filter type ${filterType}:`, error);
             }
-            // ConditionalCheckFailedException means it already exists, which is fine
           }
         }
-        const filtersOnRaw = headerMapping.filtersOn !== undefined ? values[headerMapping.filtersOn] : '';
-        const augmentedCareRaw = headerMapping.augmentedCare !== undefined ? values[headerMapping.augmentedCare] : '';
 
-        // Parse boolean fields with debug logging
-        const filtersOnParsed = parseBoolField(filtersOnRaw);
-        console.log(`Row ${rowNumber}: filtersOnRaw="${filtersOnRaw}" -> filtersOnParsed=${filtersOnParsed}`);
-        
-        // Parse filterInstalledOn and filterExpiryDate using strict DD/MM/YYYY
-        const rawInstalled = headerMapping.filterInstalledOn !== undefined ? values[headerMapping.filterInstalledOn] : '';
-        const rawExpiry = headerMapping.filterExpiryDate !== undefined ? values[headerMapping.filterExpiryDate] : '';
-        const parsedInstalled = parseExcelDate(rawInstalled, rowNumber);
-        const parsedExpiry = parseExcelDate(rawExpiry, rowNumber);
-        if (parsedInstalled.error) {
-          results.failed++;
-          results.errors.push(parsedInstalled.error);
-          continue;
-        }
-        if (parsedExpiry.error) {
-          results.failed++;
-          results.errors.push(parsedExpiry.error);
-          continue;
-        }
-        // Auto-calculate filter expiry if installed date is provided but expiry is not
-        let finalExpiryDate = parsedExpiry.date;
-        if (parsedInstalled.date && !parsedExpiry.date) {
-          // Calculate expiry as 3 months from installed date
-          const installedDate = new Date(parsedInstalled.date);
-          const expiryDate = new Date(installedDate);
-          expiryDate.setMonth(expiryDate.getMonth() + 3);
-          finalExpiryDate = expiryDate.toISOString().split('T')[0];
-          console.log(`Row ${rowNumber}: Auto-calculated expiry ${finalExpiryDate} from installed ${parsedInstalled.date}`);
-        }
-
-        // Build asset object with validated required fields
-        const asset: any = {
-          assetBarcode,
-          room,
-          filterNeeded,
-          createdBy: 'bulk-upload',
-          modifiedBy: 'bulk-upload',
-          needFlushing: parseBoolField(needFlushingRaw),
-          filterType,
-          filtersOn: filtersOnParsed,
-          augmentedCare: parseBoolField(augmentedCareRaw),
-          filterInstalledOn: parsedInstalled.date || null,
-          filterExpiryDate: finalExpiryDate || null
-        };
-
-        // Add optional fields using header mapping
+        // Build asset object (all other fields optional)
+        const asset: any = { assetBarcode, createdBy: 'bulk-upload', modifiedBy: 'bulk-upload' };
         const optionalFields = [
-          'primaryIdentifier', 'secondaryIdentifier', 'assetType', 'status',
-          'wing', 'wingInShort', 'floor', 'floorInWords', 'roomNo', 'roomName',
-          'notes'
+          'room', 'filterNeeded', 'filterInstalledOn', 'assetType', 'primaryIdentifier', 'secondaryIdentifier', 'status',
+          'wing', 'wingInShort', 'floor', 'floorInWords', 'roomNo', 'roomName', 'filtersOn', 'needFlushing', 'filterType',
+          'notes', 'augmentedCare', 'filterExpiryDate'
         ];
-
         optionalFields.forEach(fieldName => {
           if (fieldName in headerMapping) {
             const rawValue = values[headerMapping[fieldName]];
             const value = sanitizeField(rawValue, fieldName);
-            
-            // Check if value is meaningful (not null, undefined, empty string, or literal 'null'/'undefined')
-            // But allow "0" as a valid value
             if (value !== null && value !== undefined && value !== '' && value !== 'null' && value !== 'undefined') {
-              
-              // Handle special field types
-              if (fieldName === 'filtersOn' || fieldName === 'augmentedCare') {
-                asset[fieldName] = parseBoolField(value);
-              } else {
-                asset[fieldName] = value;
-              }
+              asset[fieldName] = value;
             }
           }
         });
 
-        // No filter logic is applied here; values are stored as provided in the CSV.
-
         // Save to DynamoDB
         const newAsset = await DynamoDBService.createAsset(asset);
-        
-        // Add to existing barcodes to prevent duplicates within the same upload
         existingBarcodes.add(assetBarcode);
-        
         results.success++;
 
+        // Log audit entry for this asset
+        try {
+          await DynamoDBService.logAssetAuditEntry({
+            assetId: newAsset.id,
+            timestamp: new Date().toISOString(),
+            user: 'bulk-upload',
+            action: 'CREATE',
+            details: { assetBarcode, assetName: asset.primaryIdentifier || '', changes: [] }
+          });
+        } catch (auditError) {
+          console.warn(`Failed to log audit entry for asset ${assetBarcode}:`, auditError);
+        }
       } catch (error) {
         results.failed++;
         results.errors.push(`Row ${rowNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -412,7 +335,8 @@ export async function POST(request: NextRequest) {
       success: true, 
       results: {
         total: results.total,
-        success: results.success,
+        uploaded: results.success,
+        skipped: results.duplicateBarcodes.length,
         failed: results.failed,
         errors: results.errors.slice(0, 20), // Show up to 20 errors
         duplicateBarcodes: [...new Set(results.duplicateBarcodes)], // Remove duplicates

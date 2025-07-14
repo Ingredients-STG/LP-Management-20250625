@@ -1770,7 +1770,52 @@ export default function HomePage() {
       // Format data for export
       const exportData = filteredAssets.map(asset => {
         return allFields.map(field => {
-          const value = asset[field as keyof Asset];
+          let value = asset[field as keyof Asset];
+          
+          // Special handling for filterExpiryDate: if missing but filterInstalledOn is present, auto-calculate
+          if (field === 'filterExpiryDate') {
+            if ((!value || value === 'N/A') && asset.filterInstalledOn) {
+              // Try to parse the installed date
+              const installed = new Date(asset.filterInstalledOn);
+              if (!isNaN(installed.getTime())) {
+                // Calculate expiry as 3 months after installation
+                const expiry = new Date(installed);
+                expiry.setMonth(expiry.getMonth() + 3);
+                // Preserve the original day if possible
+                const originalDay = installed.getDate();
+                if (expiry.getDate() !== originalDay) {
+                  expiry.setDate(1);
+                }
+                value = expiry.toISOString().split('T')[0];
+              }
+            }
+            
+            // Format as DD/MM/YYYY if valid date
+            if (value && value !== 'N/A' && typeof value === 'string') {
+              const d = new Date(value);
+              if (!isNaN(d.getTime())) {
+                value = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+              } else {
+                value = 'N/A';
+              }
+            } else {
+              value = 'N/A';
+            }
+          }
+          
+          // Special handling for filterInstalledOn: format as DD/MM/YYYY if valid
+          if (field === 'filterInstalledOn') {
+            if (value && value !== 'N/A' && typeof value === 'string') {
+              const d = new Date(value);
+              if (!isNaN(d.getTime())) {
+                value = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+              } else {
+                value = 'N/A';
+              }
+            } else {
+              value = 'N/A';
+            }
+          }
           const formattedValue = formatValue(value);
           // Special handling for asset barcode - always uppercase and trimmed
           if (field === 'assetBarcode') {
@@ -2942,11 +2987,11 @@ export default function HomePage() {
           <Box pl="md">
             <Text size="sm" c="red">• All assets ({assets.length} assets) - ALWAYS CLEARED</Text>
             <Text size="sm" c="orange">• Audit logs (optional)</Text>
-            <Text size="sm" c="orange">• Asset types and filter types (optional)</Text>
+            <Text size="sm" c="orange">• Asset types and filter types (optional, will be left <b>empty</b> after reset)</Text>
             <Text size="sm" c="orange">• All uploaded files (optional)</Text>
           </Box>
           <Text size="sm" fw={500}>
-            This action CANNOT be undone. The system will be restored to its initial state.
+            This action CANNOT be undone. The system will be restored to its initial state. If you clear asset types and filter types, they will be left <b>empty</b> after reset.
           </Text>
           <Text size="sm" c="dimmed">
             To confirm, please type: <Text span fw={600} c="red">RESET ALL DATA</Text>
@@ -2978,8 +3023,7 @@ export default function HomePage() {
                   clearAuditLogs,
                   clearAssetTypes,
                   clearFilterTypes: clearAssetTypes, // Clear filter types if asset types are cleared
-                  clearS3Files,
-                  reseedDefaults: true
+                  clearS3Files
                 });
                 modals.closeAll();
               } else {
@@ -3016,7 +3060,7 @@ export default function HomePage() {
                   name="clearAssetTypes"
                   value="true"
                   defaultChecked={false}
-                  label="Clear asset types and filter types (will be reseeded with defaults)"
+                  label="Clear asset types and filter types (will be left empty after reset)"
                 />
                 
                 <Checkbox
@@ -3049,7 +3093,6 @@ export default function HomePage() {
     clearAssetTypes?: boolean;
     clearFilterTypes?: boolean;
     clearS3Files?: boolean;
-    reseedDefaults?: boolean;
   }) => {
     try {
       setLoading(true);
@@ -3077,7 +3120,6 @@ export default function HomePage() {
             clearAssetTypes: resetOptions?.clearAssetTypes ?? false,
             clearFilterTypes: resetOptions?.clearFilterTypes ?? false,
             clearS3Files: resetOptions?.clearS3Files ?? true,
-            reseedDefaults: resetOptions?.reseedDefaults ?? true,
           },
         }),
       });
