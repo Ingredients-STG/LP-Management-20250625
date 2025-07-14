@@ -546,10 +546,18 @@ export async function POST(req: NextRequest) {
                 oldValue: existingAsset[field],
                 newValue: updateData[field]
               }));
+            // Always use the correct user, fallback to 'Unknown User' if not available
+            const auditUser = userEmail || 'Unknown User';
+            // Debug log
+            console.log('Bulk update audit log:', {
+              assetId: existingAsset.id,
+              user: auditUser,
+              changes
+            });
             await DynamoDBService.logAssetAuditEntry({
               assetId: existingAsset.id,
               timestamp: new Date().toISOString(),
-              user: userEmail,
+              user: auditUser,
               action: 'UPDATE',
               details: {
                 assetBarcode: barcode,
