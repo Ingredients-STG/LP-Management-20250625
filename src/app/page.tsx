@@ -168,6 +168,17 @@ function safeDate(val: any): Date | null {
   return null;
 }
 
+// Helper to get date and time string in YYYY-MM-DD_HHMMSS format
+const getDateTimeString = () => {
+  const now = new Date();
+  const date = now.toISOString().split('T')[0];
+  const time = now
+    .toTimeString()
+    .split(' ')[0]
+    .replace(/:/g, ''); // HHMMSS
+  return `${date}_${time}`;
+};
+
 export default function HomePage() {
   const { user, signOut } = useAuth();
   const [opened, { toggle }] = useDisclosure();
@@ -818,21 +829,17 @@ export default function HomePage() {
   const downloadTemplate = async (format: 'csv' | 'excel' = 'csv') => {
     try {
       const response = await fetch(`/api/bulk-upload?format=${format}`);
-      
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        
-        const dateStr = new Date().toISOString().split('T')[0];
-        a.download = `bulk-upload-template-${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
-        
+        const dateTimeStr = getDateTimeString();
+        a.download = `bulk-upload-template_${dateTimeStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
         notifications.show({
           title: 'Template Downloaded',
           message: `Bulk upload template (${format.toUpperCase()}) has been downloaded successfully`,
@@ -862,16 +869,13 @@ export default function HomePage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        
-        const dateStr = new Date().toISOString().split('T')[0];
+        const dateTimeStr = getDateTimeString();
         const suffix = includeData ? 'with-data' : 'template';
-        a.download = `bulk-update-${suffix}-${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
-        
+        a.download = `bulk-update-${suffix}_${dateTimeStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
         notifications.show({
           title: 'Template Downloaded',
           message: `Bulk update ${includeData ? 'template with current data' : 'template'} has been downloaded successfully`,
@@ -1855,7 +1859,7 @@ export default function HomePage() {
         });
       });
 
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateTimeStr = getDateTimeString();
       
       if (format === 'excel') {
         // Create Excel workbook
@@ -1883,7 +1887,7 @@ export default function HomePage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `assets-export-${dateStr}.xlsx`;
+        a.download = `assets-export_${dateTimeStr}.xlsx`;
         a.click();
         window.URL.revokeObjectURL(url);
         
@@ -1907,7 +1911,7 @@ export default function HomePage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `assets-export-${dateStr}.csv`;
+        a.download = `assets-export_${dateTimeStr}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
