@@ -765,7 +765,22 @@ export default function HomePage() {
         body: formData,
       });
 
-      const result = await response.json();
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        if (response.status === 504) {
+          throw new Error('Request timeout. The file may be too large or the server is busy. Please try with a smaller file or try again later.');
+        }
+        const errorText = await response.text();
+        throw new Error(`Server error (${response.status}): ${errorText || 'Unknown error'}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError);
+        throw new Error('Invalid response from server. Please try again.');
+      }
       
       if (result.success) {
         setUploadResults(result.results);
@@ -781,7 +796,7 @@ export default function HomePage() {
       } else {
         notifications.show({
           title: 'Upload Failed',
-          message: 'Upload failed. Please check the file and try again.',
+          message: result.error || 'Upload failed. Please check the file and try again.',
           color: 'red',
           icon: <IconX size={16} />,
         });
@@ -790,7 +805,7 @@ export default function HomePage() {
       console.error('Upload error:', error);
       notifications.show({
         title: 'Upload Error',
-        message: 'An error occurred during upload',
+        message: error instanceof Error ? error.message : 'An error occurred during upload',
         color: 'red',
         icon: <IconX size={16} />,
       });
@@ -900,7 +915,22 @@ export default function HomePage() {
         body: formData,
       });
 
-      const result = await response.json();
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        if (response.status === 504) {
+          throw new Error('Request timeout. The file may be too large or the server is busy. Please try with a smaller file or try again later.');
+        }
+        const errorText = await response.text();
+        throw new Error(`Server error (${response.status}): ${errorText || 'Unknown error'}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError);
+        throw new Error('Invalid response from server. Please try again.');
+      }
 
       if (result.success) {
         setBulkUpdateResults(result.results);

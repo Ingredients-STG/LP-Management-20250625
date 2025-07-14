@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
 import { DynamoDBService } from '@/lib/dynamodb';
@@ -19,6 +19,12 @@ const ddbClient = DynamoDBDocumentClient.from(client);
 const ASSETS_TABLE = 'water-tap-assets';
 const ASSET_TYPES_TABLE = 'AssetTypes';
 const FILTER_TYPES_TABLE = 'FilterTypes';
+
+// Cache for asset types and filter types to avoid repeated scans
+let assetTypesCache: Set<string> | null = null;
+let filterTypesCache: Set<string> | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Parse date values from Excel/CSV - supports DD/MM/YYYY format
@@ -88,20 +94,46 @@ function sanitizeField(value: any, fieldName: string): any {
 }
 
 /**
- * Get existing asset by barcode
+ * Get existing asset by barcode - optimized with case-insensitive search
  */
 async function getAssetByBarcode(barcode: string) {
   try {
+    // First try exact match (most efficient)
     const scanCommand = new ScanCommand({
       TableName: ASSETS_TABLE,
       FilterExpression: 'assetBarcode = :barcode',
       ExpressionAttributeValues: {
         ':barcode': barcode
-      }
+      },
+      Limit: 1 // Limit to 1 result for efficiency
     });
     
     const result = await ddbClient.send(scanCommand);
-    return result.Items && result.Items.length > 0 ? result.Items[0] : null;
+    if (result.Items && result.Items.length > 0) {
+      return result.Items[0];
+    }
+    
+    // If exact match fails, try case-insensitive search
+    const caseInsensitiveScan = new ScanCommand({
+      TableName: ASSETS_TABLE,
+      FilterExpression: 'contains(assetBarcode, :barcode) OR contains(assetBarcode, :barcodeLower)',
+      ExpressionAttributeValues: {
+        ':barcode': barcode,
+        ':barcodeLower': barcode.toLowerCase()
+      },
+      Limit: 10 // Limit for efficiency
+    });
+    
+    const caseResult = await ddbClient.send(caseInsensitiveScan);
+    if (caseResult.Items && caseResult.Items.length > 0) {
+      // Find the best match (exact case-insensitive match)
+      const bestMatch = caseResult.Items.find(item => 
+        item.assetBarcode?.toLowerCase() === barcode.toLowerCase()
+      );
+      return bestMatch || caseResult.Items[0];
+    }
+    
+    return null;
   } catch (error) {
     console.error('Error getting asset by barcode:', error);
     throw error;
@@ -109,20 +141,65 @@ async function getAssetByBarcode(barcode: string) {
 }
 
 /**
- * Auto-create asset type if it doesn't exist
+ * Get cached asset types to avoid repeated scans
  */
-async function ensureAssetTypeExists(assetType: string) {
-  if (!assetType) return;
-  const normalizedAssetType = assetType.trim().toLowerCase();
+async function getCachedAssetTypes(): Promise<Set<string>> {
+  const now = Date.now();
+  if (assetTypesCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    return assetTypesCache;
+  }
+  
   try {
-    // Check if already exists (case-insensitive)
     const scanResult = await ddbClient.send(new ScanCommand({
       TableName: ASSET_TYPES_TABLE,
       ProjectionExpression: '#label',
       ExpressionAttributeNames: { '#label': 'label' },
     }));
-    const existingTypes = (scanResult.Items || []).map((item: any) => item.label?.toLowerCase());
-    if (!existingTypes.includes(normalizedAssetType)) {
+    
+    assetTypesCache = new Set((scanResult.Items || []).map((item: any) => item.label?.toLowerCase()));
+    cacheTimestamp = now;
+    return assetTypesCache;
+  } catch (error) {
+    console.error('Error fetching asset types:', error);
+    return new Set();
+  }
+}
+
+/**
+ * Get cached filter types to avoid repeated scans
+ */
+async function getCachedFilterTypes(): Promise<Set<string>> {
+  const now = Date.now();
+  if (filterTypesCache && (now - cacheTimestamp) < CACHE_DURATION) {
+    return filterTypesCache;
+  }
+  
+  try {
+    const scanResult = await ddbClient.send(new ScanCommand({
+      TableName: FILTER_TYPES_TABLE,
+      ProjectionExpression: '#label',
+      ExpressionAttributeNames: { '#label': 'label' },
+    }));
+    
+    filterTypesCache = new Set((scanResult.Items || []).map((item: any) => item.label?.toLowerCase()));
+    cacheTimestamp = now;
+    return filterTypesCache;
+  } catch (error) {
+    console.error('Error fetching filter types:', error);
+    return new Set();
+  }
+}
+
+/**
+ * Auto-create asset type if it doesn't exist - optimized
+ */
+async function ensureAssetTypeExists(assetType: string) {
+  if (!assetType) return;
+  const normalizedAssetType = assetType.trim().toLowerCase();
+  
+  try {
+    const existingTypes = await getCachedAssetTypes();
+    if (!existingTypes.has(normalizedAssetType)) {
       const typeId = `asset-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       await ddbClient.send(new PutCommand({
         TableName: ASSET_TYPES_TABLE,
@@ -135,6 +212,11 @@ async function ensureAssetTypeExists(assetType: string) {
         ConditionExpression: 'attribute_not_exists(#label)',
         ExpressionAttributeNames: { '#label': 'label' }
       }));
+      
+      // Update cache
+      if (assetTypesCache) {
+        assetTypesCache.add(normalizedAssetType);
+      }
     }
   } catch (error: any) {
     if (error.name !== 'ConditionalCheckFailedException') {
@@ -144,20 +226,15 @@ async function ensureAssetTypeExists(assetType: string) {
 }
 
 /**
- * Auto-create filter type if it doesn't exist
+ * Auto-create filter type if it doesn't exist - optimized
  */
 async function ensureFilterTypeExists(filterType: string) {
   if (!filterType) return;
   const normalizedFilterType = filterType.trim().toLowerCase();
+  
   try {
-    // Check if already exists (case-insensitive)
-    const scanResult = await ddbClient.send(new ScanCommand({
-      TableName: FILTER_TYPES_TABLE,
-      ProjectionExpression: '#label',
-      ExpressionAttributeNames: { '#label': 'label' },
-    }));
-    const existingTypes = (scanResult.Items || []).map((item: any) => item.label?.toLowerCase());
-    if (!existingTypes.includes(normalizedFilterType)) {
+    const existingTypes = await getCachedFilterTypes();
+    if (!existingTypes.has(normalizedFilterType)) {
       const typeId = `filter-type-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       await ddbClient.send(new PutCommand({
         TableName: FILTER_TYPES_TABLE,
@@ -170,6 +247,11 @@ async function ensureFilterTypeExists(filterType: string) {
         ConditionExpression: 'attribute_not_exists(#label)',
         ExpressionAttributeNames: { '#label': 'label' }
       }));
+      
+      // Update cache
+      if (filterTypesCache) {
+        filterTypesCache.add(normalizedFilterType);
+      }
     }
   } catch (error: any) {
     if (error.name !== 'ConditionalCheckFailedException') {
@@ -280,6 +362,12 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // Pre-load caches to avoid repeated scans
+    await Promise.all([
+      getCachedAssetTypes(),
+      getCachedFilterTypes()
+    ]);
+
     const results = {
       total: data.length,
       updated: 0,
@@ -297,8 +385,18 @@ export async function POST(req: NextRequest) {
     const currentUser = getCurrentUser();
     const userEmail = typeof currentUser === 'string' ? currentUser : ((currentUser as any)?.email || 'unknown');
 
-    // Process each row
+    // Process each row with timeout protection
+    const startTime = Date.now();
+    const maxProcessingTime = 25000; // 25 seconds max processing time
+
     for (let i = 0; i < data.length; i++) {
+      // Check for timeout
+      if (Date.now() - startTime > maxProcessingTime) {
+        results.errors++;
+        results.errorDetails.push(`Processing timeout after ${i} rows. Please try with a smaller file.`);
+        break;
+      }
+
       const row = data[i];
       const rowNum = i + 2; // Excel row number (1-based + header row)
       try {

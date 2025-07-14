@@ -200,8 +200,18 @@ export async function POST(request: NextRequest) {
       newFilterTypes: []
     };
 
-    // Process each data row
+    // Process each data row with timeout protection
+    const startTime = Date.now();
+    const maxProcessingTime = 25000; // 25 seconds max processing time
+
     for (let i = 1; i < rows.length; i++) {
+      // Check for timeout
+      if (Date.now() - startTime > maxProcessingTime) {
+        results.failed++;
+        results.errors.push(`Processing timeout after ${i} rows. Please try with a smaller file.`);
+        break;
+      }
+
       const rowNumber = i + 1;
       const values = rows[i];
       
