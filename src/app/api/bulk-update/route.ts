@@ -530,14 +530,32 @@ export async function POST(req: NextRequest) {
         const updateResult = await updateAsset(existingAsset, updateData, userEmail);
         if (updateResult.updated) {
           results.updated++;
-          // Log audit entry for this update
+          // Log audit entry for this update with detailed field changes
           try {
+            // Compare old and new values for all updatable fields
+            const updatableFields = [
+              'assetType', 'status', 'primaryIdentifier', 'secondaryIdentifier',
+              'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+              'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn',
+              'filterType', 'needFlushing', 'notes', 'augmentedCare'
+            ];
+            const changes = updatableFields
+              .filter(field => updateData[field] !== undefined && updateData[field] !== existingAsset[field])
+              .map(field => ({
+                field,
+                oldValue: existingAsset[field],
+                newValue: updateData[field]
+              }));
             await DynamoDBService.logAssetAuditEntry({
               assetId: existingAsset.id,
               timestamp: new Date().toISOString(),
               user: userEmail,
               action: 'UPDATE',
-              details: { assetBarcode: barcode, assetName: updateData.primaryIdentifier || '', changes: [] }
+              details: {
+                assetBarcode: barcode,
+                assetName: updateData.primaryIdentifier || existingAsset.primaryIdentifier || '',
+                changes
+              }
             });
           } catch (auditError) {
             console.warn(`Failed to log audit entry for asset ${barcode}:`, auditError);
