@@ -566,9 +566,11 @@ export async function POST(req: NextRequest) {
         }
         // Always log an audit entry, even if no changes
         try {
+          // Guarantee unique timestamp by appending a random suffix
+          const uniqueTimestamp = `${new Date().toISOString()}-${Math.random().toString(36).substr(2, 6)}`;
           const auditEntry = {
             assetId: existingAsset.id,
-            timestamp: new Date().toISOString(),
+            timestamp: uniqueTimestamp,
             user: auditUser,
             action: 'UPDATE',
             details: {
