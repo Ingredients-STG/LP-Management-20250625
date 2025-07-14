@@ -141,6 +141,28 @@ async function getAssetByBarcode(barcode: string) {
 }
 
 /**
+ * Load all assets into a normalized barcode map for fast lookup
+ */
+async function getAllAssetsMap() {
+  const assetsMap = new Map();
+  let lastEvaluatedKey = undefined;
+  do {
+    const scanResult: any = await ddbClient.send(new ScanCommand({
+      TableName: ASSETS_TABLE,
+      ExclusiveStartKey: lastEvaluatedKey,
+      ProjectionExpression: 'id, assetBarcode',
+    }));
+    (scanResult.Items || []).forEach((item: any) => {
+      if (item.assetBarcode) {
+        assetsMap.set(String(item.assetBarcode).trim().toUpperCase(), item);
+      }
+    });
+    lastEvaluatedKey = scanResult.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+  return assetsMap;
+}
+
+/**
  * Get cached asset types to avoid repeated scans
  */
 async function getCachedAssetTypes(): Promise<Set<string>> {
@@ -368,6 +390,9 @@ export async function POST(req: NextRequest) {
       getCachedFilterTypes()
     ]);
 
+    // Load all assets into a normalized barcode map
+    const assetsMap = await getAllAssetsMap();
+
     const results = {
       total: data.length,
       updated: 0,
@@ -416,8 +441,9 @@ export async function POST(req: NextRequest) {
           continue;
         }
         seenBarcodes.add(barcode);
-        // Check if asset exists
-        const existingAsset = await getAssetByBarcode(barcode);
+        // Lookup asset in the map
+        const normalizedBarcode = String(barcode).trim().toUpperCase();
+        const existingAsset = assetsMap.get(normalizedBarcode);
         if (!existingAsset) {
           results.notFound++;
           results.notFoundBarcodes.push(barcode);
