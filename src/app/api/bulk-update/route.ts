@@ -149,8 +149,8 @@ async function getAllAssetsMap() {
   do {
     const scanResult: any = await ddbClient.send(new ScanCommand({
       TableName: ASSETS_TABLE,
-      ExclusiveStartKey: lastEvaluatedKey,
-      ProjectionExpression: 'id, assetBarcode',
+      ExclusiveStartKey: lastEvaluatedKey
+      // Removed ProjectionExpression to fetch all fields
     }));
     (scanResult.Items || []).forEach((item: any) => {
       if (item.assetBarcode) {
@@ -345,12 +345,19 @@ async function updateAsset(existingAsset: any, newData: any, currentUser: string
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('=== BULK UPDATE STARTED ===');
+    console.log('Timestamp:', new Date().toISOString());
+    
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    const userFromForm = formData.get('user');
+    const userEmail = (typeof userFromForm === 'string' ? userFromForm : undefined) || getCurrentUser() || 'Unknown User';
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
+
+    console.log('File received:', file.name, 'Size:', file.size);
 
     // Check file type
     const fileName = file.name.toLowerCase();
@@ -378,6 +385,8 @@ export async function POST(req: NextRequest) {
       data = XLSX.utils.sheet_to_json<any>(sheet);
     }
 
+    console.log('Parsed data rows:', data.length);
+
     if (data.length === 0) {
       return NextResponse.json({ 
         error: 'File must contain at least one data row' 
@@ -385,13 +394,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Pre-load caches to avoid repeated scans
+    console.log('Loading asset types and filter types...');
     await Promise.all([
       getCachedAssetTypes(),
       getCachedFilterTypes()
     ]);
 
     // Load all assets into a normalized barcode map
+    console.log('Loading all assets into memory map...');
     const assetsMap = await getAllAssetsMap();
+    console.log('Assets loaded:', assetsMap.size);
 
     const results = {
       total: data.length,
@@ -407,8 +419,8 @@ export async function POST(req: NextRequest) {
     };
 
     const seenBarcodes = new Set<string>();
-    const currentUser = getCurrentUser();
-    const userEmail = typeof currentUser === 'string' ? currentUser : ((currentUser as any)?.email || 'unknown');
+    // Use user from form if provided, else fallback
+    console.log('Current user:', userEmail);
 
     // Process each row with timeout protection
     const startTime = Date.now();
@@ -416,6 +428,8 @@ export async function POST(req: NextRequest) {
 
     // Collect audit log entries for response
     const auditLogEntries: any[] = [];
+    
+    console.log('Starting to process', data.length, 'rows...');
 
     for (let i = 0; i < data.length; i++) {
       // Check for timeout
@@ -427,6 +441,9 @@ export async function POST(req: NextRequest) {
 
       const row = data[i];
       const rowNum = i + 2; // Excel row number (1-based + header row)
+      
+      console.log(`Processing row ${rowNum}:`, row);
+      
       try {
         // Get barcode - this is required for identification
         const barcodeRaw = row['Asset Barcode'] || row['assetBarcode'] || row['barcode'];
@@ -437,6 +454,8 @@ export async function POST(req: NextRequest) {
         }
         // Sanitize barcode (uppercase and trim)
         const barcode = sanitizeField(barcodeRaw, 'assetBarcode');
+        console.log(`Row ${rowNum}: Processing barcode "${barcode}"`);
+        
         // Check for duplicate barcode in file
         if (seenBarcodes.has(barcode)) {
           results.skipped++;
@@ -450,8 +469,12 @@ export async function POST(req: NextRequest) {
         if (!existingAsset) {
           results.notFound++;
           results.notFoundBarcodes.push(barcode);
+          console.log(`Row ${rowNum}: Asset not found for barcode "${barcode}"`);
           continue;
         }
+        
+        console.log(`Row ${rowNum}: Found asset ${existingAsset.id} for barcode "${barcode}"`);
+        
         // Parse and prepare update data
         const updateData: any = {};
         // Map CSV/Excel columns to database fields
@@ -500,6 +523,9 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+        
+        console.log(`Row ${rowNum}: Update data prepared:`, updateData);
+        
         // Auto-calculate filter expiry date if filter installed date is provided but expiry date is not
         if (updateData.filterInstalledOn && !updateData.filterExpiryDate) {
           try {
@@ -530,23 +556,51 @@ export async function POST(req: NextRequest) {
           }
         }
         // Update the asset
+        console.log(`Row ${rowNum}: Updating asset...`);
         const updateResult = await updateAsset(existingAsset, updateData, userEmail);
-        // Compare old and new values for all updatable fields
-        const updatableFields = [
+        
+        console.log(`Row ${rowNum}: Update result:`, updateResult);
+        
+        // Define updatable fields for audit log comparison
+        const updatableFields: string[] = [
           'assetType', 'status', 'primaryIdentifier', 'secondaryIdentifier',
           'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
           'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn',
           'filterType', 'needFlushing', 'notes', 'augmentedCare'
         ];
+        // Compare old and new values for all updatable fields
         const changes = updatableFields
-          .filter(field => updateData[field] !== undefined && updateData[field] !== existingAsset[field])
-          .map(field => ({
+          .filter((field: string) => {
+            const oldVal = existingAsset[field];
+            const newVal = updateData[field];
+            // Only log if the value actually changed (including undefined -> value, value -> undefined)
+            if (typeof oldVal === 'object' && typeof newVal === 'object') {
+              return JSON.stringify(oldVal) !== JSON.stringify(newVal);
+            }
+            // For dates, compare as ISO strings if both are present
+            if (oldVal && newVal && (typeof oldVal === 'string' && typeof newVal === 'string') && (oldVal.match(/^\d{4}-\d{2}-\d{2}/) && newVal.match(/^\d{4}-\d{2}-\d{2}/))) {
+              return oldVal !== newVal;
+            }
+            // For booleans, compare as booleans
+            if (typeof oldVal === 'boolean' || typeof newVal === 'boolean') {
+              return Boolean(oldVal) !== Boolean(newVal);
+            }
+            // For everything else, compare directly (including undefined)
+            return oldVal !== newVal;
+          })
+          .map((field: string) => ({
             field,
             oldValue: existingAsset[field],
             newValue: updateData[field]
           }));
+        
+        console.log(`Row ${rowNum}: Changes detected:`, changes);
+        
         // Always use the correct user, fallback to 'Unknown User' if not available
-        const auditUser = userEmail || 'Unknown User';
+        const auditUser = userEmail;
+        
+        console.log(`Row ${rowNum}: About to log audit entry for user:`, auditUser);
+        
         // Debug log
         if (updateResult.updated) {
           results.updated++;
@@ -566,6 +620,8 @@ export async function POST(req: NextRequest) {
         }
         // Always log an audit entry, even if no changes
         try {
+          console.log(`Row ${rowNum}: Creating audit entry...`);
+          
           // Guarantee unique timestamp by appending a random suffix
           const uniqueTimestamp = `${new Date().toISOString()}-${Math.random().toString(36).substr(2, 6)}`;
           const auditEntry = {
@@ -579,7 +635,14 @@ export async function POST(req: NextRequest) {
               changes
             }
           };
+          
+          console.log(`Row ${rowNum}: Audit entry created:`, auditEntry);
+          console.log(`Row ${rowNum}: Calling DynamoDBService.logAssetAuditEntry...`);
+          
           await DynamoDBService.logAssetAuditEntry(auditEntry);
+          
+          console.log(`Row ${rowNum}: DynamoDBService.logAssetAuditEntry completed successfully`);
+          
           auditLogEntries.push(auditEntry);
           console.log('Audit log entry written:', auditEntry);
         } catch (auditError) {
@@ -596,6 +659,11 @@ export async function POST(req: NextRequest) {
         console.error(`Error processing row ${rowNum}:`, error);
       }
     }
+    
+    console.log('=== BULK UPDATE COMPLETED ===');
+    console.log('Results:', results);
+    console.log('Audit log entries created:', auditLogEntries.length);
+    
     return NextResponse.json({
       success: true,
       message: 'Bulk update completed',

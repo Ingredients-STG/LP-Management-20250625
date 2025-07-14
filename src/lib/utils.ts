@@ -237,8 +237,16 @@ export const isNumber = (value: unknown): value is number => {
 
 // Date and time formatting utilities
 export const formatTimestamp = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  
+  let d: Date;
+  if (typeof date === 'string') {
+    // If the string contains a 'Z' (end of ISO), strip anything after it
+    const zIndex = date.indexOf('Z');
+    const cleanDate = zIndex !== -1 ? date.substring(0, zIndex + 1) : date;
+    d = new Date(cleanDate);
+  } else {
+    d = date;
+  }
+  if (isNaN(d.getTime())) return '-';
   // Format as DD/MM/YYYY HH:mm:ss (UK format, 24-hour clock)
   const day = d.getDate().toString().padStart(2, '0');
   const month = (d.getMonth() + 1).toString().padStart(2, '0');
@@ -246,7 +254,6 @@ export const formatTimestamp = (date: Date | string): string => {
   const hours = d.getHours().toString().padStart(2, '0');
   const minutes = d.getMinutes().toString().padStart(2, '0');
   const seconds = d.getSeconds().toString().padStart(2, '0');
-  
   return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 };
 

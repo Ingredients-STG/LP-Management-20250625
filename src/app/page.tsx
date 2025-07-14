@@ -239,6 +239,14 @@ export default function HomePage() {
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
   
+  // Debug: Monitor auditLog state changes
+  useEffect(() => {
+    console.log('Frontend: auditLog state changed:', auditLog.length, 'entries');
+    if (auditLog.length > 0) {
+      console.log('Frontend: First audit entry:', auditLog[0]);
+    }
+  }, [auditLog]);
+  
   // Bulk Update states
   const [bulkUpdateFile, setBulkUpdateFile] = useState<File | null>(null);
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
@@ -393,12 +401,20 @@ export default function HomePage() {
   // Fetch audit logs for a specific asset
   const fetchAuditLogs = async (assetId: string) => {
     try {
+      console.log('Frontend: Fetching audit logs for asset:', assetId);
       const response = await fetch(`/api/audit-entries?assetId=${assetId}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
+          console.log('Frontend: Received audit log data:', result.data);
+          console.log('Frontend: Number of audit entries:', result.data.length);
           setAuditLog(result.data);
+          console.log('Frontend: Audit log state updated');
+        } else {
+          console.log('Frontend: API returned success: false');
         }
+      } else {
+        console.log('Frontend: API response not ok:', response.status);
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
@@ -913,6 +929,8 @@ export default function HomePage() {
     try {
       const formData = new FormData();
       formData.append('file', bulkUpdateFile);
+      // Add current user info for audit logging
+      formData.append('user', user?.email || user?.username || 'Unknown User');
 
       const response = await fetch('/api/bulk-update', {
         method: 'POST',
@@ -998,7 +1016,10 @@ export default function HomePage() {
     return fieldNames[field] || field;
   };
 
-  const formatValue = (value: any): string => {
+  const formatValue = (value: any, isOldValue = false): string => {
+    if (value === undefined && isOldValue) {
+      return 'Not previously set';
+    }
     if (value === null || value === undefined || value === '') {
       return 'N/A';
     }
@@ -2130,6 +2151,7 @@ export default function HomePage() {
                           variant="filled"
                           color="blue"
                           onClick={() => {
+                            console.log('Frontend: Opening audit modal for asset:', asset.assetBarcode);
                             setSelectedAssetAudit(asset.assetBarcode);
                             openAuditModal();
                           }}
@@ -3856,6 +3878,13 @@ export default function HomePage() {
     }
   };
 
+  // Sort audit log entries by timestamp descending before rendering
+  const sortedAuditLog = [...auditLog].sort((a, b) => {
+    const aTime = new Date(a.timestamp.split('Z')[0] + 'Z').getTime();
+    const bTime = new Date(b.timestamp.split('Z')[0] + 'Z').getTime();
+    return bTime - aTime;
+  });
+
   return (
     <ProtectedRoute>
       <AppShell
@@ -5098,7 +5127,7 @@ export default function HomePage() {
               
               <ScrollArea h={500}>
                 <Stack gap="sm">
-                  {auditLog.map((entry, index) => (
+                  {sortedAuditLog.map((entry, index) => (
                     <Card key={`${entry.assetId}-${entry.timestamp}-${index}`} shadow="sm" padding="md" radius="md" withBorder>
                         <Stack gap="xs">
                           <Group justify="space-between">
@@ -5141,7 +5170,7 @@ export default function HomePage() {
                                       </Grid.Col>
                                       <Grid.Col span={4}>
                                         <Text size="xs" c="red">
-                                          {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
+                                          {formatValue(change.oldValue, true)}
                                         </Text>
                                       </Grid.Col>
                                       <Grid.Col span={1}>
@@ -5161,7 +5190,6 @@ export default function HomePage() {
                         </Stack>
                       </Card>
                     ))}
-                  
                   {auditLog.length === 0 && (
                     <Group justify="center" py="xl">
                       <Stack align="center" gap="xs">
@@ -5249,7 +5277,7 @@ export default function HomePage() {
                                 </Text>
                                 <Group gap="xs" wrap="nowrap" style={{ flex: 1 }}>
                                   <Text size="xs" c="red" truncate style={{ flex: 1 }}>
-                                    {change.oldValue !== null ? formatValue(change.oldValue) : 'N/A'}
+                                    {formatValue(change.oldValue, true)}
                                   </Text>
                                   <Text size="xs">→</Text>
                                   <Text size="xs" c="green" truncate style={{ flex: 1 }}>

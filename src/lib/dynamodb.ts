@@ -384,9 +384,12 @@ export class DynamoDBService {
     try {
       await this.createAuditTableIfNotExists();
       
+      // Clean the audit entry to remove undefined values
+      const cleanAuditEntry = this.cleanObjectForDynamoDB(auditEntry);
+      
       const command = new PutCommand({
         TableName: AUDIT_TABLE_NAME,
-        Item: auditEntry,
+        Item: cleanAuditEntry,
       });
 
       await dynamodb.send(command);
@@ -395,6 +398,30 @@ export class DynamoDBService {
       console.error('Error logging audit entry:', error);
       throw error;
     }
+  }
+
+  // Helper function to clean objects for DynamoDB (remove undefined values)
+  private static cleanObjectForDynamoDB(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.cleanObjectForDynamoDB(item)).filter(item => item !== null);
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const cleanedValue = this.cleanObjectForDynamoDB(value);
+        if (cleanedValue !== null && cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+      return cleaned;
+    }
+    
+    return obj;
   }
 
   // Get audit entries for an asset
