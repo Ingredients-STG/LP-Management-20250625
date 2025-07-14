@@ -414,6 +414,9 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     const maxProcessingTime = 25000; // 25 seconds max processing time
 
+    // Collect audit log entries for response
+    const auditLogEntries: any[] = [];
+
     for (let i = 0; i < data.length; i++) {
       // Check for timeout
       if (Date.now() - startTime > maxProcessingTime) {
@@ -563,7 +566,7 @@ export async function POST(req: NextRequest) {
         }
         // Always log an audit entry, even if no changes
         try {
-          await DynamoDBService.logAssetAuditEntry({
+          const auditEntry = {
             assetId: existingAsset.id,
             timestamp: new Date().toISOString(),
             user: auditUser,
@@ -573,9 +576,17 @@ export async function POST(req: NextRequest) {
               assetName: updateData.primaryIdentifier || existingAsset.primaryIdentifier || '',
               changes
             }
-          });
+          };
+          await DynamoDBService.logAssetAuditEntry(auditEntry);
+          auditLogEntries.push(auditEntry);
+          console.log('Audit log entry written:', auditEntry);
         } catch (auditError) {
-          console.warn(`Failed to log audit entry for asset ${barcode}:`, auditError);
+          console.error(`Failed to log audit entry for asset ${barcode}:`, auditError);
+          auditLogEntries.push({
+            assetId: existingAsset.id,
+            error: auditError instanceof Error ? auditError.message : String(auditError),
+            attempted: true
+          });
         }
       } catch (error) {
         results.errors++;
@@ -596,7 +607,8 @@ export async function POST(req: NextRequest) {
         skippedBarcodes: results.skippedBarcodes,
         notFoundBarcodes: results.notFoundBarcodes,
         newAssetTypes: results.newAssetTypes,
-        newFilterTypes: results.newFilterTypes
+        newFilterTypes: results.newFilterTypes,
+        auditLogEntries // include audit log entries in response
       }
     });
 
