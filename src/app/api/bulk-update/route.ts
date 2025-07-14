@@ -528,49 +528,54 @@ export async function POST(req: NextRequest) {
         }
         // Update the asset
         const updateResult = await updateAsset(existingAsset, updateData, userEmail);
+        // Compare old and new values for all updatable fields
+        const updatableFields = [
+          'assetType', 'status', 'primaryIdentifier', 'secondaryIdentifier',
+          'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
+          'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn',
+          'filterType', 'needFlushing', 'notes', 'augmentedCare'
+        ];
+        const changes = updatableFields
+          .filter(field => updateData[field] !== undefined && updateData[field] !== existingAsset[field])
+          .map(field => ({
+            field,
+            oldValue: existingAsset[field],
+            newValue: updateData[field]
+          }));
+        // Always use the correct user, fallback to 'Unknown User' if not available
+        const auditUser = userEmail || 'Unknown User';
+        // Debug log
         if (updateResult.updated) {
           results.updated++;
-          // Log audit entry for this update with detailed field changes
-          try {
-            // Compare old and new values for all updatable fields
-            const updatableFields = [
-              'assetType', 'status', 'primaryIdentifier', 'secondaryIdentifier',
-              'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
-              'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn',
-              'filterType', 'needFlushing', 'notes', 'augmentedCare'
-            ];
-            const changes = updatableFields
-              .filter(field => updateData[field] !== undefined && updateData[field] !== existingAsset[field])
-              .map(field => ({
-                field,
-                oldValue: existingAsset[field],
-                newValue: updateData[field]
-              }));
-            // Always use the correct user, fallback to 'Unknown User' if not available
-            const auditUser = userEmail || 'Unknown User';
-            // Debug log
-            console.log('Bulk update audit log:', {
-              assetId: existingAsset.id,
-              user: auditUser,
-              changes
-            });
-            await DynamoDBService.logAssetAuditEntry({
-              assetId: existingAsset.id,
-              timestamp: new Date().toISOString(),
-              user: auditUser,
-              action: 'UPDATE',
-              details: {
-                assetBarcode: barcode,
-                assetName: updateData.primaryIdentifier || existingAsset.primaryIdentifier || '',
-                changes
-              }
-            });
-          } catch (auditError) {
-            console.warn(`Failed to log audit entry for asset ${barcode}:`, auditError);
-          }
+          console.log('Bulk update audit log (updated):', {
+            assetId: existingAsset.id,
+            user: auditUser,
+            changes
+          });
         } else {
           results.errors++;
           results.errorDetails.push(`Row ${rowNum}: ${updateResult.reason || 'Update failed'}`);
+          console.log('Bulk update audit log (no changes, still logging):', {
+            assetId: existingAsset.id,
+            user: auditUser,
+            changes: []
+          });
+        }
+        // Always log an audit entry, even if no changes
+        try {
+          await DynamoDBService.logAssetAuditEntry({
+            assetId: existingAsset.id,
+            timestamp: new Date().toISOString(),
+            user: auditUser,
+            action: 'UPDATE',
+            details: {
+              assetBarcode: barcode,
+              assetName: updateData.primaryIdentifier || existingAsset.primaryIdentifier || '',
+              changes
+            }
+          });
+        } catch (auditError) {
+          console.warn(`Failed to log audit entry for asset ${barcode}:`, auditError);
         }
       } catch (error) {
         results.errors++;
