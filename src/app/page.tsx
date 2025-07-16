@@ -4697,14 +4697,19 @@ export default function HomePage() {
           </Stack>
 
           <Paper p="md" mt="auto" withBorder>
-            <Stack gap="xs">
-              <Text size="sm" fw={500}>System Status</Text>
-              <Group justify="space-between">
-                <Text size="xs" c="dimmed">Operational</Text>
-                <Badge color="green" size="xs">98.5%</Badge>
-              </Group>
-              <Progress value={98.5} color="green" size="xs" />
-              <Text size="xs" c="dimmed">Last updated: Just now</Text>
+            <Stack gap="xs" align="center">
+              <img 
+                src="/stg-logo.png" 
+                alt="St George's University Hospitals NHS Foundation Trust"
+                style={{ 
+                  width: '100%', 
+                  maxWidth: '180px', 
+                  height: 'auto'
+                }}
+              />
+              <Text size="xs" c="dimmed" ta="center" style={{ lineHeight: 1.2 }}>
+                Designed by Srikanth Ismail Baig for Water Safety Team
+              </Text>
             </Stack>
           </Paper>
         </AppShell.Navbar>
