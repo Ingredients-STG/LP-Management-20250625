@@ -226,7 +226,6 @@ export default function HomePage() {
   const [augmentedCareFilter, setAugmentedCareFilter] = useState<string[]>([]);
   const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
-  const [hideTabContainer, setHideTabContainer] = useLocalStorage({ key: 'hideTabContainer', defaultValue: false });
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
@@ -4264,207 +4263,82 @@ export default function HomePage() {
           </Group>
         </AppShell.Header>
 
-        <AppShell.Navbar p="md">
-          {!hideTabContainer && (
-            <>
-              <Stack gap="xs">
-                <Button
-                  variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                  leftSection={<IconDashboard size={16} />}
-                  justify="start"
-                  onClick={() => {
-                    setActiveTab('dashboard');
-                    if (opened) toggle(); // Close mobile menu after selection
-                  }}
-                >
-                  Dashboard
-                </Button>
-                <Button
-                  variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                  leftSection={<IconDroplet size={16} />}
-                  justify="start"
-                  onClick={() => {
-                    setActiveTab('assets');
-                    if (opened) toggle(); // Close mobile menu after selection
-                  }}
-                >
-                  Assets
-                </Button>
-                <Button
-                  variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                  leftSection={<IconReport size={16} />}
-                  justify="start"
-                  onClick={() => {
-                    setActiveTab('reports');
-                    if (opened) toggle(); // Close mobile menu after selection
-                  }}
-                >
-                  Reports
-                </Button>
-                <Button
-                  variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
-                  leftSection={<IconUpload size={16} />}
-                  justify="start"
-                  onClick={() => {
-                    setActiveTab('bulk-update');
-                    if (opened) toggle(); // Close mobile menu after selection
-                  }}
-                >
-                  Bulk Update
-                </Button>
-                <Button
-                  variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                  leftSection={<IconSettings size={16} />}
-                  justify="start"
-                  onClick={() => {
-                    setActiveTab('settings');
-                    if (opened) toggle(); // Close mobile menu after selection
-                  }}
-                >
-                  Settings
-                </Button>
-              </Stack>
+                <AppShell.Navbar p="md">
+          <Stack gap="xs">
+            <Button
+              variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+              leftSection={<IconDashboard size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('dashboard');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Dashboard
+            </Button>
+            <Button
+              variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+              leftSection={<IconDroplet size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('assets');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Assets
+            </Button>
+            <Button
+              variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+              leftSection={<IconReport size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('reports');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Reports
+            </Button>
+            <Button
+              variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
+              leftSection={<IconUpload size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('bulk-update');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Bulk Update
+            </Button>
+            <Button
+              variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+              leftSection={<IconSettings size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('settings');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Settings
+            </Button>
+          </Stack>
 
-              <Paper p="md" mt="auto" withBorder>
-                <Stack gap="xs">
-                  <Text size="sm" fw={500}>System Status</Text>
-                  <Group justify="space-between">
-                    <Text size="xs" c="dimmed">Operational</Text>
-                    <Badge color="green" size="xs">98.5%</Badge>
-                  </Group>
-                  <Progress value={98.5} color="green" size="xs" />
-                  <Text size="xs" c="dimmed">Last updated: Just now</Text>
-                </Stack>
-              </Paper>
-            </>
-          )}
-          
-          {/* Mobile-only navigation when hideTabContainer is true */}
-          {hideTabContainer && (
+          <Paper p="md" mt="auto" withBorder>
             <Stack gap="xs">
-              <Button
-                variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                leftSection={<IconDashboard size={16} />}
-                justify="start"
-                onClick={() => {
-                  setActiveTab('dashboard');
-                  if (opened) toggle(); // Close mobile menu after selection
-                }}
-              >
-                Dashboard
-              </Button>
-              <Button
-                variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                leftSection={<IconDroplet size={16} />}
-                justify="start"
-                onClick={() => {
-                  setActiveTab('assets');
-                  if (opened) toggle(); // Close mobile menu after selection
-                }}
-              >
-                Assets
-              </Button>
-              <Button
-                variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                leftSection={<IconReport size={16} />}
-                justify="start"
-                onClick={() => {
-                  setActiveTab('reports');
-                  if (opened) toggle(); // Close mobile menu after selection
-                }}
-              >
-                Reports
-              </Button>
-              <Button
-                variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
-                leftSection={<IconUpload size={16} />}
-                justify="start"
-                onClick={() => {
-                  setActiveTab('bulk-update');
-                  if (opened) toggle(); // Close mobile menu after selection
-                }}
-              >
-                Bulk Update
-              </Button>
-              <Button
-                variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                leftSection={<IconSettings size={16} />}
-                justify="start"
-                onClick={() => {
-                  setActiveTab('settings');
-                  if (opened) toggle(); // Close mobile menu after selection
-                }}
-              >
-                Settings
-              </Button>
+              <Text size="sm" fw={500}>System Status</Text>
+              <Group justify="space-between">
+                <Text size="xs" c="dimmed">Operational</Text>
+                <Badge color="green" size="xs">98.5%</Badge>
+              </Group>
+              <Progress value={98.5} color="green" size="xs" />
+              <Text size="xs" c="dimmed">Last updated: Just now</Text>
             </Stack>
-          )}
+          </Paper>
         </AppShell.Navbar>
 
         <AppShell.Main className="main-shell">
           <div className="responsive-container">
 
-            {hideTabContainer && (
-              <Card 
-                shadow="sm" 
-                padding="md" 
-                radius="md" 
-                withBorder 
-                mb="lg"
-                className="tab-container-card"
-              >
-                <ScrollArea>
-                  <Group wrap="nowrap" gap="xs" justify="center">
-                  <Button
-                    variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
-                    leftSection={<IconDashboard size={16} />}
-                    onClick={() => setActiveTab('dashboard')}
-                    size="sm"
-                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                      <Text visibleFrom="sm">Dashboard</Text>
-                      <Text hiddenFrom="sm">Dash</Text>
-                  </Button>
-                  <Button
-                    variant={activeTab === 'assets' ? 'filled' : 'subtle'}
-                    leftSection={<IconDroplet size={16} />}
-                    onClick={() => setActiveTab('assets')}
-                    size="sm"
-                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Assets
-                  </Button>
-                  <Button
-                    variant={activeTab === 'reports' ? 'filled' : 'subtle'}
-                    leftSection={<IconReport size={16} />}
-                    onClick={() => setActiveTab('reports')}
-                    size="sm"
-                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Reports
-                  </Button>
-                    <Button
-                      variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
-                      leftSection={<IconUpload size={16} />}
-                      onClick={() => setActiveTab('bulk-update')}
-                      size="sm"
-                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                    >
-                      Bulk Update
-                    </Button>
-                  <Button
-                    variant={activeTab === 'settings' ? 'filled' : 'subtle'}
-                    leftSection={<IconSettings size={16} />}
-                    onClick={() => setActiveTab('settings')}
-                    size="sm"
-                      style={{ minWidth: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    Settings
-                  </Button>
-                </Group>
-                </ScrollArea>
-              </Card>
-            )}
+
             
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'assets' && renderAssets()}
