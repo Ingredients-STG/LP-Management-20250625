@@ -424,7 +424,74 @@ export class DynamoDBService {
     return obj;
   }
 
-  // Get audit entries for an asset
+  // Get asset audit entries with pagination
+  static async getAssetAuditEntriesPaginated(
+    assetId: string, 
+    limit: number = 100, 
+    lastEvaluatedKey?: any
+  ): Promise<{ entries: AuditLogEntry[]; lastEvaluatedKey?: any; hasMore: boolean }> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      const command = new ScanCommand({
+        TableName: AUDIT_TABLE_NAME,
+        FilterExpression: 'assetId = :assetId',
+        ExpressionAttributeValues: {
+          ':assetId': assetId,
+        },
+        Limit: limit,
+        ExclusiveStartKey: lastEvaluatedKey,
+      });
+
+      const result = await dynamodb.send(command);
+      const entries = (result.Items as AuditLogEntry[]) || [];
+      
+      // Sort by timestamp descending (newest first)
+      const sortedEntries = entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      return {
+        entries: sortedEntries,
+        lastEvaluatedKey: result.LastEvaluatedKey,
+        hasMore: !!result.LastEvaluatedKey
+      };
+    } catch (error) {
+      console.error('Error getting paginated audit entries:', error);
+      throw error;
+    }
+  }
+
+  // Get all audit entries with pagination
+  static async getAllAuditEntriesPaginated(
+    limit: number = 100, 
+    lastEvaluatedKey?: any
+  ): Promise<{ entries: AuditLogEntry[]; lastEvaluatedKey?: any; hasMore: boolean }> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      const command = new ScanCommand({
+        TableName: AUDIT_TABLE_NAME,
+        Limit: limit,
+        ExclusiveStartKey: lastEvaluatedKey,
+      });
+
+      const result = await dynamodb.send(command);
+      const entries = (result.Items as AuditLogEntry[]) || [];
+      
+      // Sort by timestamp descending (newest first)
+      const sortedEntries = entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      
+      return {
+        entries: sortedEntries,
+        lastEvaluatedKey: result.LastEvaluatedKey,
+        hasMore: !!result.LastEvaluatedKey
+      };
+    } catch (error) {
+      console.error('Error getting paginated all audit entries:', error);
+      throw error;
+    }
+  }
+
+  // Get asset audit entries (legacy method - loads all)
   static async getAssetAuditEntries(assetId: string): Promise<AuditLogEntry[]> {
     try {
       await this.createAuditTableIfNotExists();
@@ -448,7 +515,7 @@ export class DynamoDBService {
     }
   }
 
-  // Get all audit entries (global audit log)
+  // Get all audit entries (legacy method - loads all)
   static async getAllAuditEntries(): Promise<AuditLogEntry[]> {
     try {
       await this.createAuditTableIfNotExists();

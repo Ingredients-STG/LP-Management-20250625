@@ -1,4 +1,0 @@
-assetBarcode*,room*,filterNeeded*,filterInstalledOn,assetType,primaryIdentifier,secondaryIdentifier,status,wing,wingInShort,floor,floorInWords,roomNo,roomName,filtersOn,notes,augmentedCare
-B30674,Room 101,YES,2024-10-01,Water Tap,TAP001,SEC001,ACTIVE,North Wing,NW,Ground Floor,Ground,101,Staff Room,NO,Sample notes,NO
-B30675,Room 102,NO,,Water Cooler,COOL001,SEC002,ACTIVE,South Wing,SW,First Floor,First,102,Kitchen,NO,Another sample,NO
-B30676,Room 103,YES,2024-09-15,LNS Outlet - TMT,LNS001,SEC003,MAINTENANCE,East Wing,EW,Second Floor,Second,103,Lab,YES,Needs attention,YES 

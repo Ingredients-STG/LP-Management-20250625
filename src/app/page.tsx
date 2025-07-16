@@ -248,6 +248,27 @@ export default function HomePage() {
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
   
+  // Pagination states for audit logs
+  const [auditLogPagination, setAuditLogPagination] = useState<{
+    hasMore: boolean;
+    lastEvaluatedKey: string | null;
+    loading: boolean;
+  }>({
+    hasMore: false,
+    lastEvaluatedKey: null,
+    loading: false
+  });
+  
+  const [globalAuditLogPagination, setGlobalAuditLogPagination] = useState<{
+    hasMore: boolean;
+    lastEvaluatedKey: string | null;
+    loading: boolean;
+  }>({
+    hasMore: false,
+    lastEvaluatedKey: null,
+    loading: false
+  });
+  
   // Debug: Monitor auditLog state changes
   useEffect(() => {
     console.log('Frontend: auditLog state changed:', auditLog.length, 'entries');
@@ -409,17 +430,44 @@ export default function HomePage() {
     }
   };
 
-  // Fetch audit logs for a specific asset
-  const fetchAuditLogs = async (assetId: string) => {
+  // Fetch audit logs for a specific asset with pagination
+  const fetchAuditLogs = async (assetId: string, loadMore: boolean = false) => {
     try {
-      console.log('Frontend: Fetching audit logs for asset:', assetId);
-      const response = await fetch(`/api/audit-entries?assetId=${assetId}`);
+      if (loadMore && auditLogPagination.loading) return;
+      
+      const params = new URLSearchParams({
+        assetId,
+        limit: '100'
+      });
+      
+      if (loadMore && auditLogPagination.lastEvaluatedKey) {
+        params.append('lastEvaluatedKey', auditLogPagination.lastEvaluatedKey);
+      }
+      
+      console.log('Frontend: Fetching audit logs for asset:', assetId, loadMore ? '(loading more)' : '');
+      const response = await fetch(`/api/audit-entries?${params}`);
+      
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          console.log('Frontend: Received audit log data:', result.data);
-          console.log('Frontend: Number of audit entries:', result.data.length);
-          setAuditLog(result.data);
+          console.log('Frontend: Received audit log data:', result.data.length, 'entries');
+          console.log('Frontend: Pagination info:', result.pagination);
+          
+          if (loadMore) {
+            // Append new entries to existing ones
+            setAuditLog(prev => [...prev, ...result.data]);
+          } else {
+            // Replace existing entries
+            setAuditLog(result.data);
+          }
+          
+          // Update pagination state
+          setAuditLogPagination({
+            hasMore: result.pagination.hasMore,
+            lastEvaluatedKey: result.pagination.lastEvaluatedKey,
+            loading: false
+          });
+          
           console.log('Frontend: Audit log state updated');
         } else {
           console.log('Frontend: API returned success: false');
@@ -429,22 +477,69 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
+      setAuditLogPagination(prev => ({ ...prev, loading: false }));
     }
   };
 
-  // Fetch global audit logs (all activities)
-  const fetchGlobalAuditLogs = async () => {
+  // Fetch global audit logs with pagination
+  const fetchGlobalAuditLogs = async (loadMore: boolean = false) => {
     try {
-      const response = await fetch('/api/audit-entries');
+      if (loadMore && globalAuditLogPagination.loading) return;
+      
+      const params = new URLSearchParams({
+        limit: '100'
+      });
+      
+      if (loadMore && globalAuditLogPagination.lastEvaluatedKey) {
+        params.append('lastEvaluatedKey', globalAuditLogPagination.lastEvaluatedKey);
+      }
+      
+      console.log('Frontend: Fetching global audit logs', loadMore ? '(loading more)' : '');
+      const response = await fetch(`/api/audit-entries?${params}`);
+      
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          setGlobalAuditLog(result.data);
+          console.log('Frontend: Received global audit log data:', result.data.length, 'entries');
+          console.log('Frontend: Pagination info:', result.pagination);
+          
+          if (loadMore) {
+            // Append new entries to existing ones
+            setGlobalAuditLog(prev => [...prev, ...result.data]);
+          } else {
+            // Replace existing entries
+            setGlobalAuditLog(result.data);
+          }
+          
+          // Update pagination state
+          setGlobalAuditLogPagination({
+            hasMore: result.pagination.hasMore,
+            lastEvaluatedKey: result.pagination.lastEvaluatedKey,
+            loading: false
+          });
         }
       }
     } catch (error) {
       console.error('Error fetching global audit logs:', error);
+      setGlobalAuditLogPagination(prev => ({ ...prev, loading: false }));
     }
+  };
+
+  // Load more audit logs for specific asset
+  const loadMoreAuditLogs = async () => {
+    if (!selectedAssetAudit) return;
+    
+    const asset = assets.find(a => a.assetBarcode === selectedAssetAudit);
+    if (asset?.id) {
+      setAuditLogPagination(prev => ({ ...prev, loading: true }));
+      await fetchAuditLogs(asset.id, true);
+    }
+  };
+
+  // Load more global audit logs
+  const loadMoreGlobalAuditLogs = async () => {
+    setGlobalAuditLogPagination(prev => ({ ...prev, loading: true }));
+    await fetchGlobalAuditLogs(true);
   };
 
   // Fetch asset types from database
@@ -2679,10 +2774,11 @@ export default function HomePage() {
           {/* Collapsible filter panel */}
           <Collapse in={!filtersCollapsed} transitionDuration={200}>
             {/* Mobile filter stack */}
-            <Stack gap="xs" hiddenFrom="md" className="mobile-filter-stack">
+            <Stack gap="sm" hiddenFrom="md" className="mobile-filter-stack">
+              {/* Row 1: Status, Type */}
               <Group gap="xs" grow>
                 <MultiSelect
-                  placeholder="Filter by Status"
+                  placeholder="Status"
                   data={Array.from(new Set(assets.map(a => a.status))).filter(Boolean)}
                   value={statusFilter}
                   onChange={setStatusFilter}
@@ -2691,7 +2787,7 @@ export default function HomePage() {
                   styles={{ input: { fontSize: '16px' } }}
                 />
                 <MultiSelect
-                  placeholder="Filter by Type"
+                  placeholder="Type"
                   data={Array.from(new Set(assets.map(a => a.assetType))).filter(Boolean)}
                   value={typeFilter}
                   onChange={setTypeFilter}
@@ -2699,8 +2795,12 @@ export default function HomePage() {
                   size="sm"
                   styles={{ input: { fontSize: '16px' } }}
                 />
+              </Group>
+              
+              {/* Row 2: Floor, Wing */}
+              <Group gap="xs" grow>
                 <MultiSelect
-                  placeholder="Filter by Floor"
+                  placeholder="Floor"
                   data={Array.from(new Set(assets.map(a => a.floor))).filter(Boolean)}
                   value={floorFilter}
                   onChange={setFloorFilter}
@@ -2709,72 +2809,7 @@ export default function HomePage() {
                   styles={{ input: { fontSize: '16px' } }}
                 />
                 <MultiSelect
-                  placeholder="Filter by Filter Type"
-                  data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
-                  value={filterTypeFilter}
-                  onChange={setFilterTypeFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Need Flushing?"
-                  data={['Yes', 'No']}
-                  value={needFlushingFilter}
-                  onChange={setNeedFlushingFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Filter Needed?"
-                  data={['Yes', 'No']}
-                  value={filterNeededFilter}
-                  onChange={setFilterNeededFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Filters On?"
-                  data={['Yes', 'No']}
-                  value={filtersOnFilter}
-                  onChange={setFiltersOnFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Augmented Care?"
-                  data={['Yes', 'No']}
-                  value={augmentedCareFilter}
-                  onChange={setAugmentedCareFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <DatePickerInput
-                  type="range"
-                  placeholder="Filter Expiry Range"
-                  value={filterExpiryRange}
-                  onChange={(val) => {
-                    const toDate = (v: string | Date | null) => {
-                      if (!v) return null;
-                      if (v instanceof Date) return v;
-                      const d = new Date(v);
-                      return isNaN(d.getTime()) ? null : d;
-                    };
-                    setFilterExpiryRange([
-                      toDate(val[0]),
-                      toDate(val[1])
-                    ]);
-                  }}
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                  clearable
-                />
-                <MultiSelect
-                  placeholder="Filter by Wing"
+                  placeholder="Wing"
                   data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
                   value={wingFilter}
                   onChange={setWingFilter}
@@ -2783,22 +2818,91 @@ export default function HomePage() {
                   styles={{ input: { fontSize: '16px' } }}
                 />
               </Group>
-              <Group mt="xs" gap="xs">
-                <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters}>
-                  Clear Filters
-                </Button>
+              
+              {/* Row 3: Filter Type */}
+              <MultiSelect
+                placeholder="Filter Type"
+                data={Array.from(new Set(assets.map(a => a.filterType))).filter(Boolean)}
+                value={filterTypeFilter}
+                onChange={setFilterTypeFilter}
+                clearable
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+              />
+              
+              {/* Row 4: Boolean filters - 2 per row */}
+              <Group gap="xs" grow>
+                <MultiSelect
+                  placeholder="Need Flushing"
+                  data={['Yes', 'No']}
+                  value={needFlushingFilter}
+                  onChange={setNeedFlushingFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Filter Needed"
+                  data={['Yes', 'No']}
+                  value={filterNeededFilter}
+                  onChange={setFilterNeededFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
               </Group>
+              
+              {/* Row 5: More boolean filters */}
+              <Group gap="xs" grow>
+                <MultiSelect
+                  placeholder="Filters On"
+                  data={['Yes', 'No']}
+                  value={filtersOnFilter}
+                  onChange={setFiltersOnFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+                <MultiSelect
+                  placeholder="Augmented Care"
+                  data={['Yes', 'No']}
+                  value={augmentedCareFilter}
+                  onChange={setAugmentedCareFilter}
+                  clearable
+                  size="sm"
+                  styles={{ input: { fontSize: '16px' } }}
+                />
+              </Group>
+              
+              {/* Row 6: Date Range - Full width */}
+              <DatePickerInput
+                type="range"
+                placeholder="Filter Expiry Range"
+                value={filterExpiryRange}
+                onChange={(val) => {
+                  const toDate = (v: string | Date | null) => {
+                    if (!v) return null;
+                    if (v instanceof Date) return v;
+                    const d = new Date(v);
+                    return isNaN(d.getTime()) ? null : d;
+                  };
+                  setFilterExpiryRange([
+                    toDate(val[0]),
+                    toDate(val[1])
+                  ]);
+                }}
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+                clearable
+              />
+              
+              {/* Clear Filters Button */}
+              <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters} fullWidth>
+                Clear All Filters
+              </Button>
             </Stack>
             {/* Desktop filter layout */}
             <Grid visibleFrom="md">
-              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                <TextInput
-                  placeholder="Search assets..."
-                  leftSection={<IconSearch size={16} />}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
                 <MultiSelect
                   placeholder="Filter by Status"
@@ -4160,8 +4264,83 @@ export default function HomePage() {
           </Group>
         </AppShell.Header>
 
-        {!hideTabContainer && (
-          <AppShell.Navbar p="md">
+        <AppShell.Navbar p="md">
+          {!hideTabContainer && (
+            <>
+              <Stack gap="xs">
+                <Button
+                  variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
+                  leftSection={<IconDashboard size={16} />}
+                  justify="start"
+                  onClick={() => {
+                    setActiveTab('dashboard');
+                    if (opened) toggle(); // Close mobile menu after selection
+                  }}
+                >
+                  Dashboard
+                </Button>
+                <Button
+                  variant={activeTab === 'assets' ? 'filled' : 'subtle'}
+                  leftSection={<IconDroplet size={16} />}
+                  justify="start"
+                  onClick={() => {
+                    setActiveTab('assets');
+                    if (opened) toggle(); // Close mobile menu after selection
+                  }}
+                >
+                  Assets
+                </Button>
+                <Button
+                  variant={activeTab === 'reports' ? 'filled' : 'subtle'}
+                  leftSection={<IconReport size={16} />}
+                  justify="start"
+                  onClick={() => {
+                    setActiveTab('reports');
+                    if (opened) toggle(); // Close mobile menu after selection
+                  }}
+                >
+                  Reports
+                </Button>
+                <Button
+                  variant={activeTab === 'bulk-update' ? 'filled' : 'subtle'}
+                  leftSection={<IconUpload size={16} />}
+                  justify="start"
+                  onClick={() => {
+                    setActiveTab('bulk-update');
+                    if (opened) toggle(); // Close mobile menu after selection
+                  }}
+                >
+                  Bulk Update
+                </Button>
+                <Button
+                  variant={activeTab === 'settings' ? 'filled' : 'subtle'}
+                  leftSection={<IconSettings size={16} />}
+                  justify="start"
+                  onClick={() => {
+                    setActiveTab('settings');
+                    if (opened) toggle(); // Close mobile menu after selection
+                  }}
+                >
+                  Settings
+                </Button>
+              </Stack>
+
+              <Paper p="md" mt="auto" withBorder>
+                <Stack gap="xs">
+                  <Text size="sm" fw={500}>System Status</Text>
+                  <Group justify="space-between">
+                    <Text size="xs" c="dimmed">Operational</Text>
+                    <Badge color="green" size="xs">98.5%</Badge>
+                  </Group>
+                  <Progress value={98.5} color="green" size="xs" />
+                  <Text size="xs" c="dimmed">Last updated: Just now</Text>
+                </Stack>
+              </Paper>
+            </>
+          )}
+          
+          {/* Mobile-only navigation when hideTabContainer is true */}
+          {hideTabContainer && (
             <Stack gap="xs">
               <Button
                 variant={activeTab === 'dashboard' ? 'filled' : 'subtle'}
@@ -4219,20 +4398,8 @@ export default function HomePage() {
                 Settings
               </Button>
             </Stack>
-
-            <Paper p="md" mt="auto" withBorder>
-              <Stack gap="xs">
-                <Text size="sm" fw={500}>System Status</Text>
-                <Group justify="space-between">
-                  <Text size="xs" c="dimmed">Operational</Text>
-                  <Badge color="green" size="xs">98.5%</Badge>
-                </Group>
-                <Progress value={98.5} color="green" size="xs" />
-                <Text size="xs" c="dimmed">Last updated: Just now</Text>
-              </Stack>
-            </Paper>
-          </AppShell.Navbar>
-        )}
+          )}
+        </AppShell.Navbar>
 
         <AppShell.Main className="main-shell">
           <div className="responsive-container">
@@ -5382,6 +5549,21 @@ export default function HomePage() {
                         </Stack>
                       </Card>
                     ))}
+                  {/* Load More Button */}
+                  {auditLogPagination.hasMore && (
+                    <Group justify="center" py="md">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={loadMoreAuditLogs}
+                        loading={auditLogPagination.loading}
+                        leftSection={<IconDownload size={14} />}
+                      >
+                        Load More Entries
+                      </Button>
+                    </Group>
+                  )}
+                  
                   {auditLog.length === 0 && (
                     <Group justify="center" py="xl">
                       <Stack align="center" gap="xs">
@@ -5492,6 +5674,21 @@ export default function HomePage() {
                 </Card>
               ))}
 
+              {/* Load More Button for Global Audit Log */}
+              {globalAuditLogPagination.hasMore && (
+                <Group justify="center" py="md">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadMoreGlobalAuditLogs}
+                    loading={globalAuditLogPagination.loading}
+                    leftSection={<IconDownload size={14} />}
+                  >
+                    Load More Entries
+                  </Button>
+                </Group>
+              )}
+              
               {globalAuditLog.length === 0 && (
                 <Group justify="center" py="xl">
                   <Stack align="center" gap="xs">
@@ -5511,7 +5708,7 @@ export default function HomePage() {
             <Button 
               size="xs" 
               variant="subtle" 
-              onClick={fetchGlobalAuditLogs}
+              onClick={() => fetchGlobalAuditLogs()}
               leftSection={<IconRefresh size={14} />}
             >
               Refresh

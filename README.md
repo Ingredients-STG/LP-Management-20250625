@@ -2,6 +2,8 @@
 
 A modern, robust water tap asset management system built with **Next.js 14**, **TypeScript**, and **Tailwind CSS**.
 
+---
+
 ## 🚀 Features
 
 - **Modern Stack**: Next.js 14 with App Router, TypeScript, Tailwind CSS
@@ -32,7 +34,8 @@ A modern, robust water tap asset management system built with **Next.js 14**, **
 
 1. **Clone and Navigate**:
    ```bash
-   cd water-tap-management
+   git clone <your-repo-url>
+   cd LP\ Management
    ```
 
 2. **Install Dependencies**:
@@ -61,23 +64,25 @@ A modern, robust water tap asset management system built with **Next.js 14**, **
 ```
 src/
 ├── app/                    # Next.js App Router
-│   ├── globals.css        # Global styles and CSS variables
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Main application page
-├── components/            # React components
-│   ├── ui/               # Reusable UI components
-│   │   ├── button.tsx    # Button component with variants
-│   │   ├── card.tsx      # Card layout components
-│   │   └── input.tsx     # Input component with validation
-│   └── Dashboard.tsx     # Main dashboard component
-├── hooks/                # Custom React hooks
-│   └── useAssets.ts     # Asset management hooks
-├── lib/                  # Utility libraries
-│   ├── api.ts           # API service layer
-│   └── utils.ts         # Utility functions
-└── types/               # TypeScript type definitions
-    └── asset.ts         # Asset-related types
+│   ├── api/                # API route handlers
+│   ├── globals.css         # Global styles and CSS variables
+│   ├── layout.tsx          # Root layout
+│   ├── login/              # Login page
+│   └── page.tsx            # Main application page
+├── components/             # React components
+│   ├── ui/                 # Reusable UI components
+│   ├── BarcodeScanner.tsx  # Barcode scanner component
+│   └── ProtectedRoute.tsx  # Route protection
+├── contexts/               # React context providers
+│   └── AuthContext.tsx     # Authentication context
+├── lib/                    # Utility libraries
+│   ├── cognito.ts          # Cognito integration
+│   ├── dynamodb.ts         # DynamoDB integration
+│   ├── filterLogic.ts      # Filter logic utilities
+│   └── utils.ts            # General utilities
 ```
+
+> **Note:** Sample files and backup files (e.g., `sample_csv_upload.csv`, `sample_bulk_upload.csv`, `page.tsx.bak`) have been removed for a cleaner project. Please avoid adding unnecessary files to keep the repository tidy.
 
 ## 🎯 Key Components
 
@@ -199,21 +204,21 @@ npm run build
 
 ### Deployment Options
 
-1. **Vercel** (Recommended):
+1. **AWS Amplify (Auto-Deploy)**
+   - This project is set up to automatically deploy to AWS Amplify when changes are pushed to the `main` branch.
+   - AWS credentials and GitHub are already connected for this workflow.
+   - No manual deployment steps are required unless you wish to trigger a redeploy.
+
+2. **Vercel** (Alternative):
    ```bash
    npx vercel
    ```
 
-2. **Netlify**:
+3. **Netlify** (Alternative):
    ```bash
    npm run build
-   # Deploy dist folder
+   # Deploy the output folder
    ```
-
-3. **AWS Amplify**:
-   - Connect your GitHub repository
-   - Configure build settings
-   - Deploy automatically
 
 ## 🔧 Configuration
 
@@ -232,8 +237,7 @@ NEXT_PUBLIC_APP_VERSION="1.0.0"
 
 1. **Colors**: Modify CSS variables in `globals.css`
 2. **Components**: Extend components in `components/ui/`
-3. **API**: Update endpoints in `lib/api.ts`
-4. **Types**: Modify types in `types/asset.ts`
+3. **API**: Update endpoints in `src/lib/`
 
 ## 🤝 Contributing
 
