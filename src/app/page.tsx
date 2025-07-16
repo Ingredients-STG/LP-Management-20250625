@@ -2312,14 +2312,14 @@ export default function HomePage() {
                                 floorInWords: asset.floorInWords || '',
                                 roomNo: asset.roomNo || '',
                                 roomName: asset.roomName || '',
-                                filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
-                                filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
+                                filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes'),
+                                filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes'),
                                 filterExpiryDate: safeDate(asset.filterExpiryDate),
                                 filterInstalledOn: safeDate(asset.filterInstalledOn),
-                                needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
+                                needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
                                 filterType: asset.filterType || '',
                                 notes: asset.notes || '',
-                                augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
+                                augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
                               });
                               setAssetFiles([]);
                               openEditModal();
@@ -3208,14 +3208,14 @@ export default function HomePage() {
                                     floorInWords: asset.floorInWords || '',
                                     roomNo: asset.roomNo || '',
                                     roomName: asset.roomName || '',
-                                    filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded === 'true',
-                                    filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn === 'true',
+                                    filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes'),
+                                    filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes'),
                                     filterExpiryDate: safeDate(asset.filterExpiryDate),
                                     filterInstalledOn: safeDate(asset.filterInstalledOn),
-                                    needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing === 'true',
+                                    needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
                                     filterType: asset.filterType || '',
                                     notes: asset.notes || '',
-                                    augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare === 'true',
+                                    augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
                                   });
                                   setAssetFiles([]);
                                   openEditModal();
@@ -5308,14 +5308,14 @@ export default function HomePage() {
                       floorInWords: selectedAsset.floorInWords || '',
                       roomNo: selectedAsset.roomNo || '',
                       roomName: selectedAsset.roomName || '',
-                      filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true',
-                      filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true',
+                      filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : (selectedAsset.filterNeeded?.toString().toLowerCase() === 'true' || selectedAsset.filterNeeded?.toString().toLowerCase() === 'yes'),
+                      filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes'),
                       filterExpiryDate: safeDate(selectedAsset.filterExpiryDate),
                       filterInstalledOn: safeDate(selectedAsset.filterInstalledOn),
-                      needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true',
+                      needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : (selectedAsset.needFlushing?.toString().toLowerCase() === 'true' || selectedAsset.needFlushing?.toString().toLowerCase() === 'yes'),
                       filterType: selectedAsset.filterType || '',
                       notes: selectedAsset.notes || '',
-                      augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true',
+                      augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : (selectedAsset.augmentedCare?.toString().toLowerCase() === 'true' || selectedAsset.augmentedCare?.toString().toLowerCase() === 'yes'),
                     });
                     setAssetFiles([]);
                     openEditModal();
