@@ -2,10 +2,12 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { 
   DynamoDBDocumentClient, 
   ScanCommand, 
+  QueryCommand,
   GetCommand, 
   PutCommand, 
   UpdateCommand, 
-  DeleteCommand 
+  DeleteCommand,
+  BatchWriteCommand
 } from '@aws-sdk/lib-dynamodb';
 import { 
   CreateTableCommand, 
@@ -439,21 +441,36 @@ export class DynamoDBService {
     try {
       await this.createAuditTableIfNotExists();
       
-      const command = new ScanCommand({
+      console.log('Fetching audit entries for assetId:', assetId);
+      
+      // Use QueryCommand instead of ScanCommand for efficient retrieval
+      const command = new QueryCommand({
         TableName: AUDIT_TABLE_NAME,
-        FilterExpression: 'assetId = :assetId',
+        KeyConditionExpression: 'assetId = :assetId',
         ExpressionAttributeValues: {
           ':assetId': assetId,
         },
         Limit: limit,
         ExclusiveStartKey: lastEvaluatedKey,
+        ScanIndexForward: false, // Sort in descending order (newest first)
       });
 
       const result = await dynamodb.send(command);
       const entries = (result.Items as AuditLogEntry[]) || [];
       
-      // Sort by timestamp descending (newest first)
-      const sortedEntries = entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      console.log('Found audit entries for asset:', entries.length);
+      
+      // Since we're using ScanIndexForward: false, entries are already sorted newest first
+      // But we still need to clean timestamps for consistent sorting
+      const sortedEntries = entries.sort((a, b) => {
+        // Clean timestamps by removing any extra characters after the Z
+        const cleanTimestampA = a.timestamp.split('-')[0]; // Remove any suffix after Z
+        const cleanTimestampB = b.timestamp.split('-')[0]; // Remove any suffix after Z
+        
+        const timeA = new Date(cleanTimestampA).getTime();
+        const timeB = new Date(cleanTimestampB).getTime();
+        return timeB - timeA; // Descending order (newest first)
+      });
       
       return {
         entries: sortedEntries,
@@ -474,22 +491,53 @@ export class DynamoDBService {
     try {
       await this.createAuditTableIfNotExists();
       
+      // Use a much larger scan to ensure we get the latest entries
       const command = new ScanCommand({
         TableName: AUDIT_TABLE_NAME,
-        Limit: limit,
+        Limit: Math.max(limit * 10, 5000), // Get many more items to ensure we have the latest
         ExclusiveStartKey: lastEvaluatedKey,
       });
 
       const result = await dynamodb.send(command);
       const entries = (result.Items as AuditLogEntry[]) || [];
       
-      // Sort by timestamp descending (newest first)
-      const sortedEntries = entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      console.log('Global audit entries found:', entries.length);
+      if (entries.length > 0) {
+        console.log('Sample timestamps:', entries.slice(0, 3).map(e => e.timestamp));
+        console.log('Sample asset IDs:', entries.slice(0, 3).map(e => e.assetId));
+      }
+      
+      // Debug: print any entry with a July 16th timestamp
+      const july16Entries = entries.filter(e => e.timestamp.includes('2025-07-16'));
+      if (july16Entries.length > 0) {
+        console.log('Found July 16th entries:', july16Entries.map(e => e.timestamp));
+      } else {
+        console.log('No July 16th entries found in scan results.');
+      }
+
+      // Improved sorting: handle timestamps with suffixes properly
+      const sortedEntries = entries.sort((a, b) => {
+        // Clean timestamps by removing any extra characters after the Z
+        const cleanTimestampA = a.timestamp.split('-')[0]; // Remove any suffix after Z
+        const cleanTimestampB = b.timestamp.split('-')[0]; // Remove any suffix after Z
+        
+        const timeA = new Date(cleanTimestampA).getTime();
+        const timeB = new Date(cleanTimestampB).getTime();
+        return timeB - timeA; // Descending order (newest first)
+      });
+      
+      // Debug: print the top 10 timestamps after sorting
+      console.log('Top 10 timestamps after sorting:', sortedEntries.slice(0, 10).map(e => e.timestamp));
+      
+      console.log('After sorting - first entry timestamp:', sortedEntries[0]?.timestamp);
+      
+      // Return only the requested limit
+      const limitedEntries = sortedEntries.slice(0, limit);
       
       return {
-        entries: sortedEntries,
+        entries: limitedEntries,
         lastEvaluatedKey: result.LastEvaluatedKey,
-        hasMore: !!result.LastEvaluatedKey
+        hasMore: result.LastEvaluatedKey !== undefined || sortedEntries.length > limit
       };
     } catch (error) {
       console.error('Error getting paginated all audit entries:', error);
@@ -502,19 +550,28 @@ export class DynamoDBService {
     try {
       await this.createAuditTableIfNotExists();
       
-      const command = new ScanCommand({
+      const command = new QueryCommand({
         TableName: AUDIT_TABLE_NAME,
-        FilterExpression: 'assetId = :assetId',
+        KeyConditionExpression: 'assetId = :assetId',
         ExpressionAttributeValues: {
           ':assetId': assetId,
         },
+        ScanIndexForward: false, // Sort in descending order (newest first)
       });
 
       const result = await dynamodb.send(command);
       const entries = (result.Items as AuditLogEntry[]) || [];
       
-      // Sort by timestamp descending (newest first)
-      return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      // Sort by timestamp descending (newest first) with timestamp cleaning
+      return entries.sort((a, b) => {
+        // Clean timestamps by removing any extra characters after the Z
+        const cleanTimestampA = a.timestamp.split('-')[0]; // Remove any suffix after Z
+        const cleanTimestampB = b.timestamp.split('-')[0]; // Remove any suffix after Z
+        
+        const timeA = new Date(cleanTimestampA).getTime();
+        const timeB = new Date(cleanTimestampB).getTime();
+        return timeB - timeA; // Descending order (newest first)
+      });
     } catch (error) {
       console.error('Error getting audit entries:', error);
       throw error;
@@ -550,6 +607,48 @@ export class DynamoDBService {
       return allEntries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     } catch (error) {
       console.error('Error getting all audit entries:', error);
+      throw error;
+    }
+  }
+
+  // Delete all audit entries (reset audit log)
+  static async deleteAllAuditEntries(): Promise<void> {
+    try {
+      await this.createAuditTableIfNotExists();
+      
+      console.log('Starting to delete all audit entries...');
+      
+      // Get all audit entries first
+      const allEntries = await this.getAllAuditEntries();
+      console.log(`Found ${allEntries.length} audit entries to delete`);
+      
+      // Delete entries in batches
+      const batchSize = 25; // DynamoDB batch delete limit
+      for (let i = 0; i < allEntries.length; i += batchSize) {
+        const batch = allEntries.slice(i, i + batchSize);
+        
+        const deleteRequests = batch.map(entry => ({
+          DeleteRequest: {
+            Key: {
+              assetId: entry.assetId,
+              timestamp: entry.timestamp
+            }
+          }
+        }));
+        
+        const command = new BatchWriteCommand({
+          RequestItems: {
+            [AUDIT_TABLE_NAME]: deleteRequests
+          }
+        });
+        
+        await dynamodb.send(command);
+        console.log(`Deleted batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(allEntries.length / batchSize)}`);
+      }
+      
+      console.log('Successfully deleted all audit entries');
+    } catch (error) {
+      console.error('Error deleting all audit entries:', error);
       throw error;
     }
   }

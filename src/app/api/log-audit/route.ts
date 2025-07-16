@@ -6,7 +6,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { assetId, user, action, details } = body;
 
+    console.log('Log-audit API called with:', { assetId, user, action, detailsCount: details?.changes?.length || 0 });
+
     if (!assetId || !user || !action) {
+      console.error('Missing required fields:', { assetId, user, action });
       return NextResponse.json(
         { error: 'assetId, user, and action are required' },
         { status: 400 }
@@ -15,13 +18,17 @@ export async function POST(request: NextRequest) {
 
     const auditEntry = {
       assetId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString(), // Clean ISO timestamp
       user,
       action,
       details: details || {}
     };
 
+    console.log('Creating audit entry:', auditEntry);
+
     await DynamoDBService.logAssetAuditEntry(auditEntry);
+
+    console.log('Audit entry created successfully');
 
     return NextResponse.json({ 
       success: true, 

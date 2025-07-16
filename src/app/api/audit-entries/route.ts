@@ -48,4 +48,24 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('Resetting audit log - deleting all audit entries');
+    
+    // Delete all audit entries
+    await DynamoDBService.deleteAllAuditEntries();
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Audit log reset successfully' 
+    });
+  } catch (error) {
+    console.error('Error resetting audit log:', error);
+    return NextResponse.json(
+      { error: 'Failed to reset audit log' },
+      { status: 500 }
+    );
+  }
 } 

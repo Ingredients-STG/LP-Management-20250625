@@ -405,25 +405,35 @@ export default function HomePage() {
 
     // Send audit entry to API
     try {
+      const auditData = {
+        assetId: asset.id || '',
+        user: user?.email || user?.username || 'Unknown User', // Get current user from authentication
+        action,
+        details: {
+          assetBarcode: asset.assetBarcode,
+          assetName: asset.primaryIdentifier,
+          changes,
+        },
+      };
+      
+      console.log('Creating audit log entry:', {
+        assetId: auditData.assetId,
+        action: auditData.action,
+        changesCount: changes.length
+      });
+      
       const response = await fetch('/api/log-audit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-      assetId: asset.id || '',
-          user: user?.email || user?.username || 'Unknown User', // Get current user from authentication
-          action,
-          details: {
-      assetBarcode: asset.assetBarcode,
-      assetName: asset.primaryIdentifier,
-      changes,
-          },
-        }),
+        body: JSON.stringify(auditData),
       });
 
       if (!response.ok) {
         console.error('Failed to log audit entry');
+      } else {
+        console.log('Audit log entry created successfully');
       }
     } catch (error) {
       console.error('Error creating audit log entry:', error);
@@ -445,6 +455,7 @@ export default function HomePage() {
       }
       
       console.log('Frontend: Fetching audit logs for asset:', assetId, loadMore ? '(loading more)' : '');
+      console.log('Frontend: Using params:', params.toString());
       const response = await fetch(`/api/audit-entries?${params}`);
       
       if (response.ok) {
@@ -1432,6 +1443,11 @@ export default function HomePage() {
   useEffect(() => {
     if (showAuditModal && selectedAssetAudit) {
       const asset = assets.find(a => a.assetBarcode === selectedAssetAudit);
+      console.log('Found asset for audit:', {
+        selectedAssetAudit,
+        assetId: asset?.id,
+        assetBarcode: asset?.assetBarcode
+      });
       if (asset?.id) {
         const loadAuditLogs = async () => {
           try {
@@ -1441,6 +1457,8 @@ export default function HomePage() {
           }
         };
         loadAuditLogs();
+      } else {
+        console.log('No asset found or asset has no ID');
       }
     }
   }, [showAuditModal, selectedAssetAudit, assets]);
@@ -1641,6 +1659,11 @@ export default function HomePage() {
       setAssets(prev => [...prev, result.data]);
       
       // Create audit log entry for asset creation
+      console.log('About to create audit log entry for asset creation:', {
+        assetId: result.data.id,
+        assetBarcode: result.data.assetBarcode,
+        action: 'CREATE'
+      });
       await createAuditLogEntry(result.data, 'CREATE');
       
       form.reset();
@@ -1761,6 +1784,11 @@ export default function HomePage() {
 
       // Create audit log entry using only user-modified fields for comparison
       if (selectedAsset) {
+        console.log('About to create audit log entry for asset update:', {
+          assetId: result.data.id,
+          assetBarcode: result.data.assetBarcode,
+          action: 'UPDATE'
+        });
         await createAuditLogEntry(result.data as Asset, "UPDATE", selectedAsset);
       }
 
@@ -5828,8 +5856,12 @@ export default function HomePage() {
 
           <ScrollArea h="calc(100vh - 200px)">
             <Stack gap="sm">
-              {/* Real data from DynamoDB */}
-              {globalAuditLog.map((entry, index) => (
+              {/* Real data from DynamoDB - sorted by timestamp descending */}
+              {[...globalAuditLog].sort((a, b) => {
+                const aTime = new Date(a.timestamp.split('Z')[0] + 'Z').getTime();
+                const bTime = new Date(b.timestamp.split('Z')[0] + 'Z').getTime();
+                return bTime - aTime; // Descending order (newest first)
+              }).map((entry, index) => (
                 <Card key={`${entry.assetId}-${entry.timestamp}-${index}`} shadow="sm" padding="md" radius="md" withBorder>
                   <Stack gap="xs">
                     <Group justify="space-between">
