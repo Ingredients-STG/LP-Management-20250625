@@ -3208,6 +3208,23 @@ export default function HomePage() {
                 clearable
               />
               
+              {/* Row 7: Filter Expiry Status - Full width */}
+              <Select
+                placeholder="Filter Expiry Status"
+                data={[
+                  { value: 'expired', label: 'Filter Expired' },
+                  { value: 'this-week', label: 'Expiring This Week' },
+                  { value: 'next-week', label: 'Expiring Next Week' },
+                  { value: 'this-month', label: 'Expiring This Month' },
+                  { value: 'next-month', label: 'Expiring Next Month' }
+                ]}
+                value={filterExpiryStatus}
+                onChange={(value) => setFilterExpiryStatus(value || '')}
+                clearable
+                size="sm"
+                styles={{ input: { fontSize: '16px' } }}
+              />
+              
               {/* Clear Filters Button */}
               <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters} fullWidth>
                 Clear All Filters
