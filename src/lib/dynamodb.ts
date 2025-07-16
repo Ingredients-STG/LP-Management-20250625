@@ -42,14 +42,14 @@ export interface Asset {
   floorInWords: string;
   roomNo: string;
   roomName: string;
-  filterNeeded: boolean;
-  filtersOn: boolean;
+  filterNeeded: boolean | string;
+  filtersOn: boolean | string;
   filterExpiryDate: string;
   filterInstalledOn: string;
   filterType: string;
-  needFlushing: boolean;
+  needFlushing: boolean | string;
   notes: string;
-  augmentedCare: boolean;
+  augmentedCare: boolean | string;
   created: string;
   createdBy: string;
   modified: string;
@@ -256,7 +256,13 @@ export class DynamoDBService {
         totalAssets: assets.length,
         activeAssets: assets.filter(a => a.status === 'ACTIVE').length,
         maintenanceAssets: assets.filter(a => a.status === 'MAINTENANCE').length,
-        filtersNeeded: assets.filter(a => a.filterNeeded === true).length,
+        filtersNeeded: assets.filter(a => {
+          if (typeof a.filterNeeded === 'boolean') {
+            return a.filterNeeded;
+          }
+          const filterNeededStr = a.filterNeeded?.toString().toLowerCase();
+          return filterNeededStr === 'true' || filterNeededStr === 'yes';
+        }).length,
         statusBreakdown: {} as { [key: string]: number },
         assetTypeBreakdown: {} as { [key: string]: number },
         wingBreakdown: {} as { [key: string]: number },

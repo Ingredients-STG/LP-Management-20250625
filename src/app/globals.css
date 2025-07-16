@@ -218,6 +218,47 @@ div.action-button {
   min-width: 44px !important;
 }
 
+/* Responsive button container */
+div.action-buttons-container {
+  display: flex !important;
+  align-items: center !important;
+}
+
+div.desktop-buttons {
+  display: flex !important;
+}
+
+div.mobile-buttons {
+  display: none !important;
+}
+
+/* Ensure mobile grid buttons fill their containers */
+@media screen and (max-width: 767px) {
+  div.desktop-buttons {
+    display: none !important;
+  }
+  
+  div.mobile-buttons {
+    display: block !important;
+    width: 100% !important;
+  }
+  
+  div.asset-action-bar .mantine-Grid-root {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  
+  div.asset-action-bar .mantine-Grid-col {
+    padding: 2px !important;
+  }
+  
+  div.asset-action-bar .mantine-Button-root {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+}
+
 @media screen and (max-width: 768px) {
   /* Make title responsive */
   h3.main-title {

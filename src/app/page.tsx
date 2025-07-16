@@ -225,6 +225,7 @@ export default function HomePage() {
   const [filtersOnFilter, setFiltersOnFilter] = useState<string[]>([]);
   const [augmentedCareFilter, setAugmentedCareFilter] = useState<string[]>([]);
   const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [filterExpiryStatus, setFilterExpiryStatus] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
@@ -1357,10 +1358,57 @@ export default function HomePage() {
       // Augmented Care filter
       const assetAugmentedCare = (typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare?.toString().toLowerCase() === 'yes' || asset.augmentedCare?.toString().toLowerCase() === 'true');
       const matchesAugmentedCare = augmentedCareFilter.length > 0 ? augmentedCareFilter.includes(assetAugmentedCare ? 'Yes' : 'No') : true;
-      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry;
+      
+      // Filter Expiry Status filter
+      let matchesFilterExpiryStatus = true;
+      if (filterExpiryStatus) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const expiryDate = safeDate(asset.filterExpiryDate);
+        
+        if (expiryDate) {
+          switch (filterExpiryStatus) {
+            case 'expired':
+              matchesFilterExpiryStatus = expiryDate < today;
+              break;
+            case 'this-week':
+              const thisWeekStart = new Date(today);
+              const day = today.getDay();
+              const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+              thisWeekStart.setDate(diff);
+              const thisWeekEnd = new Date(thisWeekStart);
+              thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
+              matchesFilterExpiryStatus = expiryDate >= thisWeekStart && expiryDate <= thisWeekEnd;
+              break;
+            case 'next-week':
+              const nextWeekStart = new Date(today);
+              const nextDay = today.getDay();
+              const nextDiff = today.getDate() - nextDay + (nextDay === 0 ? -6 : 1) + 7;
+              nextWeekStart.setDate(nextDiff);
+              const nextWeekEnd = new Date(nextWeekStart);
+              nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+              matchesFilterExpiryStatus = expiryDate >= nextWeekStart && expiryDate <= nextWeekEnd;
+              break;
+            case 'this-month':
+              const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+              const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+              matchesFilterExpiryStatus = expiryDate >= thisMonthStart && expiryDate <= thisMonthEnd;
+              break;
+            case 'next-month':
+              const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+              const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+              matchesFilterExpiryStatus = expiryDate >= nextMonthStart && expiryDate <= nextMonthEnd;
+              break;
+          }
+        } else {
+          matchesFilterExpiryStatus = false;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry && matchesFilterExpiryStatus;
     }));
     setCurrentPage(1);
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange, filterExpiryStatus]);
 
   // Track previous installed date to prevent infinite loops
   const prevInstalledDateRef = useRef<Date | null>(null);
@@ -2587,10 +2635,13 @@ export default function HomePage() {
   });
 
   // Chart data
-  const statusChartData = Object.entries(stats.statusBreakdown || {}).map(([status, count]) => ({
-    name: status,
-    value: count,
-    color: getStatusColor(status)
+  const wingChartData = Object.entries(assets.reduce((acc, asset) => {
+    const wingShort = asset.wingInShort || asset.wing || 'Unknown';
+    acc[wingShort] = (acc[wingShort] || 0) + 1;
+    return acc;
+  }, {} as { [key: string]: number })).map(([wingShort, count]) => ({
+    wing: wingShort,
+    count
   }));
 
   const typeChartData = Object.entries(stats.assetTypeBreakdown || {}).map(([type, count]) => ({
@@ -2623,12 +2674,18 @@ export default function HomePage() {
           />
           <StatCard
             className="stat-card"
-            title="Under Maintenance"
-            value={stats.maintenanceAssets}
-            icon={<IconAlertTriangle size={20} />}
-            color="yellow"
-            description="Requires attention"
-            trend={-1.2}
+            title="Flushing Needed"
+            value={assets.filter(a => {
+              if (typeof a.needFlushing === 'boolean') {
+                return a.needFlushing;
+              }
+              const needFlushingStr = a.needFlushing?.toString().toLowerCase();
+              return needFlushingStr === 'true' || needFlushingStr === 'yes';
+            }).length}
+            icon={<IconDroplet size={20} />}
+            color="orange"
+            description="Requires flushing"
+            trend={0.5}
           />
           <StatCard
             className="stat-card"
@@ -2640,6 +2697,164 @@ export default function HomePage() {
             trend={0.8}
           />
         </div>
+
+        {/* Filter Expiration Statistics */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Title order={4} mb="md">Filter Expiration Overview</Title>
+          <Grid gutter="md">
+            {(() => {
+              const now = new Date();
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              
+              // Helper function to parse date and check if it's valid
+              const parseDate = (dateStr: string) => {
+                if (!dateStr) return null;
+                const date = new Date(dateStr);
+                return isNaN(date.getTime()) ? null : date;
+              };
+              
+              // Helper function to get week start (Monday)
+              const getWeekStart = (date: Date) => {
+                const day = date.getDay();
+                const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+                return new Date(date.setDate(diff));
+              };
+              
+              // Helper function to get month start
+              const getMonthStart = (date: Date) => {
+                return new Date(date.getFullYear(), date.getMonth(), 1);
+              };
+              
+              // Helper function to get month end
+              const getMonthEnd = (date: Date) => {
+                return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+              };
+              
+              // Calculate date ranges
+              const thisWeekStart = getWeekStart(new Date(today));
+              const thisWeekEnd = new Date(thisWeekStart);
+              thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
+              
+              const nextWeekStart = new Date(thisWeekStart);
+              nextWeekStart.setDate(thisWeekStart.getDate() + 7);
+              const nextWeekEnd = new Date(nextWeekStart);
+              nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+              
+              const thisMonthStart = getMonthStart(today);
+              const thisMonthEnd = getMonthEnd(today);
+              
+              const nextMonthStart = new Date(thisMonthStart);
+              nextMonthStart.setMonth(thisMonthStart.getMonth() + 1);
+              const nextMonthEnd = getMonthEnd(nextMonthStart);
+              
+              // Filter assets with valid expiry dates
+              const assetsWithExpiry = assets.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate);
+                return expiryDate !== null;
+              });
+              
+              // Calculate statistics
+              const expiredFilters = assetsWithExpiry.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate)!;
+                return expiryDate < today;
+              }).length;
+              
+              const expiringThisWeek = assetsWithExpiry.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate)!;
+                return expiryDate >= thisWeekStart && expiryDate <= thisWeekEnd;
+              }).length;
+              
+              const expiringNextWeek = assetsWithExpiry.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate)!;
+                return expiryDate >= nextWeekStart && expiryDate <= nextWeekEnd;
+              }).length;
+              
+              const expiringThisMonth = assetsWithExpiry.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate)!;
+                return expiryDate >= thisMonthStart && expiryDate <= thisMonthEnd;
+              }).length;
+              
+              const expiringNextMonth = assetsWithExpiry.filter(asset => {
+                const expiryDate = parseDate(asset.filterExpiryDate)!;
+                return expiryDate >= nextMonthStart && expiryDate <= nextMonthEnd;
+              }).length;
+              
+              return (
+                <>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Card shadow="sm" padding="md" radius="md" withBorder>
+                      <Group gap="sm">
+                        <ThemeIcon color="red" size={32} radius="md">
+                          <IconAlertTriangle size={16} />
+                        </ThemeIcon>
+                        <div>
+                          <Text size="xs" c="dimmed">Expired Filters</Text>
+                          <Text fw={700} size="lg">{expiredFilters}</Text>
+                        </div>
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                  
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Card shadow="sm" padding="md" radius="md" withBorder>
+                      <Group gap="sm">
+                        <ThemeIcon color="orange" size={32} radius="md">
+                          <IconClock size={16} />
+                        </ThemeIcon>
+                        <div>
+                          <Text size="xs" c="dimmed">Expiring This Week</Text>
+                          <Text fw={700} size="lg">{expiringThisWeek}</Text>
+                        </div>
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                  
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Card shadow="sm" padding="md" radius="md" withBorder>
+                      <Group gap="sm">
+                        <ThemeIcon color="yellow" size={32} radius="md">
+                          <IconCalendar size={16} />
+                        </ThemeIcon>
+                        <div>
+                          <Text size="xs" c="dimmed">Expiring Next Week</Text>
+                          <Text fw={700} size="lg">{expiringNextWeek}</Text>
+                        </div>
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                  
+                  <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
+                    <Card shadow="sm" padding="md" radius="md" withBorder>
+                      <Group gap="sm">
+                        <ThemeIcon color="blue" size={32} radius="md">
+                          <IconCalendar size={16} />
+                        </ThemeIcon>
+                        <div>
+                          <Text size="xs" c="dimmed">Expiring This Month</Text>
+                          <Text fw={700} size="lg">{expiringThisMonth}</Text>
+                        </div>
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                  
+                  <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
+                    <Card shadow="sm" padding="md" radius="md" withBorder>
+                      <Group gap="sm">
+                        <ThemeIcon color="green" size={32} radius="md">
+                          <IconCalendar size={16} />
+                        </ThemeIcon>
+                        <div>
+                          <Text size="xs" c="dimmed">Expiring Next Month</Text>
+                          <Text fw={700} size="lg">{expiringNextMonth}</Text>
+                        </div>
+                      </Group>
+                    </Card>
+                  </Grid.Col>
+                </>
+              );
+            })()}
+          </Grid>
+        </Card>
 
         {/* Charts */}
         <div className="dashboard-charts-row">
@@ -2655,40 +2870,59 @@ export default function HomePage() {
             )}
           </Card>
           <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Status Overview</Title>
-            {statusChartData.length > 0 && (
-              <PieChart
+            <Title order={4} mb="md">Wing Distribution (Total: {wingChartData.reduce((sum, item) => sum + item.count, 0)})</Title>
+            {wingChartData.length > 0 && (
+              <BarChart
                 h={300}
-                data={statusChartData}
-                withTooltip
-                tooltipDataSource="segment"
+                data={wingChartData}
+                dataKey="wing"
+                series={[{ name: 'count', color: 'blue.6' }]}
               />
             )}
           </Card>
+          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+            <Title order={4} mb="md">Filters to be Removed (Total: {(() => {
+              const filtersToRemove = assets.filter(a => {
+                const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
+                return !filterNeeded && filtersOn;
+              });
+              return filtersToRemove.length;
+            })()})</Title>
+            {(() => {
+              const filtersToRemove = assets.filter(a => {
+                const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
+                return !filterNeeded && filtersOn;
+              });
+              
+              // Group by wingInShort
+              const filtersToRemoveByWing = filtersToRemove.reduce((acc, asset) => {
+                const wingShort = asset.wingInShort || asset.wing || 'Unknown';
+                acc[wingShort] = (acc[wingShort] || 0) + 1;
+                return acc;
+              }, {} as { [key: string]: number });
+              
+              const filtersToRemoveData = Object.entries(filtersToRemoveByWing).map(([wingShort, count]) => ({
+                wing: wingShort,
+                count
+              }));
+              
+              return filtersToRemoveData.length > 0 ? (
+                <BarChart
+                  h={300}
+                  data={filtersToRemoveData}
+                  dataKey="wing"
+                  series={[{ name: 'count', color: 'red.6' }]}
+                />
+              ) : (
+                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text c="dimmed">No filters to remove</Text>
+                </div>
+              );
+            })()}
+          </Card>
         </div>
-
-        {/* Recent Activity */}
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Title order={4} mb="md">Recent Activity</Title>
-          <Stack gap="xs">
-            {assets.slice(0, 5).map((asset, index) => (
-              <Group key={index} justify="space-between" p="xs" style={{ borderRadius: '8px', backgroundColor: '#f8f9fa' }}>
-                <Group gap="sm">
-                  <ThemeIcon color="blue" size={24} radius="md">
-                    <IconDroplet size={12} />
-                  </ThemeIcon>
-                  <div>
-                    <Text size="sm" fw={500}>{asset.primaryIdentifier}</Text>
-                    <Text size="xs" c="dimmed">Last modified by {asset.modifiedBy}</Text>
-                  </div>
-                </Group>
-                <Text size="xs" c="dimmed">
-                  {asset.modified ? new Date(asset.modified).toLocaleDateString() : 'N/A'}
-                </Text>
-              </Group>
-            ))}
-          </Stack>
-        </Card>
       </Stack>
     </div>
   );
@@ -2698,68 +2932,147 @@ export default function HomePage() {
       {/* Filters and Actions */}
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Stack gap="md">
-          <Group justify="space-between" wrap="wrap" gap="md" align="center" className="asset-action-bar">
+                    <Group justify="space-between" wrap="wrap" gap="md" align="center" className="asset-action-bar">
             <Title order={3} style={{ marginBottom: 0 }}>Asset Management</Title>
-            <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }} className="action-buttons-group">
-              <Button
-                leftSection={<IconRefresh size={16} />}
-                variant="light"
-                onClick={fetchData}
-                loading={loading}
-                size="md"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button"
-              >
-                Refresh
-              </Button>
-              <Menu shadow="md" width={200}>
-                <Menu.Target>
+            
+            {/* Responsive button layout */}
+            <div className="action-buttons-container">
+              {/* Desktop: Single row layout */}
+              <div className="desktop-buttons">
+                <Group gap="xs" wrap="wrap" style={{ minHeight: '44px' }} className="action-buttons-group">
                   <Button
-                    leftSection={<IconDownload size={16} />}
-                    variant="outline"
-                    rightSection={<IconChevronDown size={16} />}
+                    leftSection={<IconRefresh size={16} />}
+                    variant="light"
+                    onClick={fetchData}
+                    loading={loading}
                     size="md"
                     style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
                     className="action-button"
                   >
-                    Export
+                    Refresh
                   </Button>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item
-                    leftSection={<IconFileText size={16} />}
-                    onClick={() => exportData('csv')}
+                  <Menu shadow="md" width={200}>
+                    <Menu.Target>
+                      <Button
+                        leftSection={<IconDownload size={16} />}
+                        variant="outline"
+                        rightSection={<IconChevronDown size={16} />}
+                        size="md"
+                        style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                        className="action-button"
+                      >
+                        Export
+                      </Button>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item
+                        leftSection={<IconFileText size={16} />}
+                        onClick={() => exportData('csv')}
+                      >
+                        Export as CSV
+                      </Menu.Item>
+                      <Menu.Item
+                        leftSection={<IconFileSpreadsheet size={16} />}
+                        onClick={() => exportData('excel')}
+                      >
+                        Export as Excel
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                  <Button
+                    leftSection={filtersCollapsed ? <IconChevronDown size={16} /> : <IconChevronUp size={16} />}
+                    variant="subtle"
+                    color="blue"
+                    size="md"
+                    style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                    onClick={() => setFiltersCollapsed((prev: boolean) => !prev)}
                   >
-                    Export as CSV
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={<IconFileSpreadsheet size={16} />}
-                    onClick={() => exportData('excel')}
+                    {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
+                  </Button>
+                  <Button
+                    leftSection={<IconPlus size={16} />}
+                    size="md"
+                    style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
+                    className="action-button"
+                    onClick={openModal}
                   >
-                    Export as Excel
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-              <Button
-                leftSection={filtersCollapsed ? <IconChevronDown size={16} /> : <IconChevronUp size={16} />}
-                variant="subtle"
-                color="blue"
-                size="md"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                onClick={() => setFiltersCollapsed((prev: boolean) => !prev)}
-              >
-                {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                size="md"
-                style={{ minHeight: '44px', minWidth: '44px', flexShrink: 0 }}
-                className="action-button"
-                onClick={openModal}
-              >
-                Add Asset
-              </Button>
-            </Group>
+                    Add Asset
+                  </Button>
+                </Group>
+              </div>
+              
+              {/* Mobile: 2x2 grid layout */}
+              <div className="mobile-buttons">
+                <Grid gutter="xs" style={{ width: '100%' }}>
+                  <Grid.Col span={6}>
+                    <Button
+                      leftSection={<IconRefresh size={16} />}
+                      variant="light"
+                      onClick={fetchData}
+                      loading={loading}
+                      size="md"
+                      style={{ width: '100%', minHeight: '44px' }}
+                      className="action-button"
+                    >
+                      Refresh
+                    </Button>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Menu shadow="md" width={200}>
+                      <Menu.Target>
+                        <Button
+                          leftSection={<IconDownload size={16} />}
+                          variant="outline"
+                          rightSection={<IconChevronDown size={16} />}
+                          size="md"
+                          style={{ width: '100%', minHeight: '44px' }}
+                          className="action-button"
+                        >
+                          Export
+                        </Button>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item
+                          leftSection={<IconFileText size={16} />}
+                          onClick={() => exportData('csv')}
+                        >
+                          Export as CSV
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconFileSpreadsheet size={16} />}
+                          onClick={() => exportData('excel')}
+                        >
+                          Export as Excel
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Button
+                      leftSection={filtersCollapsed ? <IconChevronDown size={16} /> : <IconChevronUp size={16} />}
+                      variant="subtle"
+                      color="blue"
+                      size="md"
+                      style={{ width: '100%', minHeight: '44px' }}
+                      onClick={() => setFiltersCollapsed((prev: boolean) => !prev)}
+                    >
+                      {filtersCollapsed ? 'Show Filters' : 'Hide Filters'}
+                    </Button>
+                  </Grid.Col>
+                  <Grid.Col span={6}>
+                    <Button
+                      leftSection={<IconPlus size={16} />}
+                      size="md"
+                      style={{ width: '100%', minHeight: '44px' }}
+                      className="action-button"
+                      onClick={openModal}
+                    >
+                      Add Asset
+                    </Button>
+                  </Grid.Col>
+                </Grid>
+              </div>
+            </div>
           </Group>
           {/* Search bar always visible */}
           <TextInput
@@ -3000,6 +3313,21 @@ export default function HomePage() {
                   data={Array.from(new Set(assets.map(a => a.wing))).filter(Boolean)}
                   value={wingFilter}
                   onChange={setWingFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <Select
+                  placeholder="Filter Expiry Status"
+                  data={[
+                    { value: 'expired', label: 'Filter Expired' },
+                    { value: 'this-week', label: 'Expiring This Week' },
+                    { value: 'next-week', label: 'Expiring Next Week' },
+                    { value: 'this-month', label: 'Expiring This Month' },
+                    { value: 'next-month', label: 'Expiring Next Month' }
+                  ]}
+                  value={filterExpiryStatus}
+                  onChange={(value) => setFilterExpiryStatus(value || '')}
                   clearable
                 />
               </Grid.Col>
@@ -4178,6 +4506,7 @@ export default function HomePage() {
     setFiltersOnFilter([]);
     setAugmentedCareFilter([]);
     setFilterExpiryRange([null, null]);
+    setFilterExpiryStatus('');
   };
 
   return (
@@ -5175,11 +5504,11 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="sm" c="dimmed">Filters On</Text>
                   <Badge 
-                    color={(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true') ? 'green' : 'red'} 
+                    color={(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes')) ? 'green' : 'red'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : selectedAsset.filtersOn === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
