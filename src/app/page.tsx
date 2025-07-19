@@ -244,6 +244,7 @@ export default function HomePage() {
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [formKey, setFormKey] = useState(0); // Force form re-render
 
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
@@ -1818,100 +1819,88 @@ export default function HomePage() {
   };
   // Handle removing filter from asset
   const handleRemoveFilter = (asset: Asset) => {
+    // Store original values for potential rollback
+    const originalFormValues = {
+      filterNeeded: form.values.filterNeeded,
+      filtersOn: form.values.filtersOn,
+      filterInstalledOn: form.values.filterInstalledOn,
+      filterExpiryDate: form.values.filterExpiryDate,
+      filterType: form.values.filterType,
+    };
+    
+    // Immediately update form values and selectedAsset state for instant visual feedback
+    if (selectedAsset && selectedAsset.id === asset.id) {
+      // Force form to update by setting values directly
+      form.setFieldValue('filterNeeded', false);
+      form.setFieldValue('filtersOn', false);
+      form.setFieldValue('filterInstalledOn', null);
+      form.setFieldValue('filterExpiryDate', null);
+      form.setFieldValue('filterType', '');
+      
+      // Also update selectedAsset state to ensure UI reflects changes immediately
+      setSelectedAsset({
+        ...selectedAsset,
+        filterNeeded: false,
+        filtersOn: false,
+        filterInstalledOn: '',
+        filterExpiryDate: '',
+        filterType: '',
+      });
+      
+      // Force form re-render by updating the key
+      setFormKey(prev => prev + 1);
+    }
+    
     modals.openConfirmModal({
       title: 'Remove Filter',
       children: (
         <Text size="sm">
-          Are you sure you want to remove the filter from asset <strong>{asset.primaryIdentifier}</strong>? 
-          This will reset all filter-related information including:
+          Are you sure you want to clear the filter fields for asset <strong>{asset.primaryIdentifier}</strong>? 
+          This will reset all filter-related information in the form:
           <br />• Filter Needed
           <br />• Filters On
           <br />• Filter Installation Date
           <br />• Filter Expiry Date
           <br />• Filter Type
           <br /><br />
-          This action will be logged in the audit trail.
+          The changes will be saved when you click "Update Asset".
         </Text>
       ),
-      labels: { confirm: 'Remove Filter', cancel: 'Cancel' },
+      labels: { confirm: 'Clear Filter Fields', cancel: 'Cancel' },
       confirmProps: { color: 'orange' },
-      onConfirm: async () => {
-        try {
-          if (!asset.id) {
-            throw new Error('Asset ID is required for filter removal');
-          }
-
-          // Store old values for audit log
-          const oldAsset = { ...asset };
-
-          // Create updated asset with filter fields reset
-          const updatedAssetData = {
-            ...asset,
-            filterNeeded: false,
-            filtersOn: false,
-            filterInstalledOn: '',
-            filterExpiryDate: '',
-            filterType: '',
-            modifiedBy: user?.email || user?.username || 'Unknown User',
-          };
-
-          const response = await fetch(`/api/assets/${asset.id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedAssetData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to remove filter');
-          }
-
-          const result = await response.json();
+      onCancel: () => {
+        // Rollback form values if user cancels
+        if (selectedAsset && selectedAsset.id === asset.id) {
+          // Force form to update by setting values directly
+          form.setFieldValue('filterNeeded', originalFormValues.filterNeeded);
+          form.setFieldValue('filtersOn', originalFormValues.filtersOn);
+          form.setFieldValue('filterInstalledOn', originalFormValues.filterInstalledOn);
+          form.setFieldValue('filterExpiryDate', originalFormValues.filterExpiryDate);
+          form.setFieldValue('filterType', originalFormValues.filterType);
           
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to remove filter');
-          }
-
-          // Create audit log entry for filter removal
-          await createAuditLogEntry(result.data, 'UPDATE', oldAsset);
-        
-          // Update local state
-          setAssets(prev => prev.map(a => 
-            a.id === asset.id ? result.data : a
-          ));
-          
-          // Update selectedAsset if it's the same asset being edited
-          if (selectedAsset && selectedAsset.id === asset.id) {
-            setSelectedAsset(result.data);
-            
-            // Update form values to reflect the changes
-            form.setValues({
-              ...form.values,
-              filterNeeded: false,
-              filtersOn: false,
-              filterInstalledOn: null,
-              filterExpiryDate: null,
-              filterType: '',
-            });
-          }
-          
-          notifications.show({
-            title: 'Success',
-            message: 'Filter removed successfully!',
-            color: 'green',
-            icon: <IconCheck size={16} />,
+          // Also restore the selectedAsset state
+          setSelectedAsset({
+            ...selectedAsset,
+            filterNeeded: originalFormValues.filterNeeded,
+            filtersOn: originalFormValues.filtersOn,
+            filterInstalledOn: originalFormValues.filterInstalledOn ? originalFormValues.filterInstalledOn.toISOString().split('T')[0] : '',
+            filterExpiryDate: originalFormValues.filterExpiryDate ? originalFormValues.filterExpiryDate.toISOString().split('T')[0] : '',
+            filterType: originalFormValues.filterType,
           });
-        } catch (error) {
-          console.error("Error removing filter:", error);
-          notifications.show({
-            title: 'Error',
-            message: `Failed to remove filter: ${error instanceof Error ? error.message : "Unknown error"}`,
-            color: 'red',
-            icon: <IconX size={16} />,
-          });
+          
+          // Force form re-render by updating the key
+          setFormKey(prev => prev + 1);
         }
+      },
+      onConfirm: () => {
+        // Form fields are already cleared when user clicked the button
+        // Just close the modal and show confirmation
+        notifications.show({
+          title: 'Filter Fields Cleared',
+          message: 'Filter fields have been cleared in the form. Click "Update Asset" to save the changes to the database.',
+          color: 'blue',
+          icon: <IconCheck size={16} />,
+        });
       },
     });
   };
@@ -2080,6 +2069,23 @@ export default function HomePage() {
               value = 'N/A';
             }
           }
+          // Special handling for boolean fields - convert to Yes/No
+          if (field === 'filterNeeded' || field === 'filtersOn' || field === 'needFlushing' || field === 'augmentedCare') {
+            if (typeof value === 'boolean') {
+              return value ? 'Yes' : 'No';
+            }
+            if (typeof value === 'string') {
+              const lowerValue = value.toLowerCase();
+              if (lowerValue === 'true' || lowerValue === 'yes' || lowerValue === '1') {
+                return 'Yes';
+              }
+              if (lowerValue === 'false' || lowerValue === 'no' || lowerValue === '0') {
+                return 'No';
+              }
+            }
+            return 'No'; // Default for undefined/null values
+          }
+          
           const formattedValue = formatValue(value);
           // Special handling for asset barcode - always uppercase and trimmed
           if (field === 'assetBarcode') {
@@ -2685,7 +2691,7 @@ export default function HomePage() {
           <StatCard
             className="stat-card"
             title="Total Assets"
-            value={stats.totalAssets}
+            value={assets.length}
             icon={<IconDroplet size={20} />}
             color="blue"
             description="All registered assets"
@@ -2694,7 +2700,7 @@ export default function HomePage() {
           <StatCard
             className="stat-card"
             title="Active Assets"
-            value={stats.activeAssets}
+            value={assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE').length}
             icon={<IconCheck size={20} />}
             color="green"
             description="Currently operational"
@@ -2703,7 +2709,7 @@ export default function HomePage() {
           <StatCard
             className="stat-card"
             title="Flushing Needed"
-            value={assets.filter(a => {
+            value={assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE').filter(a => {
               if (typeof a.needFlushing === 'boolean') {
                 return a.needFlushing;
               }
@@ -2718,7 +2724,10 @@ export default function HomePage() {
           <StatCard
             className="stat-card"
             title="Filters Needed"
-            value={stats.filtersNeeded}
+            value={assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE').filter(a => {
+              const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+              return filterNeeded;
+            }).length}
             icon={<IconFilter size={20} />}
             color="red"
             description="Filter replacement due"
@@ -2775,8 +2784,9 @@ export default function HomePage() {
               nextMonthStart.setMonth(thisMonthStart.getMonth() + 1);
               const nextMonthEnd = getMonthEnd(nextMonthStart);
               
-              // Filter assets with valid expiry dates
-              const assetsWithExpiry = assets.filter(asset => {
+              // Filter active assets with valid expiry dates
+              const activeAssets = assets.filter(asset => asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE');
+              const assetsWithExpiry = activeAssets.filter(asset => {
                 const expiryDate = parseDate(asset.filterExpiryDate);
                 return expiryDate !== null;
               });
@@ -2884,73 +2894,181 @@ export default function HomePage() {
           </Grid>
         </Card>
 
-        {/* Charts */}
-        <div className="dashboard-charts-row">
-          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Asset Types Distribution</Title>
-            {typeChartData.length > 0 && (
-              <BarChart
-                h={300}
-                data={typeChartData}
-                dataKey="type"
-                series={[{ name: 'count', color: 'blue.6' }]}
-              />
-            )}
-          </Card>
-          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Wing Distribution (Total: {wingChartData.reduce((sum, item) => sum + item.count, 0)})</Title>
-            {wingChartData.length > 0 && (
-              <BarChart
-                h={300}
-                data={wingChartData}
-                dataKey="wing"
-                series={[{ name: 'count', color: 'blue.6' }]}
-              />
-            )}
-          </Card>
-          <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
-            <Title order={4} mb="md">Filters to be Removed (Total: {(() => {
-              const filtersToRemove = assets.filter(a => {
-                const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
-                const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
-                return !filterNeeded && filtersOn;
-              });
-              return filtersToRemove.length;
-            })()})</Title>
-            {(() => {
-              const filtersToRemove = assets.filter(a => {
-                const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
-                const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
-                return !filterNeeded && filtersOn;
-              });
-              
-              // Group by wingInShort
-              const filtersToRemoveByWing = filtersToRemove.reduce((acc, asset) => {
-                const wingShort = asset.wingInShort || asset.wing || 'Unknown';
-                acc[wingShort] = (acc[wingShort] || 0) + 1;
-                return acc;
-              }, {} as { [key: string]: number });
-              
-              const filtersToRemoveData = Object.entries(filtersToRemoveByWing).map(([wingShort, count]) => ({
-                wing: wingShort,
-                count
-              }));
-              
-              return filtersToRemoveData.length > 0 ? (
-                <BarChart
-                  h={300}
-                  data={filtersToRemoveData}
-                  dataKey="wing"
-                  series={[{ name: 'count', color: 'red.6' }]}
-                />
-              ) : (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text c="dimmed">No filters to remove</Text>
-                </div>
-              );
-            })()}
-          </Card>
-        </div>
+        {/* Charts Row 1 - 2 Columns */}
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Filters to be Removed (Total: {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const filtersToRemove = activeAssets.filter(a => {
+                  const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                  const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
+                  return !filterNeeded && filtersOn;
+                });
+                return filtersToRemove.length;
+              })()})</Title>
+              {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const filtersToRemove = activeAssets.filter(a => {
+                  const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                  const filtersOn = typeof a.filtersOn === 'boolean' ? a.filtersOn : (a.filtersOn?.toString().toLowerCase() === 'true' || a.filtersOn?.toString().toLowerCase() === 'yes');
+                  return !filterNeeded && filtersOn;
+                });
+                
+                // Group by wingInShort
+                const filtersToRemoveByWing = filtersToRemove.reduce((acc, asset) => {
+                  const wingShort = asset.wingInShort || asset.wing || 'Unknown';
+                  acc[wingShort] = (acc[wingShort] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const filtersToRemoveData = Object.entries(filtersToRemoveByWing).map(([wingShort, count]) => ({
+                  wing: wingShort,
+                  count
+                }));
+                
+                return filtersToRemoveData.length > 0 ? (
+                  <BarChart
+                    h={300}
+                    data={filtersToRemoveData}
+                    dataKey="wing"
+                    series={[{ name: 'count', color: 'red.6' }]}
+                  />
+                ) : (
+                  <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text c="dimmed">No filters to remove</Text>
+                  </div>
+                );
+              })()}
+            </Card>
+          </Grid.Col>
+          
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Needed Flushing (Total: {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const neededFlushing = activeAssets.filter(a => {
+                  const needFlushing = typeof a.needFlushing === 'boolean' ? a.needFlushing : (a.needFlushing?.toString().toLowerCase() === 'true' || a.needFlushing?.toString().toLowerCase() === 'yes');
+                  return needFlushing;
+                });
+                return neededFlushing.length;
+              })()})</Title>
+              {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const neededFlushing = activeAssets.filter(a => {
+                  const needFlushing = typeof a.needFlushing === 'boolean' ? a.needFlushing : (a.needFlushing?.toString().toLowerCase() === 'true' || a.needFlushing?.toString().toLowerCase() === 'yes');
+                  return needFlushing;
+                });
+                
+                // Group by wingInShort
+                const neededFlushingByWing = neededFlushing.reduce((acc, asset) => {
+                  const wingShort = asset.wingInShort || asset.wing || 'Unknown';
+                  acc[wingShort] = (acc[wingShort] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const neededFlushingData = Object.entries(neededFlushingByWing).map(([wingShort, count]) => ({
+                  wing: wingShort,
+                  count
+                }));
+                
+                return neededFlushingData.length > 0 ? (
+                  <BarChart
+                    h={300}
+                    data={neededFlushingData}
+                    dataKey="wing"
+                    series={[{ name: 'count', color: 'orange.6' }]}
+                  />
+                ) : (
+                  <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text c="dimmed">No assets need flushing</Text>
+                  </div>
+                );
+              })()}
+            </Card>
+          </Grid.Col>
+        </Grid>
+
+        {/* Charts Row 2 - 2 Columns */}
+        <Grid mt="md">
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Asset Types Distribution</Title>
+              {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const activeTypeChartData = activeAssets.reduce((acc, asset) => {
+                  const type = asset.assetType || 'Unknown';
+                  acc[type] = (acc[type] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const activeTypeData = Object.entries(activeTypeChartData).map(([type, count]) => ({
+                  type,
+                  count
+                }));
+                
+                return activeTypeData.length > 0 ? (
+                  <BarChart
+                    h={300}
+                    data={activeTypeData}
+                    dataKey="type"
+                    series={[{ name: 'count', color: 'blue.6' }]}
+                  />
+                ) : (
+                  <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text c="dimmed">No active assets</Text>
+                  </div>
+                );
+              })()}
+            </Card>
+          </Grid.Col>
+          
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+              <Title order={4} mb="md">Wing Distribution (Total: {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const activeWingChartData = activeAssets.reduce((acc, asset) => {
+                  const wing = asset.wingInShort || asset.wing || 'Unknown';
+                  acc[wing] = (acc[wing] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const activeWingData = Object.entries(activeWingChartData).map(([wing, count]) => ({
+                  wing,
+                  count
+                }));
+                
+                return activeWingData.reduce((sum, item) => sum + item.count, 0);
+              })()})</Title>
+              {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const activeWingChartData = activeAssets.reduce((acc, asset) => {
+                  const wing = asset.wingInShort || asset.wing || 'Unknown';
+                  acc[wing] = (acc[wing] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const activeWingData = Object.entries(activeWingChartData).map(([wing, count]) => ({
+                  wing,
+                  count
+                }));
+                
+                return activeWingData.length > 0 ? (
+                  <BarChart
+                    h={300}
+                    data={activeWingData}
+                    dataKey="wing"
+                    series={[{ name: 'count', color: 'blue.6' }]}
+                  />
+                ) : (
+                  <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text c="dimmed">No active assets</Text>
+                  </div>
+                );
+              })()}
+            </Card>
+          </Grid.Col>
+        </Grid>
       </Stack>
     </div>
   );
@@ -3237,7 +3355,7 @@ export default function HomePage() {
               />
               
               {/* Row 7: Filter Expiry Status - Full width */}
-              <Select
+              <MultiSelect
                 placeholder="Filter Expiry Status"
                 data={[
                   { value: 'expired', label: 'Filter Expired' },
@@ -3246,8 +3364,8 @@ export default function HomePage() {
                   { value: 'this-month', label: 'Expiring This Month' },
                   { value: 'next-month', label: 'Expiring Next Month' }
                 ]}
-                value={filterExpiryStatus}
-                onChange={(value) => setFilterExpiryStatus(value || '')}
+                value={filterExpiryStatus ? [filterExpiryStatus] : []}
+                onChange={(values) => setFilterExpiryStatus(values.length > 0 ? values[0] : '')}
                 clearable
                 size="sm"
                 styles={{ input: { fontSize: '16px' } }}
@@ -3362,7 +3480,7 @@ export default function HomePage() {
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                <Select
+                <MultiSelect
                   placeholder="Filter Expiry Status"
                   data={[
                     { value: 'expired', label: 'Filter Expired' },
@@ -3371,8 +3489,8 @@ export default function HomePage() {
                     { value: 'this-month', label: 'Expiring This Month' },
                     { value: 'next-month', label: 'Expiring Next Month' }
                   ]}
-                  value={filterExpiryStatus}
-                  onChange={(value) => setFilterExpiryStatus(value || '')}
+                  value={filterExpiryStatus ? [filterExpiryStatus] : []}
+                  onChange={(values) => setFilterExpiryStatus(values.length > 0 ? values[0] : '')}
                   clearable
                 />
               </Grid.Col>
@@ -5054,7 +5172,7 @@ export default function HomePage() {
         fullScreen
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        <form onSubmit={form.onSubmit(handleEditAsset)}>
+        <form key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
           <Stack gap="lg">
             {/* Basic Information */}
             <div>
@@ -5291,12 +5409,30 @@ export default function HomePage() {
               {/* Remove Filter Button */}
               <Group justify="center" mt="md">
                 <Button
+                  type="button"
                   variant="outline"
                   color="orange"
                   size="sm"
                   leftSection={<IconX size={16} />}
-                  onClick={() => selectedAsset && handleRemoveFilter(selectedAsset)}
-                  disabled={!selectedAsset || (!selectedAsset.filterNeeded && !selectedAsset.filtersOn && !selectedAsset.filterType)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (selectedAsset) {
+                      handleRemoveFilter(selectedAsset);
+                    }
+                  }}
+                  disabled={!selectedAsset || (
+                    !selectedAsset.filterNeeded && 
+                    !selectedAsset.filtersOn && 
+                    !selectedAsset.filterType &&
+                    !form.values.filterNeeded &&
+                    !form.values.filtersOn &&
+                    !form.values.filterType &&
+                    !selectedAsset.filterInstalledOn &&
+                    !selectedAsset.filterExpiryDate &&
+                    !form.values.filterInstalledOn &&
+                    !form.values.filterExpiryDate
+                  )}
                 >
                   Remove Filter
                 </Button>
