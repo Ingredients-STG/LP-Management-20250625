@@ -258,7 +258,7 @@ export class DynamoDBService {
         totalAssets: assets.length,
         activeAssets: assets.filter(a => a.status === 'ACTIVE').length,
         maintenanceAssets: assets.filter(a => a.status === 'MAINTENANCE').length,
-        filtersNeeded: assets.filter(a => {
+        filtersNeeded: assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE').filter(a => {
           if (typeof a.filterNeeded === 'boolean') {
             return a.filterNeeded;
           }
@@ -268,6 +268,7 @@ export class DynamoDBService {
         statusBreakdown: {} as { [key: string]: number },
         assetTypeBreakdown: {} as { [key: string]: number },
         wingBreakdown: {} as { [key: string]: number },
+        filtersNeededByWing: {} as { [key: string]: number },
       };
 
       // Calculate breakdowns
@@ -281,6 +282,17 @@ export class DynamoDBService {
         // Wing breakdown
         const wing = asset.wing || 'Unknown';
         stats.wingBreakdown[wing] = (stats.wingBreakdown[wing] || 0) + 1;
+        
+        // Filters needed by wing breakdown (only for Active and Maintenance assets)
+        if (asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE') {
+          const needsFilter = typeof asset.filterNeeded === 'boolean' 
+            ? asset.filterNeeded 
+            : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
+          
+          if (needsFilter) {
+            stats.filtersNeededByWing[wing] = (stats.filtersNeededByWing[wing] || 0) + 1;
+          }
+        }
       });
 
       return stats;

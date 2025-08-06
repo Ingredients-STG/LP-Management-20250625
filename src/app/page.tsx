@@ -46,6 +46,7 @@ import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import SPListItemsCard from '@/components/SPListItemsCard';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
@@ -139,6 +140,14 @@ interface DashboardStats {
   statusBreakdown?: { [key: string]: number };
   assetTypeBreakdown?: { [key: string]: number };
   wingBreakdown?: { [key: string]: number };
+  filtersNeededByWing?: { [key: string]: number };
+  spListItems?: {
+    items: any[];
+    analytics: any;
+    period: number;
+    totalCount: number;
+    filteredCount: number;
+  } | null;
 }
 
 interface AuditLogEntry {
@@ -2894,6 +2903,56 @@ export default function HomePage() {
           </Grid>
         </Card>
 
+        {/* Filters Needed Chart - Full Width Below Filter Expiration Overview */}
+        <Grid gutter="md">
+          <Grid.Col span={12}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder>
+              <Title order={4} mb="md">Filters Needed (Total: {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const filtersNeeded = activeAssets.filter(a => {
+                  const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                  return filterNeeded;
+                });
+                return filtersNeeded.length;
+              })()})</Title>
+              {(() => {
+                const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
+                const filtersNeeded = activeAssets.filter(a => {
+                  const filterNeeded = typeof a.filterNeeded === 'boolean' ? a.filterNeeded : (a.filterNeeded?.toString().toLowerCase() === 'true' || a.filterNeeded?.toString().toLowerCase() === 'yes');
+                  return filterNeeded;
+                });
+                
+                // Group by wingInShort
+                const filtersNeededByWing = filtersNeeded.reduce((acc, asset) => {
+                  const wingShort = asset.wingInShort || asset.wing || 'Unknown';
+                  acc[wingShort] = (acc[wingShort] || 0) + 1;
+                  return acc;
+                }, {} as { [key: string]: number });
+                
+                const filtersNeededData = Object.entries(filtersNeededByWing).map(([wingShort, count]) => ({
+                  name: wingShort,
+                  value: count
+                })).sort((a, b) => b.value - a.value);
+                
+                return filtersNeededData.length > 0 ? (
+                  <BarChart
+                    h={200}
+                    data={filtersNeededData}
+                    dataKey="name"
+                    series={[{ name: 'value', color: 'orange.6' }]}
+                    tickLine="xy"
+                    gridAxis="xy"
+                  />
+                ) : (
+                  <Text size="sm" c="dimmed" ta="center" py="lg">
+                    No filters needed data available
+                  </Text>
+                );
+              })()}
+            </Card>
+          </Grid.Col>
+        </Grid>
+
         {/* Charts Row 1 - 2 Columns */}
         <Grid>
           <Grid.Col span={{ base: 12, md: 6 }}>
@@ -3069,6 +3128,15 @@ export default function HomePage() {
             </Card>
           </Grid.Col>
         </Grid>
+
+
+
+        {/* SPListItems Card */}
+        <SPListItemsCard 
+          data={stats.spListItems} 
+          loading={loading}
+          onRefresh={fetchData}
+        />
       </Stack>
     </div>
   );

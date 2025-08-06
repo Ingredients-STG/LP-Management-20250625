@@ -11,11 +11,29 @@ export async function GET() {
     
     const stats = await DynamoDBService.getDashboardStats();
     
+    // Fetch SPListItems data
+    let spListData = null;
+    try {
+      const spListResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/splist-items?period=30`);
+      if (spListResponse.ok) {
+        const spListResult = await spListResponse.json();
+        if (spListResult.success) {
+          spListData = spListResult.data;
+        }
+      }
+    } catch (spError) {
+      console.warn('Failed to fetch SPListItems data:', spError);
+      // Continue without SPListItems data
+    }
+    
     console.log('Dashboard stats fetched successfully');
     
     return NextResponse.json({
       success: true,
-      data: stats,
+      data: {
+        ...stats,
+        spListItems: spListData
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
