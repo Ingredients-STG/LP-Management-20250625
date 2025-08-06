@@ -58,6 +58,9 @@ interface SPListItem {
   status?: string;
   updatedAt?: string;
   modifiedBy?: string;
+  reconciliationStatus?: 'pending' | 'synced' | 'failed';
+  reconciliationTimestamp?: string;
+  reconciledBy?: string;
 }
 
 interface SPListAnalytics {

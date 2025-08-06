@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 // Configure AWS SDK v3
 const client = new DynamoDBClient({
@@ -23,6 +23,9 @@ interface SPListItem {
   status?: string;
   updatedAt?: string;
   modifiedBy?: string;
+  reconciliationStatus?: 'pending' | 'synced' | 'failed';
+  reconciliationTimestamp?: string;
+  reconciledBy?: string;
 }
 
 // Helper function to create table if it doesn't exist
@@ -71,6 +74,8 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '30'; // Default to 30 days
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     
     // Get all SPListItems
     const allItems: SPListItem[] = [];
@@ -94,10 +99,26 @@ export async function GET(request: Request) {
     
     console.log(`Found ${allItems.length} SPListItems`);
     
-    // Filter items based on period
+    // Filter items based on period or date range
     let filteredItems: SPListItem[];
     
-    if (period === 'all') {
+    if (startDate && endDate) {
+      // Filter by custom date range
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Include full end date
+      
+      filteredItems = allItems.filter(item => {
+        if (!item.FilterInstalledDate) {
+          return false;
+        }
+        const changeDate = new Date(item.FilterInstalledDate);
+        if (isNaN(changeDate.getTime())) {
+          return false;
+        }
+        return changeDate >= start && changeDate <= end;
+      });
+    } else if (period === 'all') {
       // Show all items regardless of date (include items with missing/invalid dates)
       filteredItems = allItems;
     } else {
@@ -324,4 +345,64 @@ function generateMonthlyData(items: SPListItem[], startDate: Date, endDate: Date
   return Object.entries(monthMap)
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// PUT /api/splist-items - Update reconciliation status
+export async function PUT(request: Request) {
+  try {
+    console.log('Updating SPListItem reconciliation status...');
+    
+    const body = await request.json();
+    const { id, reconciliationStatus, reconciledBy } = body;
+    
+    if (!id || !reconciliationStatus) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing required fields: id, reconciliationStatus',
+          timestamp: new Date().toISOString()
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Ensure table exists
+    await createTableIfNotExists();
+    
+    const now = new Date().toISOString();
+    
+    const updateCommand = new UpdateCommand({
+      TableName: SPLIST_TABLE_NAME,
+      Key: { id },
+      UpdateExpression: 'SET reconciliationStatus = :status, reconciliationTimestamp = :timestamp, reconciledBy = :reconciledBy, updatedAt = :updatedAt',
+      ExpressionAttributeValues: {
+        ':status': reconciliationStatus,
+        ':timestamp': now,
+        ':reconciledBy': reconciledBy || 'System',
+        ':updatedAt': now
+      },
+      ReturnValues: 'ALL_NEW'
+    });
+    
+    const result = await dynamodb.send(updateCommand);
+    
+    console.log('SPListItem reconciliation status updated successfully');
+    
+    return NextResponse.json({
+      success: true,
+      data: result.Attributes,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error updating SPListItem reconciliation status:', error);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update SPListItem reconciliation status',
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
+    );
+  }
 }

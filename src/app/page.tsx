@@ -47,6 +47,7 @@ import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SPListItemsCard from '@/components/SPListItemsCard';
+import AssetReconciliation from '@/components/AssetReconciliation';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
@@ -96,6 +97,7 @@ import {
   IconBarcode,
   IconFileReport,
   IconChevronUp,
+  IconGitCompare,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -4870,6 +4872,17 @@ export default function HomePage() {
               Bulk Update
             </Button>
             <Button
+              variant={activeTab === 'asset-reconciliation' ? 'filled' : 'subtle'}
+              leftSection={<IconGitCompare size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('asset-reconciliation');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Asset Reconciliation
+            </Button>
+            <Button
               variant={activeTab === 'settings' ? 'filled' : 'subtle'}
               leftSection={<IconSettings size={16} />}
               justify="start"
@@ -4909,6 +4922,7 @@ export default function HomePage() {
             {activeTab === 'assets' && renderAssets()}
             {activeTab === 'reports' && renderReports()}
             {activeTab === 'bulk-update' && renderBulkUpdate()}
+            {activeTab === 'asset-reconciliation' && <AssetReconciliation />}
             {activeTab === 'settings' && renderSettings()}
           </div>
         </AppShell.Main>
