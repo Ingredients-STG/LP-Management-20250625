@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { getCurrentUser, signIn, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import * as SecureStore from 'expo-secure-store';
 import { configureAmplify } from '../lib/amplify';
 
 export interface MobileUser {
@@ -39,11 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = await fetchAuthSession();
       if (current && session.tokens) {
         setUser({ username: current.username, email: current.signInDetails?.loginId });
+        try {
+          await SecureStore.setItemAsync('idToken', session.tokens.idToken?.toString() ?? '');
+        } catch {}
       } else {
         setUser(null);
+        try { await SecureStore.deleteItemAsync('idToken'); } catch {}
       }
     } catch {
       setUser(null);
+      try { await SecureStore.deleteItemAsync('idToken'); } catch {}
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function handleSignOut() {
     await signOut();
     setUser(null);
+    try { await SecureStore.deleteItemAsync('idToken'); } catch {}
   }
 
   async function getIdToken() {

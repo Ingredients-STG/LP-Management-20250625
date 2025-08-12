@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuth } from '../auth/AuthContext';
+import * as SecureStore from 'expo-secure-store';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://r1iqp059n5.execute-api.eu-west-2.amazonaws.com/dev';
 
@@ -10,7 +11,13 @@ export function useApiClient() {
   const instance = axios.create({ baseURL: API_BASE_URL });
 
   instance.interceptors.request.use(async (config) => {
-    const token = await getIdToken();
+    // Prefer freshly fetched ID token; fall back to a cached token if available
+    let token = await getIdToken();
+    if (!token) {
+      try {
+        token = (await SecureStore.getItemAsync('idToken')) || undefined;
+      } catch {}
+    }
     if (token) {
       config.headers = {
         ...(config.headers || {}),
