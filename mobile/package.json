@@ -1,0 +1,35 @@
+{
+  "name": "lp-management-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "expo": "~52.0.19",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.3",
+    "react-native-safe-area-context": "^4.10.5",
+    "react-native-screens": "^4.3.0",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.9.26",
+    "react-native-gesture-handler": "^2.16.2",
+    "react-native-reanimated": "^3.15.5",
+    "@tanstack/react-query": "^5.52.1",
+    "axios": "^1.7.7"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "^18.3.12",
+    "@types/react-native": "^0.76.0",
+    "typescript": "^5.5.4",
+    "eslint": "^9.12.0",
+    "eslint-config-universe": "^12.1.0"
+  }
+}
