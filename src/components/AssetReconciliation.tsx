@@ -75,6 +75,7 @@ interface Asset {
   needFlushing: boolean | string;
   filterType: string;
   notes: string;
+  reasonForFilterChange?: string;
   augmentedCare: boolean | string;
   created: string;
   createdBy: string;
@@ -464,7 +465,7 @@ export default function AssetReconciliation() {
             return expiry.toISOString().split('T')[0];
           };
 
-          // Update the asset with SPListItem data
+          // Update the asset with SPListItem data (5 key fields)
           const updateData = {
             ...item.matchedAsset,
             filterInstalledOn: item.spListItem.FilterInstalledDate,
@@ -472,6 +473,7 @@ export default function AssetReconciliation() {
             filterType: item.spListItem.FilterType || item.matchedAsset.filterType,
             filtersOn: true,
             filterNeeded: true,
+            reasonForFilterChange: item.spListItem.ReasonForFilterChange || 'Not specified',
             modifiedBy: 'Filter Reconciliation System',
           };
 
@@ -528,6 +530,11 @@ export default function AssetReconciliation() {
                     field: 'filtersOn',
                     oldValue: item.matchedAsset.filtersOn?.toString() || 'false',
                     newValue: 'true'
+                  },
+                  {
+                    field: 'reasonForFilterChange',
+                    oldValue: item.matchedAsset.reasonForFilterChange || 'Not set',
+                    newValue: item.spListItem.ReasonForFilterChange || 'Not specified'
                   },
                   {
                     field: 'reconciliationStatus',
@@ -632,7 +639,7 @@ export default function AssetReconciliation() {
         return expiry.toISOString().split('T')[0];
       };
 
-      // Update the asset with SPListItem data
+      // Update the asset with SPListItem data (5 key fields)
       const updateData = {
         ...selectedItem.matchedAsset,
         filterInstalledOn: selectedItem.spListItem.FilterInstalledDate,
@@ -640,6 +647,7 @@ export default function AssetReconciliation() {
         filterType: selectedItem.spListItem.FilterType || selectedItem.matchedAsset.filterType,
         filtersOn: true,
         filterNeeded: true,
+        reasonForFilterChange: selectedItem.spListItem.ReasonForFilterChange || 'Not specified',
         modifiedBy: 'Filter Reconciliation System',
       };
 
@@ -678,7 +686,7 @@ export default function AssetReconciliation() {
         throw new Error(assetResult.error || spListResult.error || 'Failed to update records');
       }
 
-      // Log the reconciliation action to audit trail
+      // Log the reconciliation action to audit trail (5 key fields)
       const auditChanges = [
         {
           field: 'filterInstalledOn',
@@ -699,6 +707,11 @@ export default function AssetReconciliation() {
           field: 'filtersOn',
           oldValue: selectedItem.matchedAsset.filtersOn?.toString() || 'false',
           newValue: 'true'
+        },
+        {
+          field: 'reasonForFilterChange',
+          oldValue: selectedItem.matchedAsset.reasonForFilterChange || 'Not set',
+          newValue: selectedItem.spListItem.ReasonForFilterChange || 'Not specified'
         },
         {
           field: 'reconciliationStatus',

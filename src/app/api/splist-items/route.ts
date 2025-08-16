@@ -20,6 +20,7 @@ interface SPListItem {
   FilterInstalledDate: string;
   FilterType?: string;
   AssetBarcode?: string;
+  ReasonForFilterChange?: 'Expired' | 'Remedial' | 'Blocked' | 'New Installation';
   status?: string;
   updatedAt?: string;
   modifiedBy?: string;
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
     const period = searchParams.get('period') || '30'; // Default to 30 days
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+    const latest = searchParams.get('latest'); // Check if we want latest record
     
     // Get all SPListItems
     const allItems: SPListItem[] = [];
@@ -98,6 +100,42 @@ export async function GET(request: Request) {
     } while (lastEvaluatedKey);
     
     console.log(`Found ${allItems.length} SPListItems`);
+    
+    // If requesting latest record only, return the most recent one
+    if (latest === 'true') {
+      // Sort by updatedAt or id (which contains timestamp) to get the latest
+      const sortedItems = allItems
+        .filter(item => item.updatedAt || item.id) // Ensure we have a timestamp
+        .sort((a, b) => {
+          const aTime = new Date(a.updatedAt || a.id).getTime();
+          const bTime = new Date(b.updatedAt || b.id).getTime();
+          return bTime - aTime; // Descending order (latest first)
+        });
+      
+      if (sortedItems.length > 0) {
+        console.log('Latest SPListItem found:', sortedItems[0].id);
+        console.log('Latest 5 SPListItems:', sortedItems.slice(0, 5).map(item => ({
+          id: item.id,
+          AssetBarcode: item.AssetBarcode,
+          ReasonForFilterChange: item.ReasonForFilterChange,
+          updatedAt: item.updatedAt
+        })));
+        
+        return NextResponse.json({
+          success: true,
+          data: sortedItems[0],
+          latest5: sortedItems.slice(0, 5), // Include latest 5 for debugging
+          message: 'Latest SPListItem record',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        return NextResponse.json({
+          success: false,
+          error: 'No SPListItems found',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
     
     // Filter items based on period or date range
     let filteredItems: SPListItem[];

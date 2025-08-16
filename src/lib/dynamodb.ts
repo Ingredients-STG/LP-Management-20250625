@@ -51,6 +51,7 @@ export interface Asset {
   filterType: string;
   needFlushing: boolean | string;
   notes: string;
+  reasonForFilterChange?: string;
   augmentedCare: boolean | string;
   created: string;
   createdBy: string;

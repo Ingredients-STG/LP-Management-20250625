@@ -121,6 +121,7 @@ interface Asset {
   needFlushing: boolean | string;
   filterType: string;
   notes: string;
+  reasonForFilterChange?: string;
   augmentedCare: boolean | string;
   attachments?: Array<{
     fileName: string;
