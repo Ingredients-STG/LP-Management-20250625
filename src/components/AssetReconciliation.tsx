@@ -360,14 +360,14 @@ export default function AssetReconciliation() {
           },
           body: JSON.stringify({
             assetId: selectedItemForDelete.matchedAsset?.id || 'N/A',
-            user: 'Asset Reconciliation System',
+            user: 'Filter Reconciliation System',
             action: 'DELETE_SPLIST_ITEM',
             details: {
               spListItemId: selectedItemForDelete.spListItem.id,
               spListLocation: selectedItemForDelete.spListItem.Location,
               assetBarcode: selectedItemForDelete.spListItem.AssetBarcode || 'N/A',
               filterInstalledDate: selectedItemForDelete.spListItem.FilterInstalledDate,
-              reason: 'Deleted via Asset Reconciliation interface'
+                                  reason: 'Deleted via Filter Reconciliation interface'
             }
           }),
         });
@@ -472,7 +472,7 @@ export default function AssetReconciliation() {
             filterType: item.spListItem.FilterType || item.matchedAsset.filterType,
             filtersOn: true,
             filterNeeded: true,
-            modifiedBy: 'Asset Reconciliation System',
+            modifiedBy: 'Filter Reconciliation System',
           };
 
           // Update asset and SPListItem in parallel
@@ -492,7 +492,7 @@ export default function AssetReconciliation() {
               body: JSON.stringify({
                 id: item.spListItem.id,
                 reconciliationStatus: 'synced',
-                reconciledBy: 'Asset Reconciliation System (Bulk)'
+                reconciledBy: 'Filter Reconciliation System (Bulk)'
               }),
             })
           ]);
@@ -532,7 +532,7 @@ export default function AssetReconciliation() {
                   {
                     field: 'reconciliationStatus',
                     oldValue: 'Not synced',
-                    newValue: 'Synced via Bulk Asset Reconciliation'
+                    newValue: 'Synced via Bulk Filter Reconciliation'
                   }
                 ];
 
@@ -543,7 +543,7 @@ export default function AssetReconciliation() {
                   },
                   body: JSON.stringify({
                     assetId: item.matchedAsset.id,
-                    user: 'Asset Reconciliation System (Bulk)',
+                    user: 'Filter Reconciliation System (Bulk)',
                     action: 'BULK_RECONCILIATION',
                     details: {
                       assetBarcode: item.matchedAsset.assetBarcode,
@@ -581,7 +581,7 @@ export default function AssetReconciliation() {
                 ...item.spListItem,
                 reconciliationStatus: 'synced',
                 reconciliationTimestamp: new Date().toISOString(),
-                reconciledBy: 'Asset Reconciliation System (Bulk)'
+                reconciledBy: 'Filter Reconciliation System (Bulk)'
               }
             }
           : item
@@ -640,7 +640,7 @@ export default function AssetReconciliation() {
         filterType: selectedItem.spListItem.FilterType || selectedItem.matchedAsset.filterType,
         filtersOn: true,
         filterNeeded: true,
-        modifiedBy: 'Asset Reconciliation System',
+        modifiedBy: 'Filter Reconciliation System',
       };
 
       // Update asset in parallel with SPListItem reconciliation status
@@ -660,7 +660,7 @@ export default function AssetReconciliation() {
           body: JSON.stringify({
             id: selectedItem.spListItem.id,
             reconciliationStatus: 'synced',
-            reconciledBy: 'Asset Reconciliation System'
+            reconciledBy: 'Filter Reconciliation System'
           }),
         })
       ]);
@@ -703,7 +703,7 @@ export default function AssetReconciliation() {
         {
           field: 'reconciliationStatus',
           oldValue: 'Not synced',
-          newValue: 'Synced via Asset Reconciliation'
+          newValue: 'Synced via Filter Reconciliation'
         }
       ];
 
@@ -716,7 +716,7 @@ export default function AssetReconciliation() {
           },
           body: JSON.stringify({
             assetId: selectedItem.matchedAsset.id,
-            user: 'Asset Reconciliation System',
+            user: 'Filter Reconciliation System',
             action: 'RECONCILIATION',
             details: {
               assetBarcode: selectedItem.matchedAsset.assetBarcode,
@@ -743,7 +743,7 @@ export default function AssetReconciliation() {
                 ...item.spListItem,
                 reconciliationStatus: 'synced',
                 reconciliationTimestamp: new Date().toISOString(),
-                reconciledBy: 'Asset Reconciliation System'
+                reconciledBy: 'Filter Reconciliation System'
               }
             }
           : item
@@ -751,7 +751,7 @@ export default function AssetReconciliation() {
 
       notifications.show({
         title: 'Success',
-        message: 'Asset reconciled successfully and marked as synced',
+        message: 'Filter reconciled successfully and marked as synced',
         color: 'green',
         icon: <IconCheck size={16} />,
       });
@@ -761,7 +761,7 @@ export default function AssetReconciliation() {
       console.error('Error confirming reconciliation:', error);
       notifications.show({
         title: 'Error',
-        message: `Failed to reconcile asset: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `Failed to reconcile filter: ${error instanceof Error ? error.message : 'Unknown error'}`,
         color: 'red',
         icon: <IconX size={16} />,
       });
@@ -826,7 +826,7 @@ export default function AssetReconciliation() {
         {/* Header */}
         <Group justify="space-between">
           <div>
-            <Title order={2}>Asset Reconciliation</Title>
+            <Title order={2}>Filter Reconciliation</Title>
             <Text size="sm" c="dimmed">
               Reconcile SPListItems data with Main Asset register
             </Text>
@@ -1198,7 +1198,7 @@ export default function AssetReconciliation() {
         <Modal
           opened={confirmModalOpened}
           onClose={closeConfirmModal}
-          title="Confirm Asset Reconciliation"
+          title="Confirm Filter Reconciliation"
           size="lg"
         >
           {selectedItem && (
@@ -1243,7 +1243,7 @@ export default function AssetReconciliation() {
                   onClick={confirmReconciliation}
                   loading={processing}
                 >
-                  Confirm Reconciliation
+                  Confirm Filter Reconciliation
                 </Button>
               </Group>
             </Stack>
