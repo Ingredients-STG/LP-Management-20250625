@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 
 // Configure AWS SDK v3
 const client = new DynamoDBClient({
@@ -400,6 +400,69 @@ export async function PUT(request: Request) {
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update SPListItem reconciliation status',
+        timestamp: new Date().toISOString()
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/splist-items - Delete SPListItem
+export async function DELETE(request: Request) {
+  try {
+    console.log('Deleting SPListItem...');
+    
+    const body = await request.json();
+    const { id } = body;
+    
+    if (!id) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing required field: id',
+          timestamp: new Date().toISOString()
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Ensure table exists
+    await createTableIfNotExists();
+    
+    const deleteCommand = new DeleteCommand({
+      TableName: SPLIST_TABLE_NAME,
+      Key: { id },
+      ReturnValues: 'ALL_OLD'
+    });
+    
+    const result = await dynamodb.send(deleteCommand);
+    
+    if (!result.Attributes) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'SPListItem not found',
+          timestamp: new Date().toISOString()
+        },
+        { status: 404 }
+      );
+    }
+    
+    console.log('SPListItem deleted successfully:', id);
+    
+    return NextResponse.json({
+      success: true,
+      data: result.Attributes,
+      message: 'SPListItem deleted successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error deleting SPListItem:', error);
+    
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete SPListItem',
         timestamp: new Date().toISOString()
       },
       { status: 500 }

@@ -36,7 +36,8 @@ import {
   IconMapPin,
   IconCalendar,
   IconInfoCircle,
-  IconExclamationMark
+  IconExclamationMark,
+  IconTrash
 } from '@tabler/icons-react';
 
 interface SPListItem {
@@ -99,8 +100,11 @@ export default function AssetReconciliation() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [confirmModalOpened, { open: openConfirmModal, close: closeConfirmModal }] = useDisclosure(false);
+  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
   const [selectedItem, setSelectedItem] = useState<ReconciliationItem | null>(null);
+  const [selectedItemForDelete, setSelectedItemForDelete] = useState<ReconciliationItem | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [showReconciled, setShowReconciled] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -303,6 +307,94 @@ export default function AssetReconciliation() {
   const handleConfirmItem = (item: ReconciliationItem) => {
     setSelectedItem(item);
     openConfirmModal();
+  };
+
+  const handleDeleteItem = (item: ReconciliationItem) => {
+    setSelectedItemForDelete(item);
+    openDeleteModal();
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!selectedItemForDelete) return;
+
+    try {
+      setDeleting(true);
+      
+      // Delete the SPListItem
+      const response = await fetch('/api/splist-items', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selectedItemForDelete.spListItem.id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete SPListItem');
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete SPListItem');
+      }
+
+      // Remove the item from local state
+      setReconciliationItems(prev => 
+        prev.filter(item => item.spListItem.id !== selectedItemForDelete.spListItem.id)
+      );
+
+      // Also remove from SPListItems state
+      setSPListItems(prev => 
+        prev.filter(item => item.id !== selectedItemForDelete.spListItem.id)
+      );
+
+      // Log audit entry for deletion
+      try {
+        await fetch('/api/log-audit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            assetId: selectedItemForDelete.matchedAsset?.id || 'N/A',
+            user: 'Asset Reconciliation System',
+            action: 'DELETE_SPLIST_ITEM',
+            details: {
+              spListItemId: selectedItemForDelete.spListItem.id,
+              spListLocation: selectedItemForDelete.spListItem.Location,
+              assetBarcode: selectedItemForDelete.spListItem.AssetBarcode || 'N/A',
+              filterInstalledDate: selectedItemForDelete.spListItem.FilterInstalledDate,
+              reason: 'Deleted via Asset Reconciliation interface'
+            }
+          }),
+        });
+      } catch (auditError) {
+        console.error('Failed to log audit entry for deletion:', auditError);
+        // Don't fail the deletion if audit logging fails
+      }
+
+      notifications.show({
+        title: 'Success',
+        message: 'SPListItem record deleted successfully',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      closeDeleteModal();
+    } catch (error) {
+      console.error('Error deleting SPListItem:', error);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleSelectItem = (itemId: string, checked: boolean) => {
@@ -1059,25 +1151,39 @@ export default function AssetReconciliation() {
                     </Stack>
                   </Table.Td>
                   <Table.Td>
-                    {item.matchedAsset && !item.userConfirmed && item.spListItem.reconciliationStatus !== 'synced' && (
-                      <Button
-                        size="xs"
-                        color={item.reconciliationStatus === 'confirmed' ? 'green' : 'blue'}
-                        onClick={() => handleConfirmItem(item)}
-                        disabled={!item.selectedBarcode}
-                      >
-                        {item.reconciliationStatus === 'confirmed' ? 'Confirm Sync' : 'Force Sync'}
-                      </Button>
-                    )}
-                    {item.spListItem.reconciliationStatus === 'synced' && (
-                      <Badge color="teal" variant="filled" size="sm">
-                        <IconCheck size={12} style={{ marginRight: 4 }} />
-                        Already Synced
-                      </Badge>
-                    )}
-                    {!item.matchedAsset && (
-                      <Text size="xs" c="dimmed">No asset found</Text>
-                    )}
+                    <Group gap="xs">
+                      {item.matchedAsset && !item.userConfirmed && item.spListItem.reconciliationStatus !== 'synced' && (
+                        <Button
+                          size="xs"
+                          color={item.reconciliationStatus === 'confirmed' ? 'green' : 'blue'}
+                          onClick={() => handleConfirmItem(item)}
+                          disabled={!item.selectedBarcode}
+                        >
+                          {item.reconciliationStatus === 'confirmed' ? 'Confirm Sync' : 'Force Sync'}
+                        </Button>
+                      )}
+                      {item.spListItem.reconciliationStatus === 'synced' && (
+                        <Badge color="teal" variant="filled" size="sm">
+                          <IconCheck size={12} style={{ marginRight: 4 }} />
+                          Already Synced
+                        </Badge>
+                      )}
+                      {!item.matchedAsset && (
+                        <Text size="xs" c="dimmed">No asset found</Text>
+                      )}
+                      
+                      {/* Delete button - always available */}
+                      <Tooltip label="Delete this SPListItem record">
+                        <ActionIcon
+                          size="sm"
+                          color="red"
+                          variant="light"
+                          onClick={() => handleDeleteItem(item)}
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   </Table.Td>
                 </Table.Tr>
                 ))
@@ -1138,6 +1244,48 @@ export default function AssetReconciliation() {
                   loading={processing}
                 >
                   Confirm Reconciliation
+                </Button>
+              </Group>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          opened={deleteModalOpened}
+          onClose={closeDeleteModal}
+          title="Delete SPListItem Record"
+          size="md"
+          centered
+        >
+          {selectedItemForDelete && (
+            <Stack gap="md">
+              <Alert icon={<IconAlertTriangle size={16} />} color="red">
+                <strong>Warning:</strong> This action cannot be undone. You are about to permanently delete this SPListItem record.
+              </Alert>
+
+              <Paper p="md" withBorder>
+                <Title order={6} mb="xs">Record to Delete</Title>
+                <Stack gap="xs">
+                  <Text size="sm"><strong>Location:</strong> {selectedItemForDelete.spListItem.Location}</Text>
+                  <Text size="sm"><strong>Filter Date:</strong> {new Date(selectedItemForDelete.spListItem.FilterInstalledDate).toLocaleDateString('en-GB')}</Text>
+                  <Text size="sm"><strong>Filter Type:</strong> {selectedItemForDelete.spListItem.FilterType || 'Not specified'}</Text>
+                  <Text size="sm"><strong>Barcode:</strong> {selectedItemForDelete.spListItem.AssetBarcode || 'Not specified'}</Text>
+                  <Text size="sm"><strong>Status:</strong> {selectedItemForDelete.spListItem.reconciliationStatus || 'Not synced'}</Text>
+                </Stack>
+              </Paper>
+
+              <Group justify="flex-end">
+                <Button variant="outline" onClick={closeDeleteModal}>
+                  Cancel
+                </Button>
+                <Button 
+                  color="red" 
+                  onClick={confirmDeleteItem}
+                  loading={deleting}
+                  leftSection={<IconTrash size={16} />}
+                >
+                  Delete Record
                 </Button>
               </Group>
             </Stack>
