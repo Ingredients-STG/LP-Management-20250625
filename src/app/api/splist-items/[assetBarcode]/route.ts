@@ -97,12 +97,51 @@ export async function GET(
       lastEvaluatedKey = result.LastEvaluatedKey;
     } while (lastEvaluatedKey);
     
+    // Helper function to parse dates in DD/MM/YYYY format
+    const parseDate = (dateStr: string): Date | null => {
+      if (!dateStr) return null;
+      
+      // Handle DD/MM/YYYY format
+      if (dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return isNaN(parsedDate.getTime()) ? null : parsedDate;
+      }
+      
+      // Handle YYYY-MM-DD format
+      const parsedDate = new Date(dateStr);
+      return isNaN(parsedDate.getTime()) ? null : parsedDate;
+    };
+
     // Sort by FilterInstalledDate (most recent first)
     const sortedChanges = filterChanges
-      .filter(item => item.FilterInstalledDate && !isNaN(new Date(item.FilterInstalledDate).getTime()))
-      .sort((a, b) => new Date(b.FilterInstalledDate).getTime() - new Date(a.FilterInstalledDate).getTime());
+      .filter(item => item.FilterInstalledDate && parseDate(item.FilterInstalledDate) !== null)
+      .sort((a, b) => {
+        const dateA = parseDate(a.FilterInstalledDate);
+        const dateB = parseDate(b.FilterInstalledDate);
+        if (!dateA || !dateB) return 0;
+        return dateB.getTime() - dateA.getTime();
+      });
     
     console.log(`Found ${sortedChanges.length} filter changes for asset barcode: ${assetBarcode}`);
+    
+    // Debug: Log all items found for this asset barcode
+    if (filterChanges.length > 0) {
+      console.log('All SPListItems found for asset barcode:', assetBarcode);
+      filterChanges.forEach((item, index) => {
+        console.log(`Item ${index + 1}:`, {
+          id: item.id,
+          AssetBarcode: item.AssetBarcode,
+          FilterInstalledDate: item.FilterInstalledDate,
+          FilterType: item.FilterType,
+          ReasonForFilterChange: item.ReasonForFilterChange,
+          reconciliationStatus: item.reconciliationStatus,
+          updatedAt: item.updatedAt
+        });
+      });
+    } else {
+      console.log(`DEBUG: No SPListItems found with AssetBarcode = "${assetBarcode}"`);
+    }
     
     return NextResponse.json({
       success: true,

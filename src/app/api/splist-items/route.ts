@@ -14,6 +14,19 @@ const client = new DynamoDBClient({
 const dynamodb = DynamoDBDocumentClient.from(client);
 const SPLIST_TABLE_NAME = 'SPListItems';
 
+// Helper function to parse DD/MM/YYYY and YYYY-MM-DD dates
+function parseDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  if (dateStr.includes('/')) {
+    const [day, month, year] = dateStr.split('/');
+    // Use UTC to avoid timezone issues
+    const parsedDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+  }
+  const parsedDate = new Date(dateStr);
+  return isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
 interface SPListItem {
   id: string;
   Location: string;
@@ -142,16 +155,15 @@ export async function GET(request: Request) {
     
     if (startDate && endDate) {
       // Filter by custom date range
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999); // Include full end date
-      
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
+
       filteredItems = allItems.filter(item => {
         if (!item.FilterInstalledDate) {
           return false;
         }
-        const changeDate = new Date(item.FilterInstalledDate);
-        if (isNaN(changeDate.getTime())) {
+        const changeDate = parseDate(item.FilterInstalledDate);
+        if (!changeDate) {
           return false;
         }
         return changeDate >= start && changeDate <= end;
@@ -169,8 +181,8 @@ export async function GET(request: Request) {
         if (!item.FilterInstalledDate) {
           return false;
         }
-        const changeDate = new Date(item.FilterInstalledDate);
-        if (isNaN(changeDate.getTime())) {
+        const changeDate = parseDate(item.FilterInstalledDate);
+        if (!changeDate) {
           return false;
         }
         return changeDate >= cutoffDate;
@@ -178,8 +190,18 @@ export async function GET(request: Request) {
     }
     
     // Calculate analytics
-    const periodDaysForAnalytics = period === 'all' ? 9999 : parseInt(period);
-    const analytics = calculateAnalytics(filteredItems, periodDaysForAnalytics);
+    let periodDaysForAnalytics: number;
+    if (period === 'all') {
+      periodDaysForAnalytics = 9999;
+    } else if (startDate && endDate) {
+      // For custom date ranges, calculate the actual period
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      periodDaysForAnalytics = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    } else {
+      periodDaysForAnalytics = parseInt(period);
+    }
+    const analytics = calculateAnalytics(filteredItems, periodDaysForAnalytics, startDate, endDate);
     
     return NextResponse.json({
       success: true,
@@ -206,7 +228,7 @@ export async function GET(request: Request) {
   }
 }
 
-function calculateAnalytics(items: SPListItem[], periodDays: number) {
+function calculateAnalytics(items: SPListItem[], periodDays: number, customStartDate?: string, customEndDate?: string) {
   const now = new Date();
   const analytics = {
     totalChanges: items.length,
@@ -217,8 +239,12 @@ function calculateAnalytics(items: SPListItem[], periodDays: number) {
     topLocations: [] as { location: string; count: number }[],
     topWings: [] as { wing: string; count: number }[],
     recentChanges: items
-      .filter(item => item.FilterInstalledDate && !isNaN(new Date(item.FilterInstalledDate).getTime()))
-      .sort((a, b) => new Date(b.FilterInstalledDate).getTime() - new Date(a.FilterInstalledDate).getTime())
+      .filter(item => item.FilterInstalledDate && parseDate(item.FilterInstalledDate) !== null)
+      .sort((a, b) => {
+        const dateA = parseDate(a.FilterInstalledDate);
+        const dateB = parseDate(b.FilterInstalledDate);
+        return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+      })
       .slice(0, 10)
   };
   
@@ -242,7 +268,7 @@ function calculateAnalytics(items: SPListItem[], periodDays: number) {
   });
   
   // Changes over time with appropriate granularity based on period
-  analytics.changesOverTime = generateTimeSeriesData(items, periodDays);
+  analytics.changesOverTime = generateTimeSeriesData(items, periodDays, customStartDate, customEndDate);
   
   // Top locations
   analytics.topLocations = Object.entries(analytics.locationBreakdown)
@@ -258,8 +284,8 @@ function calculateAnalytics(items: SPListItem[], periodDays: number) {
   return analytics;
 }
 
-function generateTimeSeriesData(items: SPListItem[], periodDays: number): { date: string; count: number }[] {
-  const endDate = new Date();
+function generateTimeSeriesData(items: SPListItem[], periodDays: number, customStartDate?: string, customEndDate?: string): { date: string; count: number }[] {
+  const endDate = customEndDate ? new Date(customEndDate) : new Date();
   
   if (periodDays >= 9999) {
     // For "All Time", use monthly granularity for the full date range of the data
@@ -268,20 +294,25 @@ function generateTimeSeriesData(items: SPListItem[], periodDays: number): { date
     // Filter out items with invalid dates for time series
     const validItems = items.filter(item => {
       if (!item.FilterInstalledDate) return false;
-      const date = new Date(item.FilterInstalledDate);
-      return !isNaN(date.getTime());
+      return parseDate(item.FilterInstalledDate) !== null;
     });
     
     if (validItems.length === 0) return [];
     
-    const dates = validItems.map(item => new Date(item.FilterInstalledDate)).sort((a, b) => a.getTime() - b.getTime());
+    const dates = validItems
+      .map(item => parseDate(item.FilterInstalledDate))
+      .filter((date): date is Date => date !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
     const startDate = new Date(dates[0].getFullYear(), dates[0].getMonth(), 1);
     
     return generateMonthlyData(validItems, startDate, endDate);
   }
   
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - periodDays);
+  const startDate = customStartDate ? new Date(customStartDate) : (() => {
+    const calculated = new Date();
+    calculated.setDate(endDate.getDate() - periodDays);
+    return calculated;
+  })();
   
   if (periodDays <= 7) {
     // Daily granularity for 7 days or less
@@ -309,7 +340,12 @@ function generateDailyData(items: SPListItem[], startDate: Date, endDate: Date):
   
   // Count actual changes
   items.forEach(item => {
-    const dateStr = item.FilterInstalledDate.split('T')[0];
+    if (!item.FilterInstalledDate) return;
+    
+    const parsedDate = parseDate(item.FilterInstalledDate);
+    if (!parsedDate) return;
+    
+    const dateStr = parsedDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
     if (dateMap.hasOwnProperty(dateStr)) {
       dateMap[dateStr]++;
     }
@@ -340,9 +376,13 @@ function generateWeeklyData(items: SPListItem[], startDate: Date, endDate: Date)
   
   // Count actual changes by week
   items.forEach(item => {
-    const itemDate = new Date(item.FilterInstalledDate);
+    if (!item.FilterInstalledDate) return;
+    
+    const parsedDate = parseDate(item.FilterInstalledDate);
+    if (!parsedDate) return;
+    
     // Get Monday of the item's week
-    const monday = new Date(itemDate);
+    const monday = new Date(parsedDate);
     const day = monday.getDay();
     const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
     monday.setDate(diff);
@@ -373,8 +413,12 @@ function generateMonthlyData(items: SPListItem[], startDate: Date, endDate: Date
   
   // Count actual changes by month
   items.forEach(item => {
-    const itemDate = new Date(item.FilterInstalledDate);
-    const monthKey = `${itemDate.getFullYear()}-${String(itemDate.getMonth() + 1).padStart(2, '0')}-01`;
+    if (!item.FilterInstalledDate) return;
+    
+    const parsedDate = parseDate(item.FilterInstalledDate);
+    if (!parsedDate) return;
+    
+    const monthKey = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-01`;
     if (monthMap.hasOwnProperty(monthKey)) {
       monthMap[monthKey]++;
     }

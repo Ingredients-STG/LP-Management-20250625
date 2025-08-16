@@ -98,6 +98,7 @@ import {
   IconFileReport,
   IconChevronUp,
   IconGitCompare,
+  IconDeviceFloppy,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -204,10 +205,44 @@ export default function HomePage() {
       event.preventDefault(); // Prevent the default browser behavior
     };
 
+    const handleForceSync = () => {
+      console.log('Force Sync event received, refreshing main assets data...');
+      
+      // Add a small delay to ensure the database has been updated
+      setTimeout(() => {
+        console.log('Triggering refresh after Force Sync...');
+        setRefreshTrigger(prev => prev + 1);
+      }, 1000); // 1 second delay
+      
+      // If a view modal is open, immediately refresh the selected asset data
+      if (selectedAssetForView) {
+        console.log('Force Sync detected with open view modal, refreshing asset data...');
+        setTimeout(async () => {
+          try {
+            // Fetch the updated asset directly
+            const response = await fetch(`/api/assets/${selectedAssetForView.id}`);
+            if (response.ok) {
+              const result = await response.json();
+              if (result.success && result.data) {
+                console.log('Directly refreshed asset data after Force Sync:', result.data.assetBarcode);
+                setSelectedAssetForView(result.data);
+                // Also refresh filter changes
+                fetchFilterChanges(result.data.assetBarcode);
+              }
+            }
+          } catch (error) {
+            console.error('Error refreshing asset after Force Sync:', error);
+          }
+        }, 1500); // 1.5 second delay to ensure database update
+      }
+    };
+
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    window.addEventListener('forceSyncComplete', handleForceSync);
 
     return () => {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('forceSyncComplete', handleForceSync);
     };
   }, []);
 
@@ -222,6 +257,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useLocalStorage({ key: 'activeTab', defaultValue: 'dashboard' });
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger for Force Sync
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const [editModalOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
@@ -1374,7 +1410,7 @@ export default function HomePage() {
     };
     
     initializeData();
-  }, []);
+  }, [refreshTrigger]);
 
   useEffect(() => {
     // Filter by search term and active filters
@@ -1536,6 +1572,31 @@ export default function HomePage() {
       if (assetsData.success && assetsData.data) {
           const assets = assetsData.data.items || assetsData.data.assets || [];
           setAssets(assets);
+          
+          // If a view modal is open, refresh the selected asset data
+          if (selectedAssetForView) {
+            const refreshedAsset = assets.find((asset: Asset) => asset.id === selectedAssetForView.id);
+            if (refreshedAsset) {
+              console.log('Refreshing selected asset for view modal:', refreshedAsset.assetBarcode);
+              console.log('Old asset data:', {
+                filterInstalledOn: selectedAssetForView.filterInstalledOn,
+                filterExpiryDate: selectedAssetForView.filterExpiryDate,
+                filterType: selectedAssetForView.filterType,
+                reasonForFilterChange: selectedAssetForView.reasonForFilterChange
+              });
+              console.log('New asset data:', {
+                filterInstalledOn: refreshedAsset.filterInstalledOn,
+                filterExpiryDate: refreshedAsset.filterExpiryDate,
+                filterType: refreshedAsset.filterType,
+                reasonForFilterChange: refreshedAsset.reasonForFilterChange
+              });
+              setSelectedAssetForView(refreshedAsset);
+              // Also refresh filter changes for the updated asset
+              fetchFilterChanges(refreshedAsset.assetBarcode);
+            } else {
+              console.log('Could not find refreshed asset with id:', selectedAssetForView.id);
+            }
+          }
         }
       } else {
         throw new Error('Failed to fetch assets');
@@ -3580,7 +3641,7 @@ export default function HomePage() {
                                     filterInstalledOn: safeDate(asset.filterInstalledOn),
                                     needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
                                     filterType: asset.filterType || '',
-                                    reasonForFilterChange: '',
+                                    reasonForFilterChange: asset.reasonForFilterChange || '',
                                     notes: asset.notes || '',
                                     augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
                                   });
@@ -5068,12 +5129,30 @@ export default function HomePage() {
       <Modal 
         opened={editModalOpened} 
         onClose={closeEditModal} 
-        title="Edit Asset" 
+        title={
+          <Group justify="space-between" style={{ width: '100%' }}>
+            <Text fw={600}>Edit Asset</Text>
+            <Group gap="xs">
+              <ActionIcon
+                type="submit"
+                form="edit-asset-form"
+                loading={isUploadingFile}
+                color="blue"
+                size="lg"
+                title="Update Asset"
+              >
+                <IconDeviceFloppy size={18} />
+              </ActionIcon>
+            </Group>
+          </Group>
+        }
         size="xl"
         centered
         scrollAreaComponent={ScrollArea.Autosize}
+        withCloseButton={true}
       >
-        <form key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
+
+        <form id="edit-asset-form" key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
           <Stack gap="md">
             {/* Basic Information */}
             <div>
@@ -5474,15 +5553,6 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-
-            <Group justify="flex-end" mt="md">
-              <Button variant="outline" onClick={closeEditModal} size="sm">
-                Cancel
-              </Button>
-              <Button type="submit" loading={isUploadingFile} size="sm">
-                Update Asset
-              </Button>
-            </Group>
           </Stack>
         </form>
       </Modal>
@@ -5491,10 +5561,85 @@ export default function HomePage() {
       <Modal 
         opened={showViewModal} 
         onClose={closeViewModal} 
-        title="Asset Details" 
+        title={
+          <Group justify="space-between" style={{ width: '100%' }}>
+            <Text fw={600}>Asset Details</Text>
+            {selectedAssetForView && (
+              <Group gap="xs">
+                <ActionIcon
+                  color="blue"
+                  size="lg"
+                  onClick={() => {
+                    try {
+                      closeViewModal();
+                      form.setValues({
+                        assetBarcode: selectedAssetForView.assetBarcode || '',
+                        primaryIdentifier: selectedAssetForView.primaryIdentifier || '',
+                        secondaryIdentifier: selectedAssetForView.secondaryIdentifier || '',
+                        assetType: selectedAssetForView.assetType || '',
+                        status: selectedAssetForView.status || 'ACTIVE',
+                        wing: selectedAssetForView.wing || '',
+                        wingInShort: selectedAssetForView.wingInShort || '',
+                        room: selectedAssetForView.room || '',
+                        floor: selectedAssetForView.floor || '',
+                        floorInWords: selectedAssetForView.floorInWords || '',
+                        roomNo: selectedAssetForView.roomNo || '',
+                        roomName: selectedAssetForView.roomName || '',
+                        filterNeeded: typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : (selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'true' || selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'yes'),
+                        filtersOn: typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes'),
+                        filterExpiryDate: safeDate(selectedAssetForView.filterExpiryDate),
+                        filterInstalledOn: safeDate(selectedAssetForView.filterInstalledOn),
+                        needFlushing: typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing?.toString().toLowerCase() === 'true' || selectedAssetForView.needFlushing?.toString().toLowerCase() === 'yes'),
+                        filterType: selectedAssetForView.filterType || '',
+                        reasonForFilterChange: selectedAssetForView.reasonForFilterChange || '',
+                        notes: selectedAssetForView.notes || '',
+                        augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
+                      });
+                      setAssetFiles([]);
+                      openEditModal();
+                    } catch (error) {
+                      console.error('Error setting form values:', error);
+                      notifications.show({
+                        title: 'Error',
+                        message: 'Failed to load asset data for editing',
+                        color: 'red',
+                        icon: <IconX size={16} />,
+                      });
+                    }
+                  }}
+                  title="Edit Asset"
+                >
+                  <IconEdit size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  size="lg"
+                  onClick={() => {
+                    setSelectedAssetAudit(selectedAssetForView.assetBarcode);
+                    openAuditModal();
+                  }}
+                  title="View Audit Log"
+                >
+                  <IconHistory size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="red"
+                  size="lg"
+                  onClick={() => handleDeleteAsset(selectedAssetForView)}
+                  title="Delete Asset"
+                >
+                  <IconTrash size={18} />
+                </ActionIcon>
+              </Group>
+            )}
+          </Group>
+        }
         size="xl"
         centered
         scrollAreaComponent={ScrollArea.Autosize}
+        withCloseButton={true}
       >
         {selectedAssetForView && (
           <Stack gap="md">
@@ -5744,7 +5889,26 @@ export default function HomePage() {
                         <Grid.Col span={6}>
                           <Text size="xs" c="dimmed" mb={2}>Date Installed</Text>
                           <Text size="sm" fw={500}>
-                            {new Date(change.FilterInstalledDate).toLocaleDateString('en-GB')}
+                            {(() => {
+                              // Handle different date formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+                              const parseDate = (dateStr: string): Date | null => {
+                                if (!dateStr) return null;
+                                
+                                // Handle DD/MM/YYYY format
+                                if (dateStr.includes('/')) {
+                                  const [day, month, year] = dateStr.split('/');
+                                  const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                  return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                                }
+                                
+                                // Handle YYYY-MM-DD format
+                                const parsedDate = new Date(dateStr);
+                                return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                              };
+                              
+                              const parsedDate = parseDate(change.FilterInstalledDate);
+                              return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid Date';
+                            })()}
                           </Text>
                         </Grid.Col>
                         <Grid.Col span={6}>
@@ -5785,80 +5949,7 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <Divider />
-            <Group justify="space-between" mt="md">
-              <Group gap="xs">
-                <Button
-                  variant="light"
-                  color="blue"
-                  size="sm"
-                  leftSection={<IconHistory size={16} />}
-                  onClick={() => {
-                    setSelectedAssetAudit(selectedAssetForView.assetBarcode);
-                    openAuditModal();
-                  }}
-                >
-                  View Audit Log
-                </Button>
-                <Button
-                  variant="light"
-                  color="red"
-                  size="sm"
-                  leftSection={<IconTrash size={16} />}
-                  onClick={() => handleDeleteAsset(selectedAssetForView)}
-                >
-                  Delete Asset
-                </Button>
-              </Group>
-              <Group gap="xs">
-                <Button variant="outline" onClick={closeViewModal} size="sm">
-                  Close
-                </Button>
-                <Button size="sm"
-                onClick={() => {
-                  try {
-                    closeViewModal();
-                    form.setValues({
-                      assetBarcode: selectedAssetForView.assetBarcode || '',
-                      primaryIdentifier: selectedAssetForView.primaryIdentifier || '',
-                      secondaryIdentifier: selectedAssetForView.secondaryIdentifier || '',
-                      assetType: selectedAssetForView.assetType || '',
-                      status: selectedAssetForView.status || 'ACTIVE',
-                      wing: selectedAssetForView.wing || '',
-                      wingInShort: selectedAssetForView.wingInShort || '',
-                      room: selectedAssetForView.room || '',
-                      floor: selectedAssetForView.floor || '',
-                      floorInWords: selectedAssetForView.floorInWords || '',
-                      roomNo: selectedAssetForView.roomNo || '',
-                      roomName: selectedAssetForView.roomName || '',
-                      filterNeeded: typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : (selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'true' || selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'yes'),
-                      filtersOn: typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes'),
-                      filterExpiryDate: safeDate(selectedAssetForView.filterExpiryDate),
-                      filterInstalledOn: safeDate(selectedAssetForView.filterInstalledOn),
-                      needFlushing: typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing?.toString().toLowerCase() === 'true' || selectedAssetForView.needFlushing?.toString().toLowerCase() === 'yes'),
-                      filterType: selectedAssetForView.filterType || '',
-                      reasonForFilterChange: '',
-                      notes: selectedAssetForView.notes || '',
-                      augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
-                    });
-                    setAssetFiles([]);
-                    openEditModal();
-                  } catch (error) {
-                    console.error('Error setting form values:', error);
-                    notifications.show({
-                      title: 'Error',
-                      message: 'Failed to load asset data for editing',
-                      color: 'red',
-                      icon: <IconX size={16} />,
-                    });
-                  }
-                }}
-              >
-                Edit Asset
-              </Button>
-              </Group>
-            </Group>
+
           </Stack>
         )}
       </Modal>

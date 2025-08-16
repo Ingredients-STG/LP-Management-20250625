@@ -438,7 +438,20 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
                           </Text>
                           <Group gap={4}>
                             <Text size="xs" c="dimmed">
-                              Filter: {new Date(item.FilterInstalledDate).toLocaleDateString('en-GB')}
+                              Filter: {(() => {
+                                const parseDate = (dateStr: string): Date | null => {
+                                  if (!dateStr) return null;
+                                  if (dateStr.includes('/')) {
+                                    const [day, month, year] = dateStr.split('/');
+                                    const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                                  }
+                                  const parsedDate = new Date(dateStr);
+                                  return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                                };
+                                const parsedDate = parseDate(item.FilterInstalledDate);
+                                return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid Date';
+                              })()}
                             </Text>
                             {item.updatedAt && (
                               <Text size="xs" c="dimmed">

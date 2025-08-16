@@ -107,6 +107,7 @@ export default function AssetReconciliation() {
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
   const [showReconciled, setShowReconciled] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -114,7 +115,7 @@ export default function AssetReconciliation() {
   // Fetch data on component mount
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [refreshTrigger]);
 
   // Refetch data when date range changes
   useEffect(() => {
@@ -241,7 +242,7 @@ export default function AssetReconciliation() {
         // Manual reconciliation - don't auto-confirm anything
         let status: 'pending' | 'confirmed' | 'mismatch' | 'not_found' = 'pending';
         if (spItem.reconciliationStatus === 'synced') {
-          status = 'confirmed'; // Already reconciled
+          status = 'confirmed'; // Already reconciled - keep as confirmed for UI consistency
         } else if (!matchedAsset) {
           status = 'not_found';
         } else if (!isBarcodeMatch || !isLocationMatch) {
@@ -452,23 +453,67 @@ export default function AssetReconciliation() {
         try {
           // Calculate filter expiry date (3 months from installation date)
           const calculateFilterExpiry = (installedDate: string): string => {
-            const installed = new Date(installedDate);
-            const expiry = new Date(installed);
-            expiry.setMonth(expiry.getMonth() + 3);
+            try {
+              // Handle different date formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+              let parsedDate: Date;
+              
+              if (installedDate.includes('/')) {
+                // Handle DD/MM/YYYY format
+                const [day, month, year] = installedDate.split('/');
+                parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+              } else {
+                // Handle YYYY-MM-DD format or other standard formats
+                parsedDate = new Date(installedDate);
+              }
+              
+              // Validate the parsed date
+              if (isNaN(parsedDate.getTime())) {
+                console.warn(`Invalid date format: ${installedDate}, using current date`);
+                parsedDate = new Date();
+              }
+              
+              const expiry = new Date(parsedDate);
+              expiry.setMonth(expiry.getMonth() + 3);
+              
+              // Handle edge cases where the day doesn't exist in the target month
+              const originalDay = parsedDate.getDate();
+              if (expiry.getDate() !== originalDay) {
+                expiry.setDate(1);
+              }
+              
+              return expiry.toISOString().split('T')[0];
+            } catch (error) {
+              console.error(`Error calculating filter expiry for date: ${installedDate}`, error);
+              // Fallback: return 3 months from current date
+              const fallbackDate = new Date();
+              fallbackDate.setMonth(fallbackDate.getMonth() + 3);
+              return fallbackDate.toISOString().split('T')[0];
+            }
+          };
+
+          // Convert DD/MM/YYYY date to YYYY-MM-DD format for database storage
+          const convertDateFormat = (dateStr: string): string => {
+            if (!dateStr) return '';
             
-            // Handle edge cases where the day doesn't exist in the target month
-            const originalDay = installed.getDate();
-            if (expiry.getDate() !== originalDay) {
-              expiry.setDate(1);
+            console.log('Bulk: Converting date format:', dateStr);
+            
+            // Handle DD/MM/YYYY format
+            if (dateStr.includes('/')) {
+              const [day, month, year] = dateStr.split('/');
+              const converted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              console.log('Bulk: Converted from DD/MM/YYYY to YYYY-MM-DD:', dateStr, '->', converted);
+              return converted;
             }
             
-            return expiry.toISOString().split('T')[0];
+            // Already in YYYY-MM-DD format
+            console.log('Bulk: Date already in correct format:', dateStr);
+            return dateStr;
           };
 
           // Update the asset with SPListItem data (5 key fields)
           const updateData = {
             ...item.matchedAsset,
-            filterInstalledOn: item.spListItem.FilterInstalledDate,
+            filterInstalledOn: convertDateFormat(item.spListItem.FilterInstalledDate),
             filterExpiryDate: calculateFilterExpiry(item.spListItem.FilterInstalledDate),
             filterType: item.spListItem.FilterType || item.matchedAsset.filterType,
             filtersOn: true,
@@ -605,6 +650,13 @@ export default function AssetReconciliation() {
         icon: <IconCheck size={16} />,
       });
 
+      // Trigger refresh to update data
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Notify HomePage to refresh its asset data
+      console.log('Dispatching forceSyncComplete event after bulk reconciliation');
+      window.dispatchEvent(new CustomEvent('forceSyncComplete'));
+
     } catch (error) {
       console.error('Error in bulk reconciliation:', error);
       notifications.show({
@@ -626,23 +678,67 @@ export default function AssetReconciliation() {
       
       // Calculate filter expiry date (3 months from installation date)
       const calculateFilterExpiry = (installedDate: string): string => {
-        const installed = new Date(installedDate);
-        const expiry = new Date(installed);
-        expiry.setMonth(expiry.getMonth() + 3);
+        try {
+          // Handle different date formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+          let parsedDate: Date;
+          
+          if (installedDate.includes('/')) {
+            // Handle DD/MM/YYYY format
+            const [day, month, year] = installedDate.split('/');
+            parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          } else {
+            // Handle YYYY-MM-DD format or other standard formats
+            parsedDate = new Date(installedDate);
+          }
+          
+          // Validate the parsed date
+          if (isNaN(parsedDate.getTime())) {
+            console.warn(`Invalid date format: ${installedDate}, using current date`);
+            parsedDate = new Date();
+          }
+          
+          const expiry = new Date(parsedDate);
+          expiry.setMonth(expiry.getMonth() + 3);
+          
+          // Handle edge cases where the day doesn't exist in the target month
+          const originalDay = parsedDate.getDate();
+          if (expiry.getDate() !== originalDay) {
+            expiry.setDate(1);
+          }
+          
+          return expiry.toISOString().split('T')[0];
+        } catch (error) {
+          console.error(`Error calculating filter expiry for date: ${installedDate}`, error);
+          // Fallback: return 3 months from current date
+          const fallbackDate = new Date();
+          fallbackDate.setMonth(fallbackDate.getMonth() + 3);
+          return fallbackDate.toISOString().split('T')[0];
+        }
+      };
+
+      // Convert DD/MM/YYYY date to YYYY-MM-DD format for database storage
+      const convertDateFormat = (dateStr: string): string => {
+        if (!dateStr) return '';
         
-        // Handle edge cases where the day doesn't exist in the target month
-        const originalDay = installed.getDate();
-        if (expiry.getDate() !== originalDay) {
-          expiry.setDate(1);
+        console.log('Converting date format:', dateStr);
+        
+        // Handle DD/MM/YYYY format
+        if (dateStr.includes('/')) {
+          const [day, month, year] = dateStr.split('/');
+          const converted = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          console.log('Converted from DD/MM/YYYY to YYYY-MM-DD:', dateStr, '->', converted);
+          return converted;
         }
         
-        return expiry.toISOString().split('T')[0];
+        // Already in YYYY-MM-DD format
+        console.log('Date already in correct format:', dateStr);
+        return dateStr;
       };
 
       // Update the asset with SPListItem data (5 key fields)
       const updateData = {
         ...selectedItem.matchedAsset,
-        filterInstalledOn: selectedItem.spListItem.FilterInstalledDate,
+        filterInstalledOn: convertDateFormat(selectedItem.spListItem.FilterInstalledDate),
         filterExpiryDate: calculateFilterExpiry(selectedItem.spListItem.FilterInstalledDate),
         filterType: selectedItem.spListItem.FilterType || selectedItem.matchedAsset.filterType,
         filtersOn: true,
@@ -650,6 +746,8 @@ export default function AssetReconciliation() {
         reasonForFilterChange: selectedItem.spListItem.ReasonForFilterChange || 'Not specified',
         modifiedBy: 'Filter Reconciliation System',
       };
+      
+      console.log('Updating asset in DynamoDB:', selectedItem.matchedAsset.id, updateData);
 
       // Update asset in parallel with SPListItem reconciliation status
       const [assetResponse, spListResponse] = await Promise.all([
@@ -685,6 +783,9 @@ export default function AssetReconciliation() {
       if (!assetResult.success || !spListResult.success) {
         throw new Error(assetResult.error || spListResult.error || 'Failed to update records');
       }
+      
+      console.log('Asset updated successfully:', selectedItem.matchedAsset.id);
+      console.log('SPListItem reconciliation status updated successfully');
 
       // Log the reconciliation action to audit trail (5 key fields)
       const auditChanges = [
@@ -769,6 +870,13 @@ export default function AssetReconciliation() {
         icon: <IconCheck size={16} />,
       });
 
+      // Trigger refresh to update data
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Notify HomePage to refresh its asset data
+      console.log('Dispatching forceSyncComplete event after single reconciliation');
+      window.dispatchEvent(new CustomEvent('forceSyncComplete'));
+      
       closeConfirmModal();
     } catch (error) {
       console.error('Error confirming reconciliation:', error);
@@ -817,7 +925,10 @@ export default function AssetReconciliation() {
   const stats = {
     total: reconciliationItems.length,
     synced: reconciliationItems.filter(item => item.spListItem.reconciliationStatus === 'synced').length,
-    confirmed: reconciliationItems.filter(item => item.reconciliationStatus === 'confirmed').length,
+    confirmed: reconciliationItems.filter(item => 
+      item.reconciliationStatus === 'confirmed' && 
+      item.spListItem.reconciliationStatus !== 'synced'
+    ).length,
     mismatch: reconciliationItems.filter(item => item.reconciliationStatus === 'mismatch').length,
     notFound: reconciliationItems.filter(item => item.reconciliationStatus === 'not_found').length,
     pending: reconciliationItems.filter(item => item.reconciliationStatus === 'pending').length,
@@ -1066,7 +1177,20 @@ export default function AssetReconciliation() {
                       <IconCalendar size={14} />
                       <Text size="sm">
                         {item.spListItem.FilterInstalledDate ? 
-                          new Date(item.spListItem.FilterInstalledDate).toLocaleDateString('en-GB') : 
+                          (() => {
+                            const parseDate = (dateStr: string): Date | null => {
+                              if (!dateStr) return null;
+                              if (dateStr.includes('/')) {
+                                const [day, month, year] = dateStr.split('/');
+                                const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                              }
+                              const parsedDate = new Date(dateStr);
+                              return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                            };
+                            const parsedDate = parseDate(item.spListItem.FilterInstalledDate);
+                            return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid Date';
+                          })() : 
                           'No date'
                         }
                       </Text>
@@ -1226,7 +1350,20 @@ export default function AssetReconciliation() {
                     <Title order={6} mb="xs">SPListItem Data</Title>
                     <Stack gap="xs">
                       <Text size="sm"><strong>Location:</strong> {selectedItem.spListItem.Location}</Text>
-                      <Text size="sm"><strong>Filter Date:</strong> {new Date(selectedItem.spListItem.FilterInstalledDate).toLocaleDateString('en-GB')}</Text>
+                      <Text size="sm"><strong>Filter Date:</strong> {(() => {
+                        const parseDate = (dateStr: string): Date | null => {
+                          if (!dateStr) return null;
+                          if (dateStr.includes('/')) {
+                            const [day, month, year] = dateStr.split('/');
+                            const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                            return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                          }
+                          const parsedDate = new Date(dateStr);
+                          return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                        };
+                        const parsedDate = parseDate(selectedItem.spListItem.FilterInstalledDate);
+                        return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid Date';
+                      })()}</Text>
                       <Text size="sm"><strong>Filter Type:</strong> {selectedItem.spListItem.FilterType || 'Not specified'}</Text>
                       <Text size="sm"><strong>Barcode:</strong> {selectedItem.spListItem.AssetBarcode || 'Not specified'}</Text>
                     </Stack>
@@ -1281,7 +1418,20 @@ export default function AssetReconciliation() {
                 <Title order={6} mb="xs">Record to Delete</Title>
                 <Stack gap="xs">
                   <Text size="sm"><strong>Location:</strong> {selectedItemForDelete.spListItem.Location}</Text>
-                  <Text size="sm"><strong>Filter Date:</strong> {new Date(selectedItemForDelete.spListItem.FilterInstalledDate).toLocaleDateString('en-GB')}</Text>
+                  <Text size="sm"><strong>Filter Date:</strong> {(() => {
+                    const parseDate = (dateStr: string): Date | null => {
+                      if (!dateStr) return null;
+                      if (dateStr.includes('/')) {
+                        const [day, month, year] = dateStr.split('/');
+                        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                      }
+                      const parsedDate = new Date(dateStr);
+                      return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                    };
+                    const parsedDate = parseDate(selectedItemForDelete.spListItem.FilterInstalledDate);
+                    return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid Date';
+                  })()}</Text>
                   <Text size="sm"><strong>Filter Type:</strong> {selectedItemForDelete.spListItem.FilterType || 'Not specified'}</Text>
                   <Text size="sm"><strong>Barcode:</strong> {selectedItemForDelete.spListItem.AssetBarcode || 'Not specified'}</Text>
                   <Text size="sm"><strong>Status:</strong> {selectedItemForDelete.spListItem.reconciliationStatus || 'Not synced'}</Text>
