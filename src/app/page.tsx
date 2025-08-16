@@ -209,6 +209,7 @@ export default function HomePage() {
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
+
   const [assets, setAssets] = useState<Asset[]>([]);
   const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
@@ -243,6 +244,9 @@ export default function HomePage() {
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
   const [showViewModal, { open: openViewModal, close: closeViewModal }] = useDisclosure(false);
+  const [selectedAssetForView, setSelectedAssetForView] = useState<Asset | null>(null);
+  const [filterChanges, setFilterChanges] = useState<any[]>([]);
+  const [loadingFilterChanges, setLoadingFilterChanges] = useState(false);
   const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
   const [showNewAssetTypeInput, setShowNewAssetTypeInput] = useState(false);
   const [newAssetType, setNewAssetType] = useState('');
@@ -288,6 +292,16 @@ export default function HomePage() {
       console.log('Frontend: First audit entry:', auditLog[0]);
     }
   }, [auditLog]);
+
+  // Fetch filter changes when view modal opens
+  useEffect(() => {
+    if (showViewModal && selectedAssetForView?.assetBarcode) {
+      fetchFilterChanges(selectedAssetForView.assetBarcode);
+    } else if (!showViewModal) {
+      // Clear filter changes when modal closes
+      setFilterChanges([]);
+    }
+  }, [showViewModal, selectedAssetForView?.assetBarcode]);
   
   // Bulk Update states
   const [bulkUpdateFile, setBulkUpdateFile] = useState<File | null>(null);
@@ -563,6 +577,35 @@ export default function HomePage() {
   const loadMoreGlobalAuditLogs = async () => {
     setGlobalAuditLogPagination(prev => ({ ...prev, loading: true }));
     await fetchGlobalAuditLogs(true);
+  };
+
+  // Fetch filter changes for a specific asset barcode
+  const fetchFilterChanges = async (assetBarcode: string) => {
+    try {
+      setLoadingFilterChanges(true);
+      console.log('Fetching filter changes for asset barcode:', assetBarcode);
+      
+      const response = await fetch(`/api/splist-items/${assetBarcode}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('Received filter changes data:', result.data.length, 'entries');
+          setFilterChanges(result.data);
+        } else {
+          console.log('API returned success: false for filter changes');
+          setFilterChanges([]);
+        }
+      } else {
+        console.error('Failed to fetch filter changes:', response.status);
+        setFilterChanges([]);
+      }
+    } catch (error) {
+      console.error('Error fetching filter changes:', error);
+      setFilterChanges([]);
+    } finally {
+      setLoadingFilterChanges(false);
+    }
   };
 
   // Fetch asset types from database
@@ -1277,6 +1320,7 @@ export default function HomePage() {
     filterInstalledOn: Date | null;
     needFlushing: boolean;
     filterType: string;
+    reasonForFilterChange: string;
     notes: string;
     augmentedCare: boolean;
   }>({
@@ -1300,6 +1344,7 @@ export default function HomePage() {
       filterInstalledOn: null,
       needFlushing: false,
       filterType: '',
+      reasonForFilterChange: '',
       notes: '',
       augmentedCare: false,
     },
@@ -1307,12 +1352,6 @@ export default function HomePage() {
       assetBarcode: (value) => {
         if (!value || value.trim() === '') {
           return 'Asset barcode is required';
-        }
-        return null;
-      },
-      primaryIdentifier: (value) => {
-        if (!value || value.trim() === '') {
-          return 'Primary identifier is required';
         }
         return null;
       },
@@ -1678,6 +1717,36 @@ export default function HomePage() {
       });
       await createAuditLogEntry(result.data, 'CREATE');
       
+      // Sync new asset to SPListItems if it has filter information
+      if (result.data.assetBarcode && result.data.filterInstalledOn && 
+          (result.data.filterNeeded === true || result.data.filterNeeded === 'true')) {
+        try {
+          console.log('New asset with filter info, syncing to SPListItems...');
+          const spListResponse = await fetch(`/api/splist-items/${result.data.assetBarcode}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              location: `${result.data.wing || ''} ${result.data.room || ''}`.trim(),
+              filterInstalledDate: result.data.filterInstalledOn,
+              filterType: result.data.filterType || '',
+              reasonForFilterChange: sanitizedValues.reasonForFilterChange || 'New Installation',
+              modifiedBy: 'web-app-user'
+            }),
+          });
+
+          if (spListResponse.ok) {
+            console.log('Successfully synced new asset filter info to SPListItems');
+          } else {
+            console.warn('Failed to sync new asset filter info to SPListItems:', await spListResponse.text());
+          }
+        } catch (spListError) {
+          console.error('Error syncing new asset to SPListItems:', spListError);
+          // Don't throw error here as the main asset creation was successful
+        }
+      }
+      
       form.reset();
       setAssetFiles([]); // Clear uploaded files
       closeModal();
@@ -1701,7 +1770,7 @@ export default function HomePage() {
 
   const handleEditAsset = async (values: any) => {
     try {
-      if (!selectedAsset?.id) {
+      if (!selectedAssetForView?.id) {
         throw new Error('No asset selected for update');
       }
 
@@ -1750,7 +1819,7 @@ export default function HomePage() {
         setIsUploadingFile(true);
         try {
           for (const file of assetFiles) {
-            const uploadResult = await handleFileUpload(file, selectedAsset.id);
+            const uploadResult = await handleFileUpload(file, selectedAssetForView.id);
             if (uploadResult) {
               newAttachments.push(uploadResult);
             }
@@ -1772,11 +1841,11 @@ export default function HomePage() {
         ...sanitizedValues,
         filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
         filterInstalledOn: formatDateForAPI(sanitizedValues.filterInstalledOn),
-        attachments: [...(selectedAsset?.attachments || []), ...newAttachments], // Merge existing and new attachments
+        attachments: [...(selectedAssetForView?.attachments || []), ...newAttachments], // Merge existing and new attachments
         modifiedBy: user?.email || user?.username || 'Unknown User',
       };
 
-      const response = await fetch(`/api/assets/${selectedAsset.id}`, {
+      const response = await fetch(`/api/assets/${selectedAssetForView.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1801,15 +1870,63 @@ export default function HomePage() {
           assetBarcode: result.data.assetBarcode,
           action: 'UPDATE'
         });
-        await createAuditLogEntry(result.data as Asset, "UPDATE", selectedAsset);
+        await createAuditLogEntry(result.data as Asset, "UPDATE", selectedAssetForView);
       }
 
       // Update local state with the updated asset from DynamoDB
       setAssets(prev => prev.map(asset => 
-        asset.id === selectedAsset?.id ? result.data : asset
+        asset.id === selectedAssetForView?.id ? result.data : asset
       ));
+
+      // Check if filter information has changed and sync to SPListItems
+      const filterInfoChanged = (
+        selectedAssetForView.filterInstalledOn !== updateData.filterInstalledOn ||
+        selectedAssetForView.filterType !== updateData.filterType ||
+        selectedAssetForView.filterNeeded !== updateData.filterNeeded ||
+        selectedAssetForView.filtersOn !== updateData.filtersOn ||
+        // Also sync if reasonForFilterChange is provided (new field)
+        (sanitizedValues.reasonForFilterChange && sanitizedValues.reasonForFilterChange !== '')
+      );
+
+      // Sync to SPListItems if filter info changed OR if it's a new filter installation
+      const shouldSyncToSPList = (filterInfoChanged || updateData.filterInstalledOn) && 
+                                 result.data.assetBarcode && 
+                                 (updateData.filterNeeded === true || updateData.filterNeeded === 'true');
+
+      if (shouldSyncToSPList) {
+        try {
+          console.log('Filter information changed, syncing to SPListItems...');
+          const spListResponse = await fetch(`/api/splist-items/${result.data.assetBarcode}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              location: `${updateData.wing || ''} ${updateData.room || ''}`.trim(),
+              filterInstalledDate: updateData.filterInstalledOn,
+              filterType: updateData.filterType,
+              reasonForFilterChange: sanitizedValues.reasonForFilterChange || 'New Installation',
+              modifiedBy: 'web-app-user'
+            }),
+          });
+
+          if (spListResponse.ok) {
+            console.log('Successfully synced filter change to SPListItems');
+            // Refresh filter changes for this asset
+            if (showViewModal) {
+              fetchFilterChanges(result.data.assetBarcode);
+            }
+          } else {
+            console.warn('Failed to sync filter change to SPListItems:', await spListResponse.text());
+          }
+        } catch (spListError) {
+          console.error('Error syncing to SPListItems:', spListError);
+          // Don't throw error here as the main asset update was successful
+        }
+      }
+
       closeEditModal();
-      setSelectedAsset(null);
+      setSelectedAssetForView(null);
       setAssetFiles([]); // Clear uploaded files
       form.reset();
       notifications.show({
@@ -1839,8 +1956,8 @@ export default function HomePage() {
       filterType: form.values.filterType,
     };
     
-    // Immediately update form values and selectedAsset state for instant visual feedback
-    if (selectedAsset && selectedAsset.id === asset.id) {
+    // Immediately update form values and selectedAssetForView state for instant visual feedback
+    if (selectedAssetForView && selectedAssetForView.id === asset.id) {
       // Force form to update by setting values directly
       form.setFieldValue('filterNeeded', false);
       form.setFieldValue('filtersOn', false);
@@ -1848,9 +1965,9 @@ export default function HomePage() {
       form.setFieldValue('filterExpiryDate', null);
       form.setFieldValue('filterType', '');
       
-      // Also update selectedAsset state to ensure UI reflects changes immediately
-      setSelectedAsset({
-        ...selectedAsset,
+      // Also update selectedAssetForView state to ensure UI reflects changes immediately
+      setSelectedAssetForView({
+        ...selectedAssetForView,
         filterNeeded: false,
         filtersOn: false,
         filterInstalledOn: '',
@@ -1881,7 +1998,7 @@ export default function HomePage() {
       confirmProps: { color: 'orange' },
       onCancel: () => {
         // Rollback form values if user cancels
-        if (selectedAsset && selectedAsset.id === asset.id) {
+        if (selectedAssetForView && selectedAssetForView.id === asset.id) {
           // Force form to update by setting values directly
           form.setFieldValue('filterNeeded', originalFormValues.filterNeeded);
           form.setFieldValue('filtersOn', originalFormValues.filtersOn);
@@ -1889,9 +2006,9 @@ export default function HomePage() {
           form.setFieldValue('filterExpiryDate', originalFormValues.filterExpiryDate);
           form.setFieldValue('filterType', originalFormValues.filterType);
           
-          // Also restore the selectedAsset state
-          setSelectedAsset({
-            ...selectedAsset,
+          // Also restore the selectedAssetForView state
+          setSelectedAssetForView({
+            ...selectedAssetForView,
             filterNeeded: originalFormValues.filterNeeded,
             filtersOn: originalFormValues.filtersOn,
             filterInstalledOn: originalFormValues.filterInstalledOn ? originalFormValues.filterInstalledOn.toISOString().split('T')[0] : '',
@@ -2248,34 +2365,28 @@ export default function HomePage() {
     currentPage * itemsPerPage
   );
 
-  const rows = paginatedAssets.flatMap((asset) => {
-    const isExpanded = expandedAssets.has(asset.assetBarcode);
+  const rows = paginatedAssets.map((asset) => {
+    const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+      asset.needFlushing : 
+      asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
     
-    return [
-      // Main row
+    return (
       <Table.Tr 
         key={asset.assetBarcode}
         style={{
-          backgroundColor: (() => {
-            const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
-              asset.needFlushing : 
-              asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
-            return needsFlushing ? 'rgba(255, 0, 0, 0.05)' : undefined;
-          })(),
-          borderLeft: (() => {
-            const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
-              asset.needFlushing : 
-              asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
-            return needsFlushing ? '3px solid red' : undefined;
-          })()
+          backgroundColor: needsFlushing ? 'rgba(255, 0, 0, 0.05)' : undefined,
+          borderLeft: needsFlushing ? '3px solid red' : undefined
         }}
       >
         <Table.Td>
-          <Tooltip label={isExpanded ? "Collapse Details" : "View Details"}>
+          <Tooltip label="View Details">
             <ActionIcon
               variant="subtle"
               color="blue"
-              onClick={() => toggleAssetExpansion(asset.assetBarcode)}
+              onClick={() => {
+                setSelectedAssetForView(asset);
+                openViewModal();
+              }}
             >
               <IconEye size={16} />
             </ActionIcon>
@@ -2361,322 +2472,8 @@ export default function HomePage() {
             })()}
           </Stack>
         </Table.Td>
-      </Table.Tr>,
-      
-      // Expanded details row
-      ...(isExpanded ? [
-        <Table.Tr key={`${asset.assetBarcode}-details`}>
-          <Table.Td colSpan={7}>
-            <Box p="md" style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
-              <Stack gap="md">
-                                  <Group justify="space-between">
-                    <Title order={5}>Asset Details</Title>
-                    <Group gap="xs">
-                      <Tooltip label="View Audit Log">
-                        <ActionIcon
-                          variant="filled"
-                          color="blue"
-                          onClick={() => {
-                            console.log('Frontend: Opening audit modal for asset:', asset.assetBarcode);
-                            setSelectedAssetAudit(asset.assetBarcode);
-                            openAuditModal();
-                          }}
-                        >
-                          <IconHistory size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Edit Asset">
-                        <ActionIcon
-                          variant="filled"
-                          color="yellow"
-                          onClick={() => {
-                            try {
-                              setSelectedAsset(asset);
-                              form.setValues({
-                                assetBarcode: asset.assetBarcode || '',
-                                primaryIdentifier: asset.primaryIdentifier || '',
-                                secondaryIdentifier: asset.secondaryIdentifier || '',
-                                assetType: asset.assetType || '',
-                                status: asset.status || 'ACTIVE',
-                                wing: asset.wing || '',
-                                wingInShort: asset.wingInShort || '',
-                                room: asset.room || '',
-                                floor: asset.floor || '',
-                                floorInWords: asset.floorInWords || '',
-                                roomNo: asset.roomNo || '',
-                                roomName: asset.roomName || '',
-                                filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes'),
-                                filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes'),
-                                filterExpiryDate: safeDate(asset.filterExpiryDate),
-                                filterInstalledOn: safeDate(asset.filterInstalledOn),
-                                needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
-                                filterType: asset.filterType || '',
-                                notes: asset.notes || '',
-                                augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
-                              });
-                              setAssetFiles([]);
-                              openEditModal();
-                            } catch (error) {
-                              console.error('Error setting form values:', error);
-                              notifications.show({
-                                title: 'Error',
-                                message: 'Failed to load asset data for editing',
-                                color: 'red',
-                                icon: <IconX size={16} />,
-                              });
-                            }
-                          }}
-                        >
-                          <IconEdit size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Delete Asset">
-                        <ActionIcon
-                          variant="filled"
-                          color="red"
-                          onClick={() => handleDeleteAsset(asset)}
-                        >
-                          <IconTrash size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Group>
-                
-                <Divider />
-                
-                <Grid>
-                  <Grid.Col span={{ base: 12, sm: 6 }}>
-                    <Stack gap="xs">
-                      <Text size="sm" fw={600} c="dimmed">BASIC INFORMATION</Text>
-                      <Group justify="space-between">
-                        <Text size="sm">Asset Barcode:</Text>
-                        <Text size="sm" fw={500}>{asset.assetBarcode}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Primary ID:</Text>
-                        <Text size="sm" fw={500}>{asset.primaryIdentifier}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Secondary ID:</Text>
-                        <Text size="sm" fw={500}>{asset.secondaryIdentifier || 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Asset Type:</Text>
-                        <Text size="sm" fw={500}>{asset.assetType}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Status:</Text>
-                        <Badge color={getStatusColor(asset.status)} variant="light" size="sm">
-                          {asset.status || 'Unknown'}
-                        </Badge>
-                      </Group>
-                    </Stack>
-                  </Grid.Col>
-                  
-                  <Grid.Col span={{ base: 12, sm: 6 }}>
-                    <Stack gap="xs">
-                      <Text size="sm" fw={600} c="dimmed">LOCATION DETAILS</Text>
-                      <Group justify="space-between">
-                        <Text size="sm">Wing:</Text>
-                        <Text size="sm" fw={500}>{asset.wing}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Wing (Short):</Text>
-                        <Text size="sm" fw={500}>{asset.wingInShort || 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Room:</Text>
-                        <Text size="sm" fw={500}>{asset.room || 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Room Name:</Text>
-                        <Text size="sm" fw={500}>{asset.roomName}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Room No:</Text>
-                        <Text size="sm" fw={500}>{asset.roomNo !== null && asset.roomNo !== undefined && asset.roomNo !== '' ? asset.roomNo : 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Floor:</Text>
-                        <Text size="sm" fw={500}>{asset.floor !== null && asset.floor !== undefined && asset.floor !== '' ? asset.floor : 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Floor (Words):</Text>
-                        <Text size="sm" fw={500}>{asset.floorInWords || 'N/A'}</Text>
-                      </Group>
-                    </Stack>
-                  </Grid.Col>
-                  
-                  <Grid.Col span={{ base: 12, sm: 6 }}>
-                    <Stack gap="xs">
-                      <Text size="sm" fw={600} c="dimmed">FILTER INFORMATION</Text>
-                      <Group justify="space-between">
-                        <Text size="sm">Filter Needed:</Text>
-                        <Badge 
-                          color={(() => {
-                            if (typeof asset.filterNeeded === 'boolean') {
-                              return asset.filterNeeded ? 'orange' : 'green';
-                            }
-                            const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-                            return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'orange' : 'green';
-                          })()} 
-                          variant="light" 
-                          size="sm"
-                        >
-                          {(() => {
-                            if (typeof asset.filterNeeded === 'boolean') {
-                              return asset.filterNeeded ? 'Yes' : 'No';
-                            }
-                            const filterNeededStr = asset.filterNeeded?.toString().toLowerCase();
-                            return filterNeededStr === 'yes' || filterNeededStr === 'true' ? 'Yes' : 'No';
-                          })()}
-                        </Badge>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Filters On:</Text>
-                        <Badge 
-                          color={(() => {
-                            if (typeof asset.filtersOn === 'boolean') {
-                              return asset.filtersOn ? 'green' : 'red';
-                            }
-                            const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
-                            return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'green' : 'red';
-                          })()} 
-                          variant="light" 
-                          size="sm"
-                        >
-                          {(() => {
-                            if (typeof asset.filtersOn === 'boolean') {
-                              return asset.filtersOn ? 'Yes' : 'No';
-                            }
-                            const filtersOnStr = asset.filtersOn?.toString().toLowerCase();
-                            return filtersOnStr === 'yes' || filtersOnStr === 'true' ? 'Yes' : 'No';
-                          })()}
-                        </Badge>
-                      </Group>
-                      <Group justify="space-between" align="flex-start">
-                        <Text size="sm">Filter Expiry:</Text>
-                        <div style={{ textAlign: 'right' }}>
-                          <Group gap="xs" justify="flex-end">
-                            {safeDate(asset.filterExpiryDate) && (
-                              <Badge 
-                                color={getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).color} 
-                                variant="light" 
-                                size="xs"
-                                mt={4}
-                              >
-                                {getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn).text}
-                              </Badge>
-                            )}
-                            <Text size="sm" fw={500}>
-                              {(() => { const d = safeDate(asset.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}
-                            </Text>
-                          </Group>
-                        </div>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Filter Installed:</Text>
-                        <Text size="sm" fw={500}>
-                          {(() => { const d = safeDate(asset.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}
-                        </Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Filter Type:</Text>
-                        <Text size="sm" fw={500}>
-                          {asset.filterType || 'N/A'}
-                        </Text>
-                      </Group>
-                    </Stack>
-                  </Grid.Col>
-                  
-                  <Grid.Col span={{ base: 12, sm: 6 }}>
-                    <Stack gap="xs">
-                      <Text size="sm" fw={600} c="dimmed">ADDITIONAL INFO</Text>
-                      <Group justify="space-between">
-                        <Text size="sm">Augmented Care:</Text>
-                        <Badge 
-                          color={(() => {
-                            if (typeof asset.augmentedCare === 'boolean') {
-                              return asset.augmentedCare ? 'blue' : 'gray';
-                            }
-                            const augmentedCareStr = asset.augmentedCare?.toString().toLowerCase();
-                            return augmentedCareStr === 'yes' || augmentedCareStr === 'true' ? 'blue' : 'gray';
-                          })()} 
-                          variant="light" 
-                          size="sm"
-                        >
-                          {(() => {
-                            if (typeof asset.augmentedCare === 'boolean') {
-                              return asset.augmentedCare ? 'Yes' : 'No';
-                            }
-                            const augmentedCareStr = asset.augmentedCare?.toString().toLowerCase();
-                            return augmentedCareStr === 'yes' || augmentedCareStr === 'true' ? 'Yes' : 'No';
-                          })()}
-                        </Badge>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Need Flushing:</Text>
-                        <Badge 
-                          color={(() => {
-                            if (typeof asset.needFlushing === 'boolean') {
-                              return asset.needFlushing ? 'orange' : 'gray';
-                            }
-                            const needFlushingStr = asset.needFlushing?.toString().toLowerCase();
-                            return needFlushingStr === 'yes' || needFlushingStr === 'true' ? 'orange' : 'gray';
-                          })()} 
-                          variant="light" 
-                          size="sm"
-                        >
-                          {(() => {
-                            if (typeof asset.needFlushing === 'boolean') {
-                              return asset.needFlushing ? 'Yes' : 'No';
-                            }
-                            const needFlushingStr = asset.needFlushing?.toString().toLowerCase();
-                            return needFlushingStr === 'yes' || needFlushingStr === 'true' ? 'Yes' : 'No';
-                          })()}
-                        </Badge>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Created:</Text>
-                        <Text size="sm" fw={500}>
-                          {asset.created ? formatTimestamp(asset.created) : 'N/A'}
-                        </Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Created By:</Text>
-                        <Text size="sm" fw={500}>{asset.createdBy || 'N/A'}</Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Modified:</Text>
-                        <Text size="sm" fw={500}>
-                          {asset.modified ? formatTimestamp(asset.modified) : 'N/A'}
-                        </Text>
-                      </Group>
-                      <Group justify="space-between">
-                        <Text size="sm">Modified By:</Text>
-                        <Text size="sm" fw={500}>{asset.modifiedBy || 'N/A'}</Text>
-                      </Group>
-                    </Stack>
-                  </Grid.Col>
-                </Grid>
-                
-                {asset.notes && (
-                  <>
-                    <Divider />
-                    <Stack gap="xs">
-                      <Text size="sm" fw={600} c="dimmed">NOTES</Text>
-                      <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                        {asset.notes}
-                      </Text>
-                    </Stack>
-                  </>
-                )}
-              </Stack>
-            </Box>
-          </Table.Td>
-        </Table.Tr>
-      ] : [])
-    ];
+      </Table.Tr>
+    );
   });
 
   // Chart data
@@ -2795,11 +2592,18 @@ export default function HomePage() {
               nextMonthStart.setMonth(thisMonthStart.getMonth() + 1);
               const nextMonthEnd = getMonthEnd(nextMonthStart);
               
-              // Filter active assets with valid expiry dates
+              // Filter active assets with valid expiry dates and filter needed = yes
               const activeAssets = assets.filter(asset => asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE');
               const assetsWithExpiry = activeAssets.filter(asset => {
                 const expiryDate = parseDate(asset.filterExpiryDate);
-                return expiryDate !== null;
+                if (expiryDate === null) return false;
+
+                // Check if filter is needed (exclude assets where filter needed = no)
+                const filterNeeded = typeof asset.filterNeeded === 'boolean'
+                  ? asset.filterNeeded
+                  : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
+
+                return filterNeeded;
               });
               
               // Calculate statistics
@@ -3775,6 +3579,7 @@ export default function HomePage() {
                                     filterInstalledOn: safeDate(asset.filterInstalledOn),
                                     needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
                                     filterType: asset.filterType || '',
+                                    reasonForFilterChange: '',
                                     notes: asset.notes || '',
                                     augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
                                   });
@@ -4492,7 +4297,7 @@ export default function HomePage() {
             • <strong>Asset Barcode</strong> must be unique - duplicates will be rejected
           </Text>
           <Text size="xs" c="dimmed">
-            • <strong>Primary Identifier</strong> is required for all assets
+            • <strong>Asset Barcode</strong> is required for all assets
           </Text>
           <Text size="xs" c="dimmed">
             • Date fields should be in DD/MM/YYYY format
@@ -4934,21 +4739,22 @@ export default function HomePage() {
         onClose={closeModal} 
         title="Add New Asset" 
         size="xl"
-        fullScreen
+        centered
         scrollAreaComponent={ScrollArea.Autosize}
       >
         <form onSubmit={form.onSubmit(handleAddAsset)}>
-          <Stack gap="lg">
+          <Stack gap="md">
             {/* Basic Information */}
             <div>
-              <Title order={5} mb="sm">Basic Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Basic Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Asset Barcode"
                     placeholder="Enter barcode"
                     inputMode="text"
                     required
+                    size="sm"
                     {...form.getInputProps('assetBarcode')}
                   />
                 </Grid.Col>
@@ -4956,7 +4762,6 @@ export default function HomePage() {
                   <TextInput
                     label="Primary Identifier"
                     placeholder="Enter identifier"
-                    required
                     inputMode="text"
                     {...form.getInputProps('primaryIdentifier')}
                   />
@@ -5031,8 +4836,8 @@ export default function HomePage() {
 
             {/* Location Information */}
             <div>
-              <Title order={5} mb="sm">Location Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Location Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing"
@@ -5101,8 +4906,8 @@ export default function HomePage() {
 
             {/* Filter Information */}
             <div>
-              <Title order={5} mb="sm">Filter Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Filter Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Checkbox
                     label="Filter Needed"
@@ -5171,6 +4976,19 @@ export default function HomePage() {
                     )}
                   </Stack>
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Select
+                    label="Reason for Filter Change"
+                    placeholder="Select reason"
+                    data={[
+                      { value: 'Expired', label: 'Expired' },
+                      { value: 'Remedial', label: 'Remedial' },
+                      { value: 'Blocked', label: 'Blocked' },
+                      { value: 'New Installation', label: 'New Installation' }
+                    ]}
+                    {...form.getInputProps('reasonForFilterChange')}
+                  />
+                </Grid.Col>
               </Grid>
             </div>
 
@@ -5178,7 +4996,7 @@ export default function HomePage() {
 
             {/* Notes */}
             <div>
-              <Title order={5} mb="sm">Additional Notes</Title>
+              <Title order={5} mb="xs">Additional Notes</Title>
               <Textarea
                 label="Notes"
                 placeholder="Additional notes and comments"
@@ -5191,7 +5009,7 @@ export default function HomePage() {
 
             {/* File Attachments */}
             <div>
-              <Title order={5} mb="sm">File Attachments</Title>
+              <Title order={5} mb="xs">File Attachments</Title>
               <Text size="sm" c="dimmed" mb="md">
                 Upload documents, images, or other files related to this asset.
               </Text>
@@ -5233,11 +5051,11 @@ export default function HomePage() {
               )}
             </div>
 
-            <Group justify="flex-end" mt="lg">
-              <Button variant="outline" onClick={closeModal}>
+            <Group justify="flex-end" mt="md">
+              <Button variant="outline" onClick={closeModal} size="sm">
                 Cancel
               </Button>
-              <Button type="submit" loading={isUploadingFile}>
+              <Button type="submit" loading={isUploadingFile} size="sm">
                 Add Asset
               </Button>
             </Group>
@@ -5251,15 +5069,15 @@ export default function HomePage() {
         onClose={closeEditModal} 
         title="Edit Asset" 
         size="xl"
-        fullScreen
+        centered
         scrollAreaComponent={ScrollArea.Autosize}
       >
         <form key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
-          <Stack gap="lg">
+          <Stack gap="md">
             {/* Basic Information */}
             <div>
-              <Title order={5} mb="sm">Basic Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Basic Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Asset Barcode"
@@ -5272,7 +5090,6 @@ export default function HomePage() {
                   <TextInput
                     label="Primary Identifier"
                     placeholder="Enter identifier"
-                    required
                     {...form.getInputProps('primaryIdentifier')}
                   />
                 </Grid.Col>
@@ -5346,8 +5163,8 @@ export default function HomePage() {
 
             {/* Location Information */}
             <div>
-              <Title order={5} mb="sm">Location Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Location Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <TextInput
                     label="Wing"
@@ -5416,8 +5233,8 @@ export default function HomePage() {
 
             {/* Filter Information */}
             <div>
-              <Title order={5} mb="sm">Filter Information</Title>
-              <Grid>
+              <Title order={5} mb="xs">Filter Information</Title>
+              <Grid gutter="xs">
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Checkbox
                     label="Filter Needed"
@@ -5486,6 +5303,19 @@ export default function HomePage() {
                     )}
                   </Stack>
                 </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Select
+                    label="Reason for Filter Change"
+                    placeholder="Select reason"
+                    data={[
+                      { value: 'Expired', label: 'Expired' },
+                      { value: 'Remedial', label: 'Remedial' },
+                      { value: 'Blocked', label: 'Blocked' },
+                      { value: 'New Installation', label: 'New Installation' }
+                    ]}
+                    {...form.getInputProps('reasonForFilterChange')}
+                  />
+                </Grid.Col>
               </Grid>
               
               {/* Remove Filter Button */}
@@ -5499,19 +5329,19 @@ export default function HomePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (selectedAsset) {
-                      handleRemoveFilter(selectedAsset);
+                    if (selectedAssetForView) {
+                      handleRemoveFilter(selectedAssetForView);
                     }
                   }}
-                  disabled={!selectedAsset || (
-                    !selectedAsset.filterNeeded && 
-                    !selectedAsset.filtersOn && 
-                    !selectedAsset.filterType &&
+                  disabled={!selectedAssetForView || (
+                    !selectedAssetForView.filterNeeded && 
+                    !selectedAssetForView.filtersOn && 
+                    !selectedAssetForView.filterType &&
                     !form.values.filterNeeded &&
                     !form.values.filtersOn &&
                     !form.values.filterType &&
-                    !selectedAsset.filterInstalledOn &&
-                    !selectedAsset.filterExpiryDate &&
+                    !selectedAssetForView.filterInstalledOn &&
+                    !selectedAssetForView.filterExpiryDate &&
                     !form.values.filterInstalledOn &&
                     !form.values.filterExpiryDate
                   )}
@@ -5525,7 +5355,7 @@ export default function HomePage() {
 
             {/* Notes */}
             <div>
-              <Title order={5} mb="sm">Additional Notes</Title>
+              <Title order={5} mb="xs">Additional Notes</Title>
               <Textarea
                 label="Notes"
                 placeholder="Additional notes and comments"
@@ -5536,7 +5366,7 @@ export default function HomePage() {
 
             {/* File Attachments */}
             <div>
-              <Title order={5} mb="sm">File Attachments</Title>
+              <Title order={5} mb="xs">File Attachments</Title>
               <Text size="sm" c="dimmed" mb="md">
                 Upload documents, images, or other files related to this asset.
               </Text>
@@ -5578,11 +5408,11 @@ export default function HomePage() {
               )}
 
               {/* Show existing attachments for edit mode */}
-              {selectedAsset && selectedAsset.attachments && selectedAsset.attachments.length > 0 && (
+              {selectedAssetForView && selectedAssetForView.attachments && selectedAssetForView.attachments.length > 0 && (
                 <div>
                   <Text size="sm" fw={500} mt="md" mb="xs">Current Attachments:</Text>
                   <Stack gap="xs">
-                    {selectedAsset.attachments.map((attachment, index) => (
+                    {selectedAssetForView.attachments.map((attachment, index) => (
                       <Group key={index} justify="space-between" p="xs" bg="blue.0" style={{ borderRadius: '4px' }}>
                         <Group gap="xs">
                           <IconPaperclip size={14} />
@@ -5618,17 +5448,17 @@ export default function HomePage() {
                             color="red"
                             onClick={async () => {
                               const success = await handleFileDelete(attachment.s3Url, attachment.fileName);
-                              if (success && selectedAsset) {
-                                // Update the selectedAsset to remove the deleted attachment
+                              if (success && selectedAssetForView) {
+                                // Update the selectedAssetForView to remove the deleted attachment
                                 const updatedAsset = {
-                                  ...selectedAsset,
-                                  attachments: selectedAsset.attachments?.filter(a => a.s3Url !== attachment.s3Url) || []
+                                  ...selectedAssetForView,
+                                  attachments: selectedAssetForView.attachments?.filter(a => a.s3Url !== attachment.s3Url) || []
                                 };
-                                setSelectedAsset(updatedAsset);
+                                setSelectedAssetForView(updatedAsset);
                                 
                                 // Also update the assets list
                                 setAssets(prev => prev.map(asset => 
-                                  asset.id === selectedAsset.id ? updatedAsset : asset
+                                  asset.id === selectedAssetForView.id ? updatedAsset : asset
                                 ));
                               }
                             }}
@@ -5644,11 +5474,11 @@ export default function HomePage() {
               )}
             </div>
 
-            <Group justify="flex-end" mt="lg">
-              <Button variant="outline" onClick={closeEditModal}>
+            <Group justify="flex-end" mt="md">
+              <Button variant="outline" onClick={closeEditModal} size="sm">
                 Cancel
               </Button>
-              <Button type="submit" loading={isUploadingFile}>
+              <Button type="submit" loading={isUploadingFile} size="sm">
                 Update Asset
               </Button>
             </Group>
@@ -5661,56 +5491,56 @@ export default function HomePage() {
         opened={showViewModal} 
         onClose={closeViewModal} 
         title="Asset Details" 
-        size="lg"
-        fullScreen
+        size="xl"
+        centered
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        {selectedAsset && (
-          <Stack gap="lg">
+        {selectedAssetForView && (
+          <Stack gap="md">
             {/* Basic Information */}
             <div>
-              <Text fw={600} mb="sm" c="blue">Basic Information</Text>
-              <Grid>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Asset Barcode</Text>
-                  <Text fw={500} size="sm">{selectedAsset.assetBarcode || 'N/A'}</Text>
+              <Text fw={600} mb="xs" c="blue">Basic Information</Text>
+              <Grid gutter="xs">
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Asset Barcode</Text>
+                  <Text fw={500} size="sm">{selectedAssetForView.assetBarcode || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Status</Text>
-                  <Badge color={getStatusColor(selectedAsset.status)} variant="light" size="sm">
-                    {selectedAsset.status}
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Status</Text>
+                  <Badge color={getStatusColor(selectedAssetForView.status)} variant="light" size="sm">
+                    {selectedAssetForView.status}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Primary Identifier</Text>
-                  <Text fw={500} size="sm">{selectedAsset.primaryIdentifier}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Primary Identifier</Text>
+                  <Text fw={500} size="sm">{selectedAssetForView.primaryIdentifier}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Secondary Identifier</Text>
-                  <Text size="sm">{selectedAsset.secondaryIdentifier || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Secondary Identifier</Text>
+                  <Text size="sm">{selectedAssetForView.secondaryIdentifier || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Asset Type</Text>
-                  <Text size="sm">{selectedAsset.assetType}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Asset Type</Text>
+                  <Text size="sm">{selectedAssetForView.assetType}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Augmented Care</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Augmented Care</Text>
                   <Badge 
-                    color={(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'blue' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : selectedAsset.augmentedCare === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Need Flushing</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Need Flushing</Text>
                   <Badge 
-                    color={(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'orange' : 'gray'} 
+                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'orange' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : selectedAsset.needFlushing === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
               </Grid>
@@ -5720,35 +5550,35 @@ export default function HomePage() {
 
             {/* Location Information */}
             <div>
-              <Text fw={600} mb="sm" c="blue">Location Information</Text>
-              <Grid>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Wing</Text>
-                  <Text size="sm">{selectedAsset.wing || 'N/A'}</Text>
+              <Text fw={600} mb="xs" c="blue">Location Information</Text>
+              <Grid gutter="xs">
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Wing</Text>
+                  <Text size="sm">{selectedAssetForView.wing || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Wing (Short)</Text>
-                  <Text size="sm">{selectedAsset.wingInShort || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Wing (Short)</Text>
+                  <Text size="sm">{selectedAssetForView.wingInShort || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Room</Text>
-                  <Text size="sm">{selectedAsset.room || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Room</Text>
+                  <Text size="sm">{selectedAssetForView.room || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Room Name</Text>
-                  <Text size="sm">{selectedAsset.roomName || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Room Name</Text>
+                  <Text size="sm">{selectedAssetForView.roomName || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Room Number</Text>
-                  <Text size="sm">{selectedAsset.roomNo !== null && selectedAsset.roomNo !== undefined && selectedAsset.roomNo !== '' ? selectedAsset.roomNo : 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Room Number</Text>
+                  <Text size="sm">{selectedAssetForView.roomNo !== null && selectedAssetForView.roomNo !== undefined && selectedAssetForView.roomNo !== '' ? selectedAssetForView.roomNo : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Floor</Text>
-                  <Text size="sm">{selectedAsset.floor !== null && selectedAsset.floor !== undefined && selectedAsset.floor !== '' ? selectedAsset.floor : 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Floor</Text>
+                  <Text size="sm">{selectedAssetForView.floor !== null && selectedAssetForView.floor !== undefined && selectedAssetForView.floor !== '' ? selectedAssetForView.floor : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Floor (In Words)</Text>
-                  <Text size="sm">{selectedAsset.floorInWords || 'N/A'}</Text>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" mb={2}>Floor (In Words)</Text>
+                  <Text size="sm">{selectedAssetForView.floorInWords || 'N/A'}</Text>
                 </Grid.Col>
               </Grid>
             </div>
@@ -5756,62 +5586,75 @@ export default function HomePage() {
             <Divider />
 
             {/* Filter Information */}
-            <div>
-              <Text fw={600} mb="sm" c="blue">Filter Information</Text>
-              <Grid>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filter Needed</Text>
+            {!(
+              !selectedAssetForView.filterNeeded && 
+              !selectedAssetForView.filtersOn && 
+              !selectedAssetForView.filterType &&
+              (!selectedAssetForView.filterInstalledOn || selectedAssetForView.filterInstalledOn === '') &&
+              !selectedAssetForView.filterInstalledOn &&
+              !selectedAssetForView.filterExpiryDate &&
+              (selectedAssetForView.notes === '' || !selectedAssetForView.notes)
+            ) && (
+              <>
+                <Divider />
+                <div>
+                  <Text fw={600} mb="xs" c="blue">Filter Information</Text>
+              <Grid gutter="xs">
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Filter Needed</Text>
                   <Badge 
-                    color={(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'orange' : 'green'} 
+                    color={(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'orange' : 'green'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : selectedAsset.filterNeeded === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filters On</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Filters On</Text>
                   <Badge 
-                    color={(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes')) ? 'green' : 'red'} 
+                    color={(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'green' : 'red'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes')) ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filter Installed On</Text>
-                  <Text size="sm">{(() => { const d = safeDate(selectedAsset.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Filter Installed On</Text>
+                  <Text size="sm">{(() => { const d = safeDate(selectedAssetForView.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filter Expiry</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Filter Expiry</Text>
                   <div>
-                    <Text size="sm">{(() => { const d = safeDate(selectedAsset.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
-                    {safeDate(selectedAsset.filterExpiryDate) && (
+                    <Text size="sm">{(() => { const d = safeDate(selectedAssetForView.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
+                    {safeDate(selectedAssetForView.filterExpiryDate) && (
                       <Badge 
-                        color={getFilterExpiryStatus(selectedAsset.filterExpiryDate, selectedAsset.filterInstalledOn).color} 
+                        color={getFilterExpiryStatus(selectedAssetForView.filterExpiryDate, selectedAssetForView.filterInstalledOn).color} 
                         variant="light" 
                         size="xs"
                         mt={4}
                       >
-                        {getFilterExpiryStatus(selectedAsset.filterExpiryDate, selectedAsset.filterInstalledOn).text}
+                        {getFilterExpiryStatus(selectedAssetForView.filterExpiryDate, selectedAssetForView.filterInstalledOn).text}
                       </Badge>
                     )}
                   </div>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Filter Type</Text>
-                  <Text size="sm">{selectedAsset.filterType || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Filter Type</Text>
+                  <Text size="sm">{selectedAssetForView.filterType || 'N/A'}</Text>
                 </Grid.Col>
               </Grid>
-            </div>
+                </div>
+              </>
+            )}
 
-            {selectedAsset.notes && (
+            {selectedAssetForView.notes && (
               <>
                 <Divider />
                 <div>
-                  <Text fw={600} mb="sm" c="blue">Notes</Text>
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAsset.notes}</Text>
+                  <Text fw={600} mb="xs" c="blue">Notes</Text>
+                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAssetForView.notes}</Text>
                 </div>
               </>
             )}
@@ -5819,34 +5662,34 @@ export default function HomePage() {
             {/* Metadata */}
             <Divider />
             <div>
-              <Text fw={600} mb="sm" c="blue">Metadata</Text>
-              <Grid>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Created</Text>
-                  <Text size="sm">{selectedAsset.created ? formatTimestamp(selectedAsset.created) : 'N/A'}</Text>
+              <Text fw={600} mb="xs" c="blue">Metadata</Text>
+              <Grid gutter="xs">
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Created</Text>
+                  <Text size="sm">{selectedAssetForView.created ? formatTimestamp(selectedAssetForView.created) : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Created By</Text>
-                  <Text size="sm">{selectedAsset.createdBy || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Created By</Text>
+                  <Text size="sm">{selectedAssetForView.createdBy || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Modified</Text>
-                  <Text size="sm">{selectedAsset.modified ? formatTimestamp(selectedAsset.modified) : 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Modified</Text>
+                  <Text size="sm">{selectedAssetForView.modified ? formatTimestamp(selectedAssetForView.modified) : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={{ base: 12, sm: 6 }}>
-                  <Text size="sm" c="dimmed">Modified By</Text>
-                  <Text size="sm">{selectedAsset.modifiedBy || 'N/A'}</Text>
+                <Grid.Col span={6}>
+                  <Text size="xs" c="dimmed" mb={2}>Modified By</Text>
+                  <Text size="sm">{selectedAssetForView.modifiedBy || 'N/A'}</Text>
                 </Grid.Col>
               </Grid>
-                         </div>
+            </div>
 
-            {selectedAsset.attachments && selectedAsset.attachments.length > 0 && (
+            {selectedAssetForView.attachments && selectedAssetForView.attachments.length > 0 && (
               <>
                 <Divider />
                 <div>
-                  <Text fw={600} mb="sm" c="blue">Attachments</Text>
+                  <Text fw={600} mb="xs" c="blue">Attachments</Text>
                   <Stack gap="xs">
-                    {selectedAsset.attachments.map((attachment, index) => (
+                    {selectedAssetForView.attachments.map((attachment, index) => (
                       <Group key={index} justify="space-between" p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
                         <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
                           <IconPaperclip size={16} />
@@ -5884,35 +5727,119 @@ export default function HomePage() {
               </>
             )}
 
-            <Group justify="flex-end" mt="lg">
-              <Button variant="outline" onClick={closeViewModal}>
-                Close
-              </Button>
-              <Button
+            {/* Filter Changes History */}
+            <Divider />
+            <div>
+              <Group justify="space-between" align="center" mb="xs">
+                <Text fw={600} c="blue">Filter Change History</Text>
+                {loadingFilterChanges && <Loader size="xs" />}
+              </Group>
+              
+              {filterChanges.length > 0 ? (
+                <Stack gap="xs">
+                  {filterChanges.map((change, index) => (
+                    <Card key={index} p="sm" withBorder>
+                      <Grid gutter="xs">
+                        <Grid.Col span={6}>
+                          <Text size="xs" c="dimmed" mb={2}>Date Installed</Text>
+                          <Text size="sm" fw={500}>
+                            {new Date(change.FilterInstalledDate).toLocaleDateString('en-GB')}
+                          </Text>
+                        </Grid.Col>
+                        <Grid.Col span={6}>
+                          <Text size="xs" c="dimmed" mb={2}>Filter Type</Text>
+                          <Text size="sm">{change.FilterType || 'Not specified'}</Text>
+                        </Grid.Col>
+                        <Grid.Col span={6}>
+                          <Text size="xs" c="dimmed" mb={2}>Location</Text>
+                          <Text size="sm">{change.Location}</Text>
+                        </Grid.Col>
+                        <Grid.Col span={6}>
+                          <Text size="xs" c="dimmed" mb={2}>Reason</Text>
+                          <Badge 
+                            size="sm"
+                            color={change.ReasonForFilterChange === 'Expired' ? 'red' : 
+                                   change.ReasonForFilterChange === 'Remedial' ? 'orange' : 
+                                   change.ReasonForFilterChange === 'Blocked' ? 'yellow' : 'blue'}
+                            variant="light"
+                          >
+                            {change.ReasonForFilterChange || 'Not specified'}
+                          </Badge>
+                        </Grid.Col>
+                      </Grid>
+                      {change.reconciledBy && (
+                        <Text size="xs" c="dimmed" mt="xs">
+                          Reconciled by: {change.reconciledBy} on {new Date(change.reconciliationTimestamp).toLocaleDateString('en-GB')}
+                        </Text>
+                      )}
+                    </Card>
+                  ))}
+                </Stack>
+              ) : (
+                !loadingFilterChanges && (
+                  <Text size="sm" c="dimmed" ta="center" py="md">
+                    No filter change history found for this asset
+                  </Text>
+                )
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <Divider />
+            <Group justify="space-between" mt="md">
+              <Group gap="xs">
+                <Button
+                  variant="light"
+                  color="blue"
+                  size="sm"
+                  leftSection={<IconHistory size={16} />}
+                  onClick={() => {
+                    setSelectedAssetAudit(selectedAssetForView.assetBarcode);
+                    openAuditModal();
+                  }}
+                >
+                  View Audit Log
+                </Button>
+                <Button
+                  variant="light"
+                  color="red"
+                  size="sm"
+                  leftSection={<IconTrash size={16} />}
+                  onClick={() => handleDeleteAsset(selectedAssetForView)}
+                >
+                  Delete Asset
+                </Button>
+              </Group>
+              <Group gap="xs">
+                <Button variant="outline" onClick={closeViewModal} size="sm">
+                  Close
+                </Button>
+                <Button size="sm"
                 onClick={() => {
                   try {
                     closeViewModal();
                     form.setValues({
-                      assetBarcode: selectedAsset.assetBarcode || '',
-                      primaryIdentifier: selectedAsset.primaryIdentifier || '',
-                      secondaryIdentifier: selectedAsset.secondaryIdentifier || '',
-                      assetType: selectedAsset.assetType || '',
-                      status: selectedAsset.status || 'ACTIVE',
-                      wing: selectedAsset.wing || '',
-                      wingInShort: selectedAsset.wingInShort || '',
-                      room: selectedAsset.room || '',
-                      floor: selectedAsset.floor || '',
-                      floorInWords: selectedAsset.floorInWords || '',
-                      roomNo: selectedAsset.roomNo || '',
-                      roomName: selectedAsset.roomName || '',
-                      filterNeeded: typeof selectedAsset.filterNeeded === 'boolean' ? selectedAsset.filterNeeded : (selectedAsset.filterNeeded?.toString().toLowerCase() === 'true' || selectedAsset.filterNeeded?.toString().toLowerCase() === 'yes'),
-                      filtersOn: typeof selectedAsset.filtersOn === 'boolean' ? selectedAsset.filtersOn : (selectedAsset.filtersOn?.toString().toLowerCase() === 'true' || selectedAsset.filtersOn?.toString().toLowerCase() === 'yes'),
-                      filterExpiryDate: safeDate(selectedAsset.filterExpiryDate),
-                      filterInstalledOn: safeDate(selectedAsset.filterInstalledOn),
-                      needFlushing: typeof selectedAsset.needFlushing === 'boolean' ? selectedAsset.needFlushing : (selectedAsset.needFlushing?.toString().toLowerCase() === 'true' || selectedAsset.needFlushing?.toString().toLowerCase() === 'yes'),
-                      filterType: selectedAsset.filterType || '',
-                      notes: selectedAsset.notes || '',
-                      augmentedCare: typeof selectedAsset.augmentedCare === 'boolean' ? selectedAsset.augmentedCare : (selectedAsset.augmentedCare?.toString().toLowerCase() === 'true' || selectedAsset.augmentedCare?.toString().toLowerCase() === 'yes'),
+                      assetBarcode: selectedAssetForView.assetBarcode || '',
+                      primaryIdentifier: selectedAssetForView.primaryIdentifier || '',
+                      secondaryIdentifier: selectedAssetForView.secondaryIdentifier || '',
+                      assetType: selectedAssetForView.assetType || '',
+                      status: selectedAssetForView.status || 'ACTIVE',
+                      wing: selectedAssetForView.wing || '',
+                      wingInShort: selectedAssetForView.wingInShort || '',
+                      room: selectedAssetForView.room || '',
+                      floor: selectedAssetForView.floor || '',
+                      floorInWords: selectedAssetForView.floorInWords || '',
+                      roomNo: selectedAssetForView.roomNo || '',
+                      roomName: selectedAssetForView.roomName || '',
+                      filterNeeded: typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : (selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'true' || selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'yes'),
+                      filtersOn: typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes'),
+                      filterExpiryDate: safeDate(selectedAssetForView.filterExpiryDate),
+                      filterInstalledOn: safeDate(selectedAssetForView.filterInstalledOn),
+                      needFlushing: typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing?.toString().toLowerCase() === 'true' || selectedAssetForView.needFlushing?.toString().toLowerCase() === 'yes'),
+                      filterType: selectedAssetForView.filterType || '',
+                      reasonForFilterChange: '',
+                      notes: selectedAssetForView.notes || '',
+                      augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
                     });
                     setAssetFiles([]);
                     openEditModal();
@@ -5929,6 +5856,7 @@ export default function HomePage() {
               >
                 Edit Asset
               </Button>
+              </Group>
             </Group>
           </Stack>
         )}
@@ -5940,10 +5868,10 @@ export default function HomePage() {
         onClose={closeAuditModal} 
         title="Asset Audit Log" 
         size="xl"
-        fullScreen
+        centered
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        <Stack gap="md">
+        <Stack gap="sm">
           {selectedAssetAudit && (
             <>
               <Group justify="space-between">
@@ -6058,16 +5986,16 @@ export default function HomePage() {
         onError={handleScannerError}
       />
 
-      {/* Global Audit Trail Drawer */}
-      <Drawer
+      {/* Global Audit Trail Modal */}
+      <Modal
         opened={showAuditDrawer}
         onClose={closeAuditDrawer}
         title="System Audit Trail"
-        position="right"
         size="xl"
+        centered
         scrollAreaComponent={ScrollArea.Autosize}
       >
-        <Stack gap="md">
+        <Stack gap="sm">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
               Recent system activities across all assets
@@ -6190,7 +6118,7 @@ export default function HomePage() {
             </Button>
           </Group>
         </Stack>
-      </Drawer>
+      </Modal>
 
       {/* Spotlight Search */}
       <Spotlight
