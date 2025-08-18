@@ -33,7 +33,7 @@ interface SPListItem {
   FilterInstalledDate: string;
   FilterType?: string;
   AssetBarcode?: string;
-  ReasonForFilterChange?: 'Expired' | 'Remedial' | 'Blocked' | 'New Installation';
+  ReasonForFilterChange?: 'Expired' | 'Remedial' | 'Blocked' | 'Missing' | 'New Installation';
   status?: string;
   updatedAt?: string;
   modifiedBy?: string;

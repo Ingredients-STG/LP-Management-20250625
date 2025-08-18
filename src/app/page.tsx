@@ -99,6 +99,7 @@ import {
   IconChevronUp,
   IconGitCompare,
   IconDeviceFloppy,
+  IconFilterOff,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -346,6 +347,7 @@ export default function HomePage() {
   const [bulkUpdateResults, setBulkUpdateResults] = useState<any>(null);
 
   const [filtersCollapsed, setFiltersCollapsed] = useLocalStorage({ key: 'filtersCollapsed', defaultValue: false });
+  const [advancedFiltersCollapsed, setAdvancedFiltersCollapsed] = useLocalStorage({ key: 'advancedFiltersCollapsed', defaultValue: true });
 
   // Toggle asset expansion
   const toggleAssetExpansion = (assetBarcode: string) => {
@@ -1950,10 +1952,10 @@ export default function HomePage() {
         (sanitizedValues.reasonForFilterChange && sanitizedValues.reasonForFilterChange !== '')
       );
 
-      // Sync to SPListItems if filter info changed OR if it's a new filter installation
-      const shouldSyncToSPList = (filterInfoChanged || updateData.filterInstalledOn) && 
-                                 result.data.assetBarcode && 
-                                 (updateData.filterNeeded === true || updateData.filterNeeded === 'true');
+      // Sync to SPListItems only when Filter Installed On field has a value
+      const shouldSyncToSPList = updateData.filterInstalledOn && 
+                                 updateData.filterInstalledOn.trim() !== '' && 
+                                 result.data.assetBarcode;
 
       if (shouldSyncToSPList) {
         try {
@@ -3224,93 +3226,115 @@ export default function HomePage() {
                 styles={{ input: { fontSize: '16px' } }}
               />
               
-              {/* Row 4: Boolean filters - 2 per row */}
-              <Group gap="xs" grow>
-                <MultiSelect
-                  placeholder="Need Flushing"
-                  data={['Yes', 'No']}
-                  value={needFlushingFilter}
-                  onChange={setNeedFlushingFilter}
-                  clearable
+              {/* Advanced Filters - Collapsible for better mobile UX */}
+              <Collapse in={!advancedFiltersCollapsed}>
+                <Stack gap="xs" mt="xs">
+                  {/* Row 4: Boolean filters - 2 per row */}
+                  <Group gap="xs" grow>
+                    <MultiSelect
+                      placeholder="Need Flushing"
+                      data={['Yes', 'No']}
+                      value={needFlushingFilter}
+                      onChange={setNeedFlushingFilter}
+                      clearable
+                      size="sm"
+                      styles={{ input: { fontSize: '16px' } }}
+                    />
+                    <MultiSelect
+                      placeholder="Filter Needed"
+                      data={['Yes', 'No']}
+                      value={filterNeededFilter}
+                      onChange={setFilterNeededFilter}
+                      clearable
+                      size="sm"
+                      styles={{ input: { fontSize: '16px' } }}
+                    />
+                  </Group>
+                  
+                  {/* Row 5: More boolean filters */}
+                  <Group gap="xs" grow>
+                    <MultiSelect
+                      placeholder="Filters On"
+                      data={['Yes', 'No']}
+                      value={filtersOnFilter}
+                      onChange={setFiltersOnFilter}
+                      clearable
+                      size="sm"
+                      styles={{ input: { fontSize: '16px' } }}
+                    />
+                    <MultiSelect
+                      placeholder="Augmented Care"
+                      data={['Yes', 'No']}
+                      value={augmentedCareFilter}
+                      onChange={setAugmentedCareFilter}
+                      clearable
+                      size="sm"
+                      styles={{ input: { fontSize: '16px' } }}
+                    />
+                  </Group>
+                  
+                  {/* Row 6: Date Range - Full width */}
+                  <DatePickerInput
+                    type="range"
+                    placeholder="Filter Expiry Range"
+                    value={filterExpiryRange}
+                    onChange={(val) => {
+                      const toDate = (v: string | Date | null) => {
+                        if (!v) return null;
+                        if (v instanceof Date) return v;
+                        const d = new Date(v);
+                        return isNaN(d.getTime()) ? null : d;
+                      };
+                      setFilterExpiryRange([
+                        toDate(val[0]),
+                        toDate(val[1])
+                      ]);
+                    }}
+                    size="sm"
+                    styles={{ input: { fontSize: '16px' } }}
+                    clearable
+                  />
+                  
+                  {/* Row 7: Filter Expiry Status - Full width */}
+                  <MultiSelect
+                    placeholder="Filter Expiry Status"
+                    data={[
+                      { value: 'expired', label: 'Filter Expired' },
+                      { value: 'this-week', label: 'Expiring This Week' },
+                      { value: 'next-week', label: 'Expiring Next Week' },
+                      { value: 'this-month', label: 'Expiring This Month' },
+                      { value: 'next-month', label: 'Expiring Next Month' }
+                    ]}
+                    value={filterExpiryStatus ? [filterExpiryStatus] : []}
+                    onChange={(values) => setFilterExpiryStatus(values.length > 0 ? values[0] : '')}
+                    clearable
+                    size="sm"
+                    styles={{ input: { fontSize: '16px' } }}
+                  />
+                </Stack>
+              </Collapse>
+              
+              {/* Mobile Filter Action Buttons */}
+              <Group gap="xs" justify="space-between" mt="sm">
+                <Button
+                  variant="subtle"
+                  color="blue"
                   size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Filter Needed"
-                  data={['Yes', 'No']}
-                  value={filterNeededFilter}
-                  onChange={setFilterNeededFilter}
-                  clearable
+                  onClick={() => setAdvancedFiltersCollapsed(!advancedFiltersCollapsed)}
+                  leftSection={advancedFiltersCollapsed ? <IconChevronDown size={16} /> : <IconChevronUp size={16} />}
+                >
+                  {advancedFiltersCollapsed ? 'More Filters' : 'Less Filters'}
+                </Button>
+                <Button
+                  variant="outline"
+                  color="gray"
                   size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
+                  onClick={clearAllFilters}
+                  leftSection={<IconFilterOff size={16} />}
+                >
+                  Clear All
+                </Button>
               </Group>
-              
-              {/* Row 5: More boolean filters */}
-              <Group gap="xs" grow>
-                <MultiSelect
-                  placeholder="Filters On"
-                  data={['Yes', 'No']}
-                  value={filtersOnFilter}
-                  onChange={setFiltersOnFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-                <MultiSelect
-                  placeholder="Augmented Care"
-                  data={['Yes', 'No']}
-                  value={augmentedCareFilter}
-                  onChange={setAugmentedCareFilter}
-                  clearable
-                  size="sm"
-                  styles={{ input: { fontSize: '16px' } }}
-                />
-              </Group>
-              
-              {/* Row 6: Date Range - Full width */}
-              <DatePickerInput
-                type="range"
-                placeholder="Filter Expiry Range"
-                value={filterExpiryRange}
-                onChange={(val) => {
-                  const toDate = (v: string | Date | null) => {
-                    if (!v) return null;
-                    if (v instanceof Date) return v;
-                    const d = new Date(v);
-                    return isNaN(d.getTime()) ? null : d;
-                  };
-                  setFilterExpiryRange([
-                    toDate(val[0]),
-                    toDate(val[1])
-                  ]);
-                }}
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-                clearable
-              />
-              
-              {/* Row 7: Filter Expiry Status - Full width */}
-              <MultiSelect
-                placeholder="Filter Expiry Status"
-                data={[
-                  { value: 'expired', label: 'Filter Expired' },
-                  { value: 'this-week', label: 'Expiring This Week' },
-                  { value: 'next-week', label: 'Expiring Next Week' },
-                  { value: 'this-month', label: 'Expiring This Month' },
-                  { value: 'next-month', label: 'Expiring Next Month' }
-                ]}
-                value={filterExpiryStatus ? [filterExpiryStatus] : []}
-                onChange={(values) => setFilterExpiryStatus(values.length > 0 ? values[0] : '')}
-                clearable
-                size="sm"
-                styles={{ input: { fontSize: '16px' } }}
-              />
-              
-              {/* Clear Filters Button */}
-              <Button variant="outline" color="gray" size="sm" onClick={clearAllFilters} fullWidth>
-                Clear All Filters
-              </Button>
             </Stack>
             {/* Desktop filter layout */}
             <Grid visibleFrom="md">
@@ -3508,8 +3532,8 @@ export default function HomePage() {
                     <Card 
                       key={asset.assetBarcode} 
                       shadow="sm" 
-                      padding="sm" 
-                      radius="md" 
+                      padding="md" 
+                      radius="lg" 
                       withBorder
                       style={{ 
                         cursor: 'pointer',
@@ -3523,101 +3547,150 @@ export default function HomePage() {
                           const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
                             asset.needFlushing : 
                             asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
-                          return needsFlushing ? '3px solid red' : undefined;
-                        })()
+                          return needsFlushing ? '4px solid red' : undefined;
+                        })(),
+                        transition: 'all 0.2s ease',
                       }}
                       onClick={() => {
                         setSelectedAsset(asset);
                         openViewModal();
                       }}
                     >
-                      <Stack gap="xs">
-                        <Group justify="space-between" align="flex-start">
+                      <Stack gap="sm">
+                        {/* Header with Asset Barcode and Status */}
+                        <Group justify="space-between" align="center">
                           <div>
-                            <Text fw={600} size="sm">{asset.assetBarcode}</Text>
-                            <Text size="xs" c="dimmed">{asset.room}</Text>
+                            <Text fw={700} size="lg" c="blue">{asset.assetBarcode}</Text>
+                            <Text size="sm" c="dimmed" fw={500}>
+                              {asset.room ? `${asset.wing} - ${asset.room}` : `${asset.wing} - ${asset.floor}`}
+                            </Text>
                           </div>
-                          <Badge color={getStatusColor(asset.status)} variant="light" size="sm">
+                          <Badge 
+                            color={getStatusColor(asset.status)} 
+                            variant="filled" 
+                            size="lg"
+                            radius="md"
+                          >
                             {asset.status}
                           </Badge>
                         </Group>
                         
-                        <Group justify="space-between">
-                          <div>
-                            <Text size="xs" c="dimmed">Type</Text>
-                            <Text size="sm">{asset.assetType}</Text>
-                          </div>
-                                                      <div>
-                              <Text size="xs" c="dimmed">Installed</Text>
-                              <Text size="sm">
+                        {/* Asset Type and Location Info */}
+                        <Paper p="sm" withBorder radius="md" bg="gray.0">
+                          <Grid gutter="sm">
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>ASSET TYPE</Text>
+                              <Text size="sm" fw={600}>{asset.assetType || 'N/A'}</Text>
+                            </Grid.Col>
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>LOCATION</Text>
+                              <Text size="sm" fw={600}>{asset.floor}</Text>
+                            </Grid.Col>
+                          </Grid>
+                        </Paper>
+                        
+                        {/* Filter Information Section */}
+                        <Paper p="sm" withBorder radius="md" bg="blue.0">
+                          <Grid gutter="sm">
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>FILTER STATUS</Text>
+                              <Badge 
+                                color={(() => {
+                                  const filtersOn = typeof asset.filtersOn === 'boolean' ? 
+                                    asset.filtersOn : 
+                                    asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true';
+                                  return filtersOn ? 'green' : 'gray';
+                                })()} 
+                                variant="filled"
+                                size="md"
+                              >
+                                {(() => {
+                                  const filtersOn = typeof asset.filtersOn === 'boolean' ? 
+                                    asset.filtersOn : 
+                                    asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true';
+                                  return filtersOn ? 'INSTALLED' : 'NOT INSTALLED';
+                                })()}
+                              </Badge>
+                            </Grid.Col>
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>EXPIRY STATUS</Text>
+                              {(() => {
+                                const expiryStatus = getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn);
+                                return (
+                                  <Badge 
+                                    color={expiryStatus.color} 
+                                    variant="filled" 
+                                    size="md"
+                                  >
+                                    {expiryStatus.text}
+                                  </Badge>
+                                );
+                              })()}
+                            </Grid.Col>
+                          </Grid>
+                          
+                          {/* Filter Details Row */}
+                          <Grid gutter="sm" mt="sm">
+                            {asset.filterType && (
+                              <Grid.Col span={6}>
+                                <Text size="xs" c="dimmed" fw={600} mb={2}>FILTER TYPE</Text>
+                                <Text size="sm" fw={600}>{asset.filterType}</Text>
+                              </Grid.Col>
+                            )}
+                            <Grid.Col span={asset.filterType ? 6 : 12}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>INSTALLED ON</Text>
+                              <Text size="sm" fw={600}>
                                 {(() => { 
                                   const d = safeDate(asset.filterInstalledOn); 
                                   return d ? d.toLocaleDateString('en-GB') : 'Not installed'; 
                                 })()}
                               </Text>
-                            </div>
-                        </Group>
-                        
-                        <Group justify="space-between" align="center">
-                          <Stack gap="xs" style={{ flex: 1 }}>
-                            <Group gap="xs">
-                              <Text size="xs" c="dimmed">Filter Expiry:</Text>
-                              {(() => {
-                                const expiryStatus = getFilterExpiryStatus(asset.filterExpiryDate, asset.filterInstalledOn);
-                                return (
-                                  <>
-                                    <Badge 
-                                      color={expiryStatus.color} 
-                                      variant="light" 
-                                      size="xs"
-                                    >
-                                      {expiryStatus.text}
-                                    </Badge>
-                                    <Text size="xs" c="dimmed">
-                                      {(() => { 
-                                        const d = safeDate(asset.filterExpiryDate); 
-                                        return d ? d.toLocaleDateString('en-GB') : 'N/A'; 
-                                      })()}
-                                    </Text>
-                                  </>
-                                );
-                              })()}
-                            </Group>
-                            {/* Need Flushing Alert for Mobile */}
-                            {(() => {
-                              const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
-                                asset.needFlushing : 
-                                asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
-                              
-                              return needsFlushing ? (
-                                <Badge 
-                                  color="red" 
-                                  variant="filled" 
-                                  size="xs"
-                                  leftSection={<IconAlertTriangle size={10} />}
-                                >
-                                  NEEDS FLUSHING
-                                </Badge>
-                              ) : null;
-                            })()}
-                          </Stack>
-                          <Group gap="xs">
+                            </Grid.Col>
+                          </Grid>
+                        </Paper>
+
+                        {/* Need Flushing Alert */}
+                        {(() => {
+                          const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
+                            asset.needFlushing : 
+                            asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true';
+                          
+                          return needsFlushing ? (
+                            <Paper p="sm" withBorder radius="md" bg="red.0">
+                              <Group gap="sm" align="center">
+                                <IconAlertTriangle size={20} color="red" />
+                                <div>
+                                  <Text size="sm" fw={700} c="red">NEEDS FLUSHING</Text>
+                                  <Text size="xs" c="dimmed">This asset requires immediate attention</Text>
+                                </div>
+                              </Group>
+                            </Paper>
+                          ) : null;
+                        })()}
+
+                        {/* Action Buttons Section */}
+                        <Group justify="space-between" align="center" mt="sm">
+                          <Text size="xs" c="dimmed" ta="center" style={{ flex: 1 }}>
+                            Tap card to view details
+                          </Text>
+                          <Group gap="sm">
                             <ActionIcon
-                              variant="light"
-                              color="blue"
-                              size="sm"
+                              variant="filled"
+                              color="green"
+                              size="md"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedAssetAudit(asset.assetBarcode);
                                 openAuditModal();
                               }}
+                              title="View Audit Log"
                             >
-                              <IconHistory size={14} />
+                              <IconHistory size={16} />
                             </ActionIcon>
                             <ActionIcon
-                              variant="light"
-                              color="yellow"
-                              size="sm"
+                              variant="filled"
+                              color="blue"
+                              size="md"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 try {
@@ -3657,19 +3730,21 @@ export default function HomePage() {
                                   });
                                 }
                               }}
+                              title="Edit Asset"
                             >
-                              <IconEdit size={14} />
+                              <IconEdit size={16} />
                             </ActionIcon>
                             <ActionIcon
-                              variant="light"
+                              variant="filled"
                               color="red"
-                              size="sm"
+                              size="md"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteAsset(asset);
                               }}
+                              title="Delete Asset"
                             >
-                              <IconTrash size={14} />
+                              <IconTrash size={16} />
                             </ActionIcon>
                           </Group>
                         </Group>
@@ -4799,13 +4874,39 @@ export default function HomePage() {
       <Modal 
         opened={modalOpened} 
         onClose={closeModal} 
-        title="Add New Asset" 
+        title="" 
         size="xl"
         centered
         scrollAreaComponent={ScrollArea.Autosize}
+        withCloseButton={false}
       >
         <form onSubmit={form.onSubmit(handleAddAsset)}>
           <Stack gap="md">
+            {/* Custom Header with Action Buttons */}
+            <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
+              <Text fw={600} size="lg">Add New Asset</Text>
+              <Group gap="md">
+                <ActionIcon
+                  type="submit"
+                  loading={isUploadingFile}
+                  color="blue"
+                  size="md"
+                  title="Add Asset"
+                >
+                  <IconDeviceFloppy size={16} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="md"
+                  onClick={closeModal}
+                  title="Close"
+                >
+                  <IconX size={16} />
+                </ActionIcon>
+              </Group>
+            </Group>
+
             {/* Basic Information */}
             <div>
               <Title order={5} mb="xs">Basic Information</Title>
@@ -5046,6 +5147,7 @@ export default function HomePage() {
                       { value: 'Expired', label: 'Expired' },
                       { value: 'Remedial', label: 'Remedial' },
                       { value: 'Blocked', label: 'Blocked' },
+                      { value: 'Missing', label: 'Missing' },
                       { value: 'New Installation', label: 'New Installation' }
                     ]}
                     {...form.getInputProps('reasonForFilterChange')}
@@ -5113,14 +5215,7 @@ export default function HomePage() {
               )}
             </div>
 
-            <Group justify="flex-end" mt="md">
-              <Button variant="outline" onClick={closeModal} size="sm">
-                Cancel
-              </Button>
-              <Button type="submit" loading={isUploadingFile} size="sm">
-                Add Asset
-              </Button>
-            </Group>
+
           </Stack>
         </form>
       </Modal>
@@ -5129,31 +5224,40 @@ export default function HomePage() {
       <Modal 
         opened={editModalOpened} 
         onClose={closeEditModal} 
-        title={
-          <Group justify="space-between" style={{ width: '100%' }}>
-            <Text fw={600}>Edit Asset</Text>
-            <Group gap="xs">
-              <ActionIcon
-                type="submit"
-                form="edit-asset-form"
-                loading={isUploadingFile}
-                color="blue"
-                size="lg"
-                title="Update Asset"
-              >
-                <IconDeviceFloppy size={18} />
-              </ActionIcon>
-            </Group>
-          </Group>
-        }
+        title=""
         size="xl"
         centered
         scrollAreaComponent={ScrollArea.Autosize}
-        withCloseButton={true}
+        withCloseButton={false}
       >
 
         <form id="edit-asset-form" key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
           <Stack gap="md">
+            {/* Custom Header with Action Buttons */}
+            <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
+              <Text fw={600} size="lg">Edit Asset</Text>
+              <Group gap="md">
+                <ActionIcon
+                  type="submit"
+                  loading={isUploadingFile}
+                  color="blue"
+                  size="md"
+                  title="Update Asset"
+                >
+                  <IconDeviceFloppy size={16} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="md"
+                  onClick={closeEditModal}
+                  title="Close"
+                >
+                  <IconX size={16} />
+                </ActionIcon>
+              </Group>
+            </Group>
+
             {/* Basic Information */}
             <div>
               <Title order={5} mb="xs">Basic Information</Title>
@@ -5391,6 +5495,7 @@ export default function HomePage() {
                       { value: 'Expired', label: 'Expired' },
                       { value: 'Remedial', label: 'Remedial' },
                       { value: 'Blocked', label: 'Blocked' },
+                      { value: 'Missing', label: 'Missing' },
                       { value: 'New Installation', label: 'New Installation' }
                     ]}
                     {...form.getInputProps('reasonForFilterChange')}
@@ -5561,14 +5666,22 @@ export default function HomePage() {
       <Modal 
         opened={showViewModal} 
         onClose={closeViewModal} 
-        title={
-          <Group justify="space-between" style={{ width: '100%' }}>
-            <Text fw={600}>Asset Details</Text>
-            {selectedAssetForView && (
-              <Group gap="xs">
+        title=""
+        size="xl"
+        centered
+        scrollAreaComponent={ScrollArea.Autosize}
+        withCloseButton={false}
+      >
+        {selectedAssetForView && (
+          <Stack gap="md">
+            {/* Custom Header with Action Buttons */}
+            <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
+              <Text fw={600} size="lg">Asset Details</Text>
+              <Group gap="md">
                 <ActionIcon
+                  variant="light"
                   color="blue"
-                  size="lg"
+                  size="md"
                   onClick={() => {
                     try {
                       closeViewModal();
@@ -5609,40 +5722,41 @@ export default function HomePage() {
                   }}
                   title="Edit Asset"
                 >
-                  <IconEdit size={18} />
+                  <IconEdit size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
-                  color="blue"
-                  size="lg"
+                  color="green"
+                  size="md"
                   onClick={() => {
                     setSelectedAssetAudit(selectedAssetForView.assetBarcode);
                     openAuditModal();
                   }}
                   title="View Audit Log"
                 >
-                  <IconHistory size={18} />
+                  <IconHistory size={16} />
                 </ActionIcon>
                 <ActionIcon
                   variant="light"
                   color="red"
-                  size="lg"
+                  size="md"
                   onClick={() => handleDeleteAsset(selectedAssetForView)}
                   title="Delete Asset"
                 >
-                  <IconTrash size={18} />
+                  <IconTrash size={16} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size="md"
+                  onClick={closeViewModal}
+                  title="Close"
+                >
+                  <IconX size={16} />
                 </ActionIcon>
               </Group>
-            )}
-          </Group>
-        }
-        size="xl"
-        centered
-        scrollAreaComponent={ScrollArea.Autosize}
-        withCloseButton={true}
-      >
-        {selectedAssetForView && (
-          <Stack gap="md">
+            </Group>
+
             {/* Basic Information */}
             <div>
               <Text fw={600} mb="xs" c="blue">Basic Information</Text>

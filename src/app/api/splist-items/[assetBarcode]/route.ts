@@ -188,9 +188,9 @@ export async function POST(
       status: 'active',
       updatedAt: new Date().toISOString(),
       modifiedBy: body.modifiedBy || 'system',
-      reconciliationStatus: 'synced',
+      reconciliationStatus: 'pending',
       reconciliationTimestamp: new Date().toISOString(),
-      reconciledBy: 'web-app'
+      reconciledBy: null
     };
     
     const { PutCommand } = await import('@aws-sdk/lib-dynamodb');

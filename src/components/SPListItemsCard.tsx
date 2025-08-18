@@ -92,12 +92,71 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30');
   const [localData, setLocalData] = useState<SPListData | null>(data || null);
   const [localLoading, setLocalLoading] = useState(loading);
+  const [dateRangePreset, setDateRangePreset] = useState<string>('');
 
-  // Fetch data when period changes
-  const fetchData = async (period: string = selectedPeriod) => {
+  // Helper function to get preset date ranges
+  const getPresetDateRange = (preset: string): { startDate: string; endDate: string } | null => {
+    const today = new Date();
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+    switch (preset) {
+      case 'today':
+        return { startDate: formatDate(today), endDate: formatDate(today) };
+      case 'yesterday': {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return { startDate: formatDate(yesterday), endDate: formatDate(yesterday) };
+      }
+      case 'thisWeek': {
+        // Week starts on Monday
+        const startOfWeek = new Date(today);
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Monday start
+        startOfWeek.setDate(diff);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        return { startDate: formatDate(startOfWeek), endDate: formatDate(endOfWeek) };
+      }
+      case 'lastWeek': {
+        // Last week (Monday to Sunday)
+        const lastWeekStart = new Date(today);
+        const day = today.getDay();
+        const diff = today.getDate() - day + (day === 0 ? -6 : 1) - 7; // Go back one week
+        lastWeekStart.setDate(diff);
+        const lastWeekEnd = new Date(lastWeekStart);
+        lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+        return { startDate: formatDate(lastWeekStart), endDate: formatDate(lastWeekEnd) };
+      }
+      case 'thisMonth': {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        return { startDate: formatDate(startOfMonth), endDate: formatDate(endOfMonth) };
+      }
+      case 'lastMonth': {
+        const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        return { startDate: formatDate(startOfLastMonth), endDate: formatDate(endOfLastMonth) };
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Fetch data when period changes or preset is used
+  const fetchData = async (period: string = selectedPeriod, preset: string = '') => {
     setLocalLoading(true);
     try {
-      const response = await fetch(`/api/splist-items?period=${period}`);
+      let url = `/api/splist-items?period=${period}`;
+      
+      // If preset is selected, add date range parameters
+      if (preset) {
+        const dateRange = getPresetDateRange(preset);
+        if (dateRange) {
+          url = `/api/splist-items?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+        }
+      }
+      
+      const response = await fetch(url);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -131,7 +190,20 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
   const handlePeriodChange = (period: string | null) => {
     if (period) {
       setSelectedPeriod(period);
+      setDateRangePreset(''); // Clear preset when using period
       fetchData(period);
+    }
+  };
+
+  const handlePresetChange = (preset: string | null) => {
+    if (preset) {
+      setDateRangePreset(preset);
+      setSelectedPeriod(''); // Clear period when using preset
+      fetchData('', preset);
+    } else {
+      setDateRangePreset('');
+      setSelectedPeriod('30'); // Reset to default period
+      fetchData('30');
     }
   };
 
@@ -266,6 +338,22 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
           <Group gap="xs">
             <Select
               size="xs"
+              placeholder="Quick Range"
+              value={dateRangePreset}
+              onChange={handlePresetChange}
+              data={[
+                { value: 'today', label: 'Today' },
+                { value: 'yesterday', label: 'Yesterday' },
+                { value: 'thisWeek', label: 'This Week' },
+                { value: 'lastWeek', label: 'Last Week' },
+                { value: 'thisMonth', label: 'This Month' },
+                { value: 'lastMonth', label: 'Last Month' }
+              ]}
+              clearable
+              w={110}
+            />
+            <Select
+              size="xs"
               value={selectedPeriod}
               onChange={handlePeriodChange}
               data={[
@@ -282,7 +370,12 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
                 variant="light" 
                 color="blue" 
                 onClick={() => {
-                  fetchData();
+                  // Use current filters when refreshing
+                  if (dateRangePreset) {
+                    fetchData('', dateRangePreset);
+                  } else {
+                    fetchData(selectedPeriod);
+                  }
                   if (onRefresh) {
                     onRefresh();
                   }

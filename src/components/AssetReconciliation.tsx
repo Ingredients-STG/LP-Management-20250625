@@ -21,9 +21,11 @@ import {
   Alert,
   Checkbox,
   Modal,
-  Grid
+  Grid,
+  Textarea,
+  Box
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { DatePickerInput, DateInput } from '@mantine/dates';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
@@ -37,7 +39,9 @@ import {
   IconCalendar,
   IconInfoCircle,
   IconExclamationMark,
-  IconTrash
+  IconTrash,
+  IconEdit,
+  IconDeviceFloppy
 } from '@tabler/icons-react';
 
 interface SPListItem {
@@ -46,8 +50,10 @@ interface SPListItem {
   FilterInstalledDate: string;
   FilterType?: string;
   AssetBarcode?: string;
+  ReasonForFilterChange?: 'Expired' | 'Remedial' | 'Blocked' | 'Missing' | 'New Installation';
   status?: string;
   updatedAt?: string;
+  createdAt?: string;
   modifiedBy?: string;
   reconciliationStatus?: 'pending' | 'synced' | 'failed';
   reconciliationTimestamp?: string;
@@ -111,6 +117,74 @@ export default function AssetReconciliation() {
   const [showReconciled, setShowReconciled] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [dateRangePreset, setDateRangePreset] = useState<string>('');
+  
+  // Edit functionality state
+  const [editingItem, setEditingItem] = useState<SPListItem | null>(null);
+  const [editModalOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
+  const [saving, setSaving] = useState(false);
+
+  // Helper function to get preset date ranges
+  const getPresetDateRange = (preset: string): [Date, Date] | null => {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+    switch (preset) {
+      case 'today':
+        return [startOfToday, endOfToday];
+      case 'yesterday': {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const startOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+        const endOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
+        return [startOfYesterday, endOfYesterday];
+      }
+      case 'thisWeek': {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay()); // Go to Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setHours(23, 59, 59, 999);
+        return [startOfWeek, endOfWeek];
+      }
+      case 'lastWeek': {
+        const lastWeekStart = new Date(today);
+        lastWeekStart.setDate(today.getDate() - today.getDay() - 7); // Go to last Sunday
+        lastWeekStart.setHours(0, 0, 0, 0);
+        const lastWeekEnd = new Date(lastWeekStart);
+        lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
+        lastWeekEnd.setHours(23, 59, 59, 999);
+        return [lastWeekStart, lastWeekEnd];
+      }
+      case 'thisMonth': {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+        return [startOfMonth, endOfMonth];
+      }
+      case 'lastMonth': {
+        const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+        return [startOfLastMonth, endOfLastMonth];
+      }
+      default:
+        return null;
+    }
+  };
+
+  // Handle preset selection
+  const handlePresetChange = (preset: string) => {
+    setDateRangePreset(preset);
+    if (preset === '') {
+      setDateRange([null, null]);
+    } else {
+      const range = getPresetDateRange(preset);
+      if (range) {
+        setDateRange(range);
+      }
+    }
+  };
 
   // Fetch data on component mount
   useEffect(() => {
@@ -210,6 +284,31 @@ export default function AssetReconciliation() {
           return false;
         }
         return true;
+      })
+      .sort((a, b) => {
+        // Sort by creation date/time (latest first)
+        // Use updatedAt if available, otherwise use id (which contains timestamp)
+        const getTimestamp = (item: SPListItem): number => {
+          if (item.updatedAt) {
+            return new Date(item.updatedAt).getTime();
+          }
+          // Extract timestamp from id if it follows the pattern "splist-{timestamp}-{random}"
+          if (item.id && item.id.startsWith('splist-')) {
+            const parts = item.id.split('-');
+            if (parts.length >= 2) {
+              const timestamp = parseInt(parts[1]);
+              if (!isNaN(timestamp)) {
+                return timestamp;
+              }
+            }
+          }
+          // Fallback to id comparison
+          return parseInt(item.id) || 0;
+        };
+        
+        const timeA = getTimestamp(a);
+        const timeB = getTimestamp(b);
+        return timeB - timeA; // Descending order (latest first)
       })
       .map(spItem => {
         // Try to find matching asset by barcode first
@@ -424,6 +523,67 @@ export default function AssetReconciliation() {
       setSelectedItems(new Set(reconcilableIds));
     } else {
       setSelectedItems(new Set());
+    }
+  };
+
+  // Edit functionality handlers
+  const handleEditItem = (item: SPListItem) => {
+    setEditingItem({ ...item });
+    openEditModal();
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingItem) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch('/api/splist-items', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editingItem),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update SPListItem');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update SPListItem');
+      }
+
+      // Update local state
+      setSPListItems(prev => 
+        prev.map(item => item.id === editingItem.id ? editingItem : item)
+      );
+
+      // Refresh reconciliation items
+      const updatedAssets = assets;
+      const updatedSPListItems = spListItems.map(item => 
+        item.id === editingItem.id ? editingItem : item
+      );
+      createReconciliationItems(updatedSPListItems, updatedAssets);
+
+      notifications.show({
+        title: 'Success',
+        message: 'SPListItem updated successfully',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      closeEditModal();
+    } catch (error) {
+      console.error('Error updating SPListItem:', error);
+      notifications.show({
+        title: 'Error',
+        message: `Failed to update record: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -960,15 +1120,96 @@ export default function AssetReconciliation() {
           </Button>
         </Group>
 
-        {/* Date Range Filter */}
+        {/* Date Range Filter - Mobile Optimized */}
         <Card withBorder p="md">
-          <Group>
+          {/* Mobile Layout */}
+          <Box hiddenFrom="md">
+            <Stack gap="md">
+              <Select
+                label="Quick Date Range"
+                placeholder="Select preset range"
+                value={dateRangePreset}
+                onChange={(value) => handlePresetChange(value || '')}
+                data={[
+                  { value: '', label: 'Custom Range' },
+                  { value: 'today', label: 'Today' },
+                  { value: 'yesterday', label: 'Yesterday' },
+                  { value: 'thisWeek', label: 'This Week' },
+                  { value: 'lastWeek', label: 'Last Week' },
+                  { value: 'thisMonth', label: 'This Month' },
+                  { value: 'lastMonth', label: 'Last Month' }
+                ]}
+                clearable
+                size="md"
+              />
+              <DatePickerInput
+                type="range"
+                label="Filter Date Range"
+                placeholder="Select date range for filter installation"
+                value={dateRange}
+                onChange={(newRange) => {
+                  setDateRange(newRange);
+                  // Clear preset selection when manually changing dates
+                  if (dateRangePreset !== '') {
+                    setDateRangePreset('');
+                  }
+                }}
+                clearable
+                size="md"
+              />
+              <Checkbox
+                label="Show already reconciled items"
+                checked={showReconciled}
+                onChange={(event) => {
+                  setShowReconciled(event.currentTarget.checked);
+                  // Refresh data to apply filter
+                  createReconciliationItems(spListItems, assets);
+                }}
+                size="md"
+              />
+              <Button 
+                leftSection={<IconRefresh size={16} />} 
+                onClick={fetchData}
+                variant="filled"
+                size="md"
+                fullWidth
+              >
+                Refresh Data
+              </Button>
+            </Stack>
+          </Box>
+
+          {/* Desktop Layout */}
+          <Group align="end" wrap="wrap" visibleFrom="md">
+            <Select
+              label="Quick Date Range"
+              placeholder="Select preset range"
+              value={dateRangePreset}
+              onChange={(value) => handlePresetChange(value || '')}
+              data={[
+                { value: '', label: 'Custom Range' },
+                { value: 'today', label: 'Today' },
+                { value: 'yesterday', label: 'Yesterday' },
+                { value: 'thisWeek', label: 'This Week' },
+                { value: 'lastWeek', label: 'Last Week' },
+                { value: 'thisMonth', label: 'This Month' },
+                { value: 'lastMonth', label: 'Last Month' }
+              ]}
+              clearable
+              style={{ minWidth: 200 }}
+            />
             <DatePickerInput
               type="range"
               label="Filter Date Range"
               placeholder="Select date range for filter installation"
               value={dateRange}
-              onChange={setDateRange}
+              onChange={(newRange) => {
+                setDateRange(newRange);
+                // Clear preset selection when manually changing dates
+                if (dateRangePreset !== '') {
+                  setDateRangePreset('');
+                }
+              }}
               clearable
               style={{ minWidth: 300 }}
             />
@@ -980,13 +1221,11 @@ export default function AssetReconciliation() {
                 // Refresh data to apply filter
                 createReconciliationItems(spListItems, assets);
               }}
-              mt="xl"
             />
             <Button 
               leftSection={<IconRefresh size={16} />} 
               onClick={fetchData}
               variant="outline"
-              mt="xl"
             >
               Refresh
             </Button>
@@ -1044,30 +1283,45 @@ export default function AssetReconciliation() {
           <Progress value={stats.total > 0 ? (stats.synced / stats.total) * 100 : 0} color="teal" />
         </Card>
 
-        {/* Filters */}
+        {/* Filters - Mobile Optimized */}
         <Card withBorder p="md">
-          <Group>
+          <Stack gap="md">
+            {/* Search - Full width on all devices */}
             <TextInput
               placeholder="Search by location, barcode, or asset name..."
               leftSection={<IconSearch size={16} />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.currentTarget.value)}
-              style={{ flex: 1 }}
+              size="sm"
             />
-            <Select
-              placeholder="Filter by status"
-              value={selectedStatus}
-              onChange={(value) => setSelectedStatus(value || 'all')}
-              data={[
-                { value: 'all', label: 'All Status' },
-                { value: 'confirmed', label: 'Ready to Confirm' },
-                { value: 'mismatch', label: 'Needs Review' },
-                { value: 'not_found', label: 'Asset Not Found' },
-                { value: 'pending', label: 'Pending' },
-              ]}
-              w={200}
-            />
-          </Group>
+            
+            {/* Filters Row - Responsive */}
+            <Group gap="xs" grow>
+              <Select
+                placeholder="Filter by status"
+                value={selectedStatus}
+                onChange={(value) => setSelectedStatus(value || 'all')}
+                data={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'confirmed', label: 'Ready to Confirm' },
+                  { value: 'mismatch', label: 'Needs Review' },
+                  { value: 'not_found', label: 'Asset Not Found' },
+                  { value: 'pending', label: 'Pending' },
+                ]}
+                size="sm"
+              />
+              <Checkbox
+                label="Show reconciled"
+                checked={showReconciled}
+                onChange={(event) => {
+                  setShowReconciled(event.currentTarget.checked);
+                  // Refresh data to apply filter
+                  createReconciliationItems(spListItems, assets);
+                }}
+                size="sm"
+              />
+            </Group>
+          </Stack>
         </Card>
 
         {/* Bulk Actions */}
@@ -1101,7 +1355,9 @@ export default function AssetReconciliation() {
 
         {/* Reconciliation Table */}
         <Card withBorder>
-          <Table striped highlightOnHover>
+          {/* Desktop Table View */}
+          <Box visibleFrom="md">
+            <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>
@@ -1135,6 +1391,8 @@ export default function AssetReconciliation() {
                 </Table.Th>
                 <Table.Th>SPList Location</Table.Th>
                 <Table.Th>Filter Date</Table.Th>
+                <Table.Th>Reason</Table.Th>
+                <Table.Th>Created Date</Table.Th>
                 <Table.Th>SPList Barcode</Table.Th>
                 <Table.Th>Asset Barcode</Table.Th>
                 <Table.Th>Asset Location</Table.Th>
@@ -1146,7 +1404,7 @@ export default function AssetReconciliation() {
             <Table.Tbody>
               {filteredItems.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={9} ta="center" py="xl">
+                  <Table.Td colSpan={11} ta="center" py="xl">
                     <Text c="dimmed">No reconciliation items found</Text>
                   </Table.Td>
                 </Table.Tr>
@@ -1195,6 +1453,38 @@ export default function AssetReconciliation() {
                         }
                       </Text>
                     </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      size="sm"
+                      variant="light"
+                      color={
+                        item.spListItem.ReasonForFilterChange === 'Expired' ? 'red' :
+                        item.spListItem.ReasonForFilterChange === 'Remedial' ? 'orange' :
+                        item.spListItem.ReasonForFilterChange === 'Blocked' ? 'yellow' :
+                        item.spListItem.ReasonForFilterChange === 'Missing' ? 'purple' :
+                        item.spListItem.ReasonForFilterChange === 'New Installation' ? 'green' :
+                        'gray'
+                      }
+                    >
+                      {item.spListItem.ReasonForFilterChange || 'Not Set'}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {item.spListItem.createdAt || item.spListItem.updatedAt ? 
+                        (() => {
+                          const dateStr = item.spListItem.createdAt || item.spListItem.updatedAt || '';
+                          const date = new Date(dateStr);
+                          return !isNaN(date.getTime()) ? 
+                            date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString('en-GB', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            }) : 'Unknown';
+                        })() : 
+                        'Unknown'
+                      }
+                    </Text>
                   </Table.Td>
                   <Table.Td>
                     <TextInput
@@ -1309,6 +1599,20 @@ export default function AssetReconciliation() {
                         <Text size="xs" c="dimmed">No asset found</Text>
                       )}
                       
+                      {/* Edit button - available for non-synced items */}
+                      {item.spListItem.reconciliationStatus !== 'synced' && (
+                        <Tooltip label="Edit this SPListItem record">
+                          <ActionIcon
+                            size="sm"
+                            color="blue"
+                            variant="light"
+                            onClick={() => handleEditItem(item.spListItem)}
+                          >
+                            <IconEdit size={14} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                      
                       {/* Delete button - always available */}
                       <Tooltip label="Delete this SPListItem record">
                         <ActionIcon
@@ -1327,6 +1631,209 @@ export default function AssetReconciliation() {
               )}
             </Table.Tbody>
           </Table>
+          </Box>
+
+          {/* Mobile Card View - Enhanced */}
+          <Box hiddenFrom="md">
+            <Stack gap="md">
+              {filteredItems.length === 0 ? (
+                <Paper p="xl" ta="center" withBorder>
+                  <Stack align="center" gap="md">
+                    <IconFilter size={48} color="gray" />
+                    <div>
+                      <Text fw={600} size="lg" c="dimmed">No reconciliation items found</Text>
+                      <Text size="sm" c="dimmed">Try adjusting your filter criteria</Text>
+                    </div>
+                  </Stack>
+                </Paper>
+              ) : (
+                filteredItems.map((item) => (
+                  <Card 
+                    key={item.spListItem.id} 
+                    withBorder 
+                    p="md" 
+                    radius="lg" 
+                    shadow="sm"
+                    style={{ 
+                      backgroundColor: item.spListItem.reconciliationStatus === 'synced' ? 
+                        'rgba(0, 255, 0, 0.02)' : 
+                        item.matchedAsset ? 'rgba(0, 0, 255, 0.02)' : 'rgba(255, 0, 0, 0.02)',
+                      borderLeft: `4px solid ${
+                        item.spListItem.reconciliationStatus === 'synced' ? 'green' : 
+                        item.matchedAsset ? 'blue' : 'red'
+                      }`
+                    }}
+                  >
+                    <Stack gap="sm">
+                      {/* Header with location and status */}
+                      <Group justify="space-between" align="center">
+                        <div>
+                          <Text size="lg" fw={700} c="blue">
+                            {item.spListItem.Location || 'Unknown Location'}
+                          </Text>
+                          <Text size="sm" c="dimmed" fw={500}>
+                            Created: {item.spListItem.createdAt ? 
+                              new Date(item.spListItem.createdAt).toLocaleDateString('en-GB') + ' ' +
+                              new Date(item.spListItem.createdAt).toLocaleTimeString('en-GB', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              }) : 
+                              (item.spListItem.updatedAt ? 
+                                new Date(item.spListItem.updatedAt).toLocaleDateString('en-GB') + ' ' +
+                                new Date(item.spListItem.updatedAt).toLocaleTimeString('en-GB', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                }) : 
+                                'Unknown'
+                              )
+                            }
+                          </Text>
+                        </div>
+                        <Badge
+                          size="lg"
+                          variant="filled"
+                          color={
+                            item.spListItem.reconciliationStatus === 'synced' ? 'green' : 
+                            item.matchedAsset ? 'blue' : 'red'
+                          }
+                        >
+                          {item.spListItem.reconciliationStatus === 'synced' ? 'SYNCED' : 
+                           item.matchedAsset ? 'MATCHED' : 'UNMATCHED'}
+                        </Badge>
+                      </Group>
+
+                      {/* Reason and Filter Info */}
+                      <Paper p="sm" withBorder radius="md" bg="gray.0">
+                        <Grid gutter="sm">
+                          <Grid.Col span={6}>
+                            <Text size="xs" c="dimmed" fw={600} mb={2}>REASON</Text>
+                            <Badge
+                              size="md"
+                              variant="filled"
+                              color={
+                                item.spListItem.ReasonForFilterChange === 'Expired' ? 'red' :
+                                item.spListItem.ReasonForFilterChange === 'Remedial' ? 'orange' :
+                                item.spListItem.ReasonForFilterChange === 'Blocked' ? 'yellow' :
+                                item.spListItem.ReasonForFilterChange === 'Missing' ? 'purple' :
+                                item.spListItem.ReasonForFilterChange === 'New Installation' ? 'green' :
+                                'gray'
+                              }
+                            >
+                              {item.spListItem.ReasonForFilterChange || 'Not Set'}
+                            </Badge>
+                          </Grid.Col>
+                          <Grid.Col span={6}>
+                            <Text size="xs" c="dimmed" fw={600} mb={2}>FILTER DATE</Text>
+                            <Text size="sm" fw={600}>
+                              {item.spListItem.FilterInstalledDate ? 
+                                (() => {
+                                  const parseDate = (dateStr: string): Date | null => {
+                                    if (!dateStr) return null;
+                                    if (dateStr.includes('/')) {
+                                      const [day, month, year] = dateStr.split('/');
+                                      const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                      return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                                    }
+                                    const parsedDate = new Date(dateStr);
+                                    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                                  };
+                                  const parsedDate = parseDate(item.spListItem.FilterInstalledDate);
+                                  return parsedDate ? parsedDate.toLocaleDateString('en-GB') : 'Invalid';
+                                })() : 
+                                'No date'
+                              }
+                            </Text>
+                          </Grid.Col>
+                        </Grid>
+                      </Paper>
+
+                      {/* Asset Barcode Information */}
+                      <Paper p="sm" withBorder radius="md" bg="blue.0">
+                        <Grid gutter="sm">
+                          <Grid.Col span={6}>
+                            <Text size="xs" c="dimmed" fw={600} mb={2}>SP BARCODE</Text>
+                            <Text size="sm" fw={600} c="blue">
+                              {item.spListItem.AssetBarcode || 'N/A'}
+                            </Text>
+                          </Grid.Col>
+                          <Grid.Col span={6}>
+                            <Text size="xs" c="dimmed" fw={600} mb={2}>MATCHED BARCODE</Text>
+                            <Text size="sm" fw={600} c={item.selectedBarcode ? 'green' : 'red'}>
+                              {item.selectedBarcode || 'No match'}
+                            </Text>
+                          </Grid.Col>
+                        </Grid>
+                      </Paper>
+
+                      {/* Filter Type Information */}
+                      {item.spListItem.FilterType && (
+                        <Paper p="sm" withBorder radius="md" bg="gray.1">
+                          <Text size="xs" c="dimmed" fw={600} mb={2}>FILTER TYPE</Text>
+                          <Text size="sm" fw={600}>{item.spListItem.FilterType}</Text>
+                        </Paper>
+                      )}
+
+                      {/* Action Section */}
+                      <Group justify="space-between" align="center" mt="sm">
+                        <Group gap="xs">
+                          <Checkbox
+                            size="md"
+                            checked={selectedItems.has(item.spListItem.id)}
+                            onChange={(event) => handleSelectItem(item.spListItem.id, event.currentTarget.checked)}
+                            disabled={
+                              !item.matchedAsset || 
+                              item.spListItem.reconciliationStatus === 'synced' ||
+                              !item.selectedBarcode
+                            }
+                            label={
+                              <Text size="sm" fw={500}>
+                                {selectedItems.has(item.spListItem.id) ? 'Selected' : 'Select for sync'}
+                              </Text>
+                            }
+                          />
+                        </Group>
+                        
+                        {/* Mobile Action Buttons */}
+                        <Group gap="sm">
+                          {item.spListItem.reconciliationStatus !== 'synced' && (
+                            <ActionIcon
+                              size="md"
+                              color="blue"
+                              variant="filled"
+                              onClick={() => handleEditItem(item.spListItem)}
+                              title="Edit Item"
+                            >
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                          )}
+                          <ActionIcon
+                            size="md"
+                            color="red"
+                            variant="filled"
+                            onClick={() => handleDeleteItem(item)}
+                            title="Delete Item"
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                          {item.matchedAsset && item.selectedBarcode && item.spListItem.reconciliationStatus !== 'synced' && (
+                            <ActionIcon
+                              size="md"
+                              color="green"
+                              variant="filled"
+                              onClick={() => handleForceSync(item)}
+                              title="Force Sync"
+                            >
+                              <IconRefresh size={16} />
+                            </ActionIcon>
+                          )}
+                        </Group>
+                      </Group>
+                    </Stack>
+                  </Card>
+                ))
+              )}
+            </Stack>
+          </Box>
 
 
         </Card>
@@ -1449,6 +1956,96 @@ export default function AssetReconciliation() {
                   leftSection={<IconTrash size={16} />}
                 >
                   Delete Record
+                </Button>
+              </Group>
+            </Stack>
+          )}
+        </Modal>
+
+        {/* Edit SPListItem Modal */}
+        <Modal
+          opened={editModalOpened}
+          onClose={closeEditModal}
+          title="Edit SPListItem Record"
+          size="lg"
+        >
+          {editingItem && (
+            <Stack gap="md">
+              <Grid>
+                <Grid.Col span={6}>
+                  <TextInput
+                    label="Location"
+                    value={editingItem.Location || ''}
+                    onChange={(e) => setEditingItem(prev => prev ? { ...prev, Location: e.currentTarget.value } : null)}
+                    placeholder="Enter location"
+                    required
+                  />
+                </Grid.Col>
+                <Grid.Col span={6}>
+                  <TextInput
+                    label="Asset Barcode"
+                    value={editingItem.AssetBarcode || ''}
+                    onChange={(e) => setEditingItem(prev => prev ? { ...prev, AssetBarcode: e.currentTarget.value } : null)}
+                    placeholder="Enter asset barcode"
+                    leftSection={<IconBarcode size={16} />}
+                  />
+                </Grid.Col>
+              </Grid>
+
+              <Grid>
+                <Grid.Col span={6}>
+                  <DateInput
+                    label="Filter Installed Date"
+                    value={editingItem.FilterInstalledDate ? new Date(editingItem.FilterInstalledDate) : null}
+                    onChange={(date) => {
+                      if (date) {
+                        setEditingItem(prev => prev ? { 
+                          ...prev, 
+                          FilterInstalledDate: date.toISOString().split('T')[0] 
+                        } : null);
+                      }
+                    }}
+                    placeholder="Select date"
+                    leftSection={<IconCalendar size={16} />}
+                  />
+                </Grid.Col>
+                <Grid.Col span={6}>
+                  <Select
+                    label="Reason for Filter Change"
+                    value={editingItem.ReasonForFilterChange || ''}
+                    onChange={(value) => setEditingItem(prev => prev ? { 
+                      ...prev, 
+                      ReasonForFilterChange: value as 'Expired' | 'Remedial' | 'Blocked' | 'Missing' | 'New Installation'
+                    } : null)}
+                    data={[
+                      { value: 'Expired', label: 'Expired' },
+                      { value: 'Remedial', label: 'Remedial' },
+                      { value: 'Blocked', label: 'Blocked' },
+                      { value: 'Missing', label: 'Missing' },
+                      { value: 'New Installation', label: 'New Installation' }
+                    ]}
+                    placeholder="Select reason"
+                  />
+                </Grid.Col>
+              </Grid>
+
+              <TextInput
+                label="Filter Type"
+                value={editingItem.FilterType || ''}
+                onChange={(e) => setEditingItem(prev => prev ? { ...prev, FilterType: e.currentTarget.value } : null)}
+                placeholder="Enter filter type"
+              />
+
+              <Group justify="flex-end">
+                <Button variant="outline" onClick={closeEditModal}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveEdit}
+                  loading={saving}
+                  leftSection={<IconDeviceFloppy size={16} />}
+                >
+                  Save Changes
                 </Button>
               </Group>
             </Stack>
