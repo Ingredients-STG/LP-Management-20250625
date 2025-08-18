@@ -1999,7 +1999,7 @@ export default function AssetReconciliation() {
                     label="Filter Installed Date"
                     value={editingItem.FilterInstalledDate ? new Date(editingItem.FilterInstalledDate) : null}
                     onChange={(date) => {
-                      if (date) {
+                      if (date && date instanceof Date && !isNaN(date.getTime())) {
                         setEditingItem(prev => prev ? { 
                           ...prev, 
                           FilterInstalledDate: date.toISOString().split('T')[0] 
