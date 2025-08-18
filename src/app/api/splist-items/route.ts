@@ -429,54 +429,134 @@ function generateMonthlyData(items: SPListItem[], startDate: Date, endDate: Date
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// PUT /api/splist-items - Update reconciliation status
+// PUT /api/splist-items - Update SPListItem record (full update or reconciliation status only)
 export async function PUT(request: Request) {
   try {
-    console.log('Updating SPListItem reconciliation status...');
-    
     const body = await request.json();
-    const { id, reconciliationStatus, reconciledBy } = body;
     
-    if (!id || !reconciliationStatus) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: id, reconciliationStatus',
-          timestamp: new Date().toISOString()
-        },
-        { status: 400 }
-      );
-    }
+    // Check if this is a full record update (has more fields) or just reconciliation status update
+    const isFullUpdate = body.Location || body.AssetBarcode || body.FilterInstalledDate || body.FilterType || body.ReasonForFilterChange;
     
-    // Ensure table exists
-    await createTableIfNotExists();
-    
-    const now = new Date().toISOString();
-    
-    const updateCommand = new UpdateCommand({
-      TableName: SPLIST_TABLE_NAME,
-      Key: { id },
-      UpdateExpression: 'SET reconciliationStatus = :status, reconciliationTimestamp = :timestamp, reconciledBy = :reconciledBy, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':status': reconciliationStatus,
-        ':timestamp': now,
-        ':reconciledBy': reconciledBy || 'System',
+    if (isFullUpdate) {
+      console.log('Updating SPListItem record (full update)...');
+      
+      const { id, Location, AssetBarcode, FilterInstalledDate, FilterType, ReasonForFilterChange } = body;
+      
+      if (!id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Missing required field: id',
+            timestamp: new Date().toISOString()
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Ensure table exists
+      await createTableIfNotExists();
+      
+      const now = new Date().toISOString();
+      
+      // Build update expression dynamically
+      const updateExpressions = ['updatedAt = :updatedAt'];
+      const expressionAttributeValues: any = {
         ':updatedAt': now
-      },
-      ReturnValues: 'ALL_NEW'
-    });
-    
-    const result = await dynamodb.send(updateCommand);
-    
-    console.log('SPListItem reconciliation status updated successfully');
-    
-    return NextResponse.json({
-      success: true,
-      data: result.Attributes,
-      timestamp: new Date().toISOString()
-    });
+      };
+      const expressionAttributeNames: any = {};
+      
+      if (Location !== undefined) {
+        updateExpressions.push('#location = :location');
+        expressionAttributeValues[':location'] = Location;
+        expressionAttributeNames['#location'] = 'Location'; // Location is a reserved keyword
+      }
+      
+      if (AssetBarcode !== undefined) {
+        updateExpressions.push('AssetBarcode = :assetBarcode');
+        expressionAttributeValues[':assetBarcode'] = AssetBarcode;
+      }
+      
+      if (FilterInstalledDate !== undefined) {
+        updateExpressions.push('FilterInstalledDate = :filterInstalledDate');
+        expressionAttributeValues[':filterInstalledDate'] = FilterInstalledDate;
+      }
+      
+      if (FilterType !== undefined) {
+        updateExpressions.push('FilterType = :filterType');
+        expressionAttributeValues[':filterType'] = FilterType;
+      }
+      
+      if (ReasonForFilterChange !== undefined) {
+        updateExpressions.push('ReasonForFilterChange = :reasonForFilterChange');
+        expressionAttributeValues[':reasonForFilterChange'] = ReasonForFilterChange;
+      }
+      
+      const updateCommand = new UpdateCommand({
+        TableName: SPLIST_TABLE_NAME,
+        Key: { id },
+        UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ...(Object.keys(expressionAttributeNames).length > 0 && { ExpressionAttributeNames: expressionAttributeNames }),
+        ReturnValues: 'ALL_NEW'
+      });
+      
+      const result = await dynamodb.send(updateCommand);
+      
+      console.log('SPListItem record updated successfully');
+      
+      return NextResponse.json({
+        success: true,
+        data: result.Attributes,
+        timestamp: new Date().toISOString()
+      });
+      
+    } else {
+      // Legacy reconciliation status update
+      console.log('Updating SPListItem reconciliation status...');
+      
+      const { id, reconciliationStatus, reconciledBy } = body;
+      
+      if (!id || !reconciliationStatus) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Missing required fields: id, reconciliationStatus',
+            timestamp: new Date().toISOString()
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Ensure table exists
+      await createTableIfNotExists();
+      
+      const now = new Date().toISOString();
+      
+      const updateCommand = new UpdateCommand({
+        TableName: SPLIST_TABLE_NAME,
+        Key: { id },
+        UpdateExpression: 'SET reconciliationStatus = :status, reconciliationTimestamp = :timestamp, reconciledBy = :reconciledBy, updatedAt = :updatedAt',
+        ExpressionAttributeValues: {
+          ':status': reconciliationStatus,
+          ':timestamp': now,
+          ':reconciledBy': reconciledBy || 'System',
+          ':updatedAt': now
+        },
+        ReturnValues: 'ALL_NEW'
+      });
+      
+      const result = await dynamodb.send(updateCommand);
+      
+      console.log('SPListItem reconciliation status updated successfully');
+      
+      return NextResponse.json({
+        success: true,
+        data: result.Attributes,
+        timestamp: new Date().toISOString()
+      });
+    }
   } catch (error) {
-    console.error('Error updating SPListItem reconciliation status:', error);
+    console.error('Error updating SPListItem:', error);
     
     return NextResponse.json(
       {

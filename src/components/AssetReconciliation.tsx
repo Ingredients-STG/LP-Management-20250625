@@ -124,6 +124,7 @@ export default function AssetReconciliation() {
   const [editingItem, setEditingItem] = useState<SPListItem | null>(null);
   const [editModalOpened, { open: openEditModal, close: closeEditModal }] = useDisclosure(false);
   const [saving, setSaving] = useState(false);
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
 
   // Helper function to get preset date ranges
   const getPresetDateRange = (preset: string): [Date, Date] | null => {
@@ -187,9 +188,26 @@ export default function AssetReconciliation() {
     }
   };
 
+  // Fetch filter types
+  const fetchFilterTypes = async () => {
+    try {
+      const response = await fetch('/api/filter-types');
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          const uniqueFilterTypes = [...new Set(result.data.filter(Boolean))] as string[];
+          setFilterTypes(uniqueFilterTypes);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching filter types:', error);
+    }
+  };
+
   // Fetch data on component mount
   useEffect(() => {
     fetchData();
+    fetchFilterTypes();
   }, [refreshTrigger]);
 
   // Refetch data when date range changes
@@ -1997,17 +2015,60 @@ export default function AssetReconciliation() {
                 <Grid.Col span={6}>
                   <DateInput
                     label="Filter Installed Date"
-                    value={editingItem.FilterInstalledDate ? new Date(editingItem.FilterInstalledDate) : null}
+                    value={(() => {
+                      if (!editingItem.FilterInstalledDate) return null;
+                      
+                      try {
+                        let dateStr = editingItem.FilterInstalledDate;
+                        
+                        // Handle different date formats
+                        if (dateStr.includes('/')) {
+                          // Handle DD/MM/YYYY format
+                          const [day, month, year] = dateStr.split('/');
+                          const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                          return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                        } else {
+                          // Handle YYYY-MM-DD format or ISO format
+                          const parsedDate = new Date(dateStr + 'T00:00:00'); // Add time to ensure proper parsing
+                          return isNaN(parsedDate.getTime()) ? null : parsedDate;
+                        }
+                      } catch (error) {
+                        console.error('Error parsing date:', error);
+                        return null;
+                      }
+                    })()}
                     onChange={(date) => {
-                      if (date && date instanceof Date && !isNaN(date.getTime())) {
+                      if (date) {
+                        let isoDate: string;
+                        
+                        if (date instanceof Date && !isNaN(date.getTime())) {
+                          // Handle Date object
+                          isoDate = date.toISOString().split('T')[0];
+                        } else if (typeof date === 'string') {
+                          // Handle date string (YYYY-MM-DD format)
+                          isoDate = date;
+                        } else {
+                          setEditingItem(prev => prev ? { 
+                            ...prev, 
+                            FilterInstalledDate: '' 
+                          } : null);
+                          return;
+                        }
+                        
                         setEditingItem(prev => prev ? { 
                           ...prev, 
-                          FilterInstalledDate: date.toISOString().split('T')[0] 
+                          FilterInstalledDate: isoDate 
+                        } : null);
+                      } else {
+                        setEditingItem(prev => prev ? { 
+                          ...prev, 
+                          FilterInstalledDate: '' 
                         } : null);
                       }
                     }}
                     placeholder="Select date"
                     leftSection={<IconCalendar size={16} />}
+                    clearable
                   />
                 </Grid.Col>
                 <Grid.Col span={6}>
@@ -2030,11 +2091,14 @@ export default function AssetReconciliation() {
                 </Grid.Col>
               </Grid>
 
-              <TextInput
+              <Select
                 label="Filter Type"
                 value={editingItem.FilterType || ''}
-                onChange={(e) => setEditingItem(prev => prev ? { ...prev, FilterType: e.currentTarget.value } : null)}
-                placeholder="Enter filter type"
+                onChange={(value) => setEditingItem(prev => prev ? { ...prev, FilterType: value || '' } : null)}
+                data={filterTypes.map(type => ({ value: type, label: type }))}
+                placeholder="Select filter type"
+                searchable
+                clearable
               />
 
               <Group justify="flex-end">
