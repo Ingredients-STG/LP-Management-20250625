@@ -41,7 +41,8 @@ import {
   IconExclamationMark,
   IconTrash,
   IconEdit,
-  IconDeviceFloppy
+  IconDeviceFloppy,
+  IconFilter
 } from '@tabler/icons-react';
 
 interface SPListItem {
