@@ -1952,8 +1952,10 @@ export default function HomePage() {
         (sanitizedValues.reasonForFilterChange && sanitizedValues.reasonForFilterChange !== '')
       );
 
-      // Sync to SPListItems only when Filter Installed On field has a value
-      const shouldSyncToSPList = updateData.filterInstalledOn && 
+      // Sync to SPListItems only when Filter Installed On field has actually changed
+      const filterInstalledOnChanged = selectedAssetForView.filterInstalledOn !== updateData.filterInstalledOn;
+      const shouldSyncToSPList = filterInstalledOnChanged && 
+                                 updateData.filterInstalledOn && 
                                  updateData.filterInstalledOn.trim() !== '' && 
                                  result.data.assetBarcode;
 
@@ -2610,7 +2612,7 @@ export default function HomePage() {
         {/* Filter Expiration Statistics */}
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Title order={4} mb="md">Filter Expiration Overview</Title>
-          <Grid gutter="md">
+          <Grid gutter="md" justify="center" align="stretch">
             {(() => {
               const now = new Date();
               const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -2824,9 +2826,9 @@ export default function HomePage() {
         </Grid>
 
         {/* Charts Row 1 - 2 Columns */}
-        <Grid>
+        <Grid justify="center" align="stretch">
           <Grid.Col span={{ base: 12, md: 6 }}>
-            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+            <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card" style={{ marginLeft: '1rem' }}>
               <Title order={4} mb="md">Filters to be Removed (Total: {(() => {
                 const activeAssets = assets.filter(a => a.status === 'ACTIVE' || a.status === 'MAINTENANCE');
                 const filtersToRemove = activeAssets.filter(a => {
@@ -5669,13 +5671,22 @@ export default function HomePage() {
         title=""
         size="xl"
         centered
-        scrollAreaComponent={ScrollArea.Autosize}
         withCloseButton={false}
+        styles={{
+          content: {
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          },
+          body: {
+            maxHeight: 'calc(90vh - 60px)',
+            overflowY: 'auto'
+          }
+        }}
       >
         {selectedAssetForView && (
           <Stack gap="md">
-            {/* Custom Header with Action Buttons */}
-            <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
+              {/* Custom Header with Action Buttons */}
+              <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
               <Text fw={600} size="lg">Asset Details</Text>
               <Group gap="md">
                 <ActionIcon

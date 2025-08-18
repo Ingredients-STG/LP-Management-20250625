@@ -1088,7 +1088,7 @@ div.mobile-buttons {
 .dashboard-stats-row {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
   width: 100%;
 }
@@ -1107,9 +1107,13 @@ div.mobile-buttons {
   }
 }
 
+/* Ensure Filter Expiration Overview cards use full width on mobile */
+.dashboard-container .mantine-Card-root .mantine-Grid-root .mantine-Grid-col {
+  width: 100% !important;
+}
+
 .stat-card {
   width: 100%;
-  max-width: 400px;
 }
 
 .asset-action-bar {

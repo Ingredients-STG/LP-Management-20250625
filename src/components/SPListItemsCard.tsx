@@ -388,8 +388,8 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
         </Group>
 
         {/* Key Stats */}
-        <Grid gutter="md">
-          <Grid.Col span={3}>
+        <Grid gutter="md" align="stretch">
+          <Grid.Col span={{ base: 12, xs: 6, sm: 3 }}>
             <Card padding="sm" withBorder>
               <Group gap="xs">
                 <ThemeIcon color="blue" variant="light" size="sm">
@@ -402,7 +402,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
               </Group>
             </Card>
           </Grid.Col>
-          <Grid.Col span={3}>
+          <Grid.Col span={{ base: 12, xs: 6, sm: 3 }}>
             <Card padding="sm" withBorder>
               <Group gap="xs">
                 <ThemeIcon color="green" variant="light" size="sm">
@@ -415,7 +415,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
               </Group>
             </Card>
           </Grid.Col>
-          <Grid.Col span={3}>
+          <Grid.Col span={{ base: 12, xs: 6, sm: 3 }}>
             <Card padding="sm" withBorder>
               <Group gap="xs">
                 <ThemeIcon color="orange" variant="light" size="sm">
@@ -428,7 +428,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
               </Group>
             </Card>
           </Grid.Col>
-          <Grid.Col span={3}>
+          <Grid.Col span={{ base: 12, xs: 6, sm: 3 }}>
             <Card padding="sm" withBorder>
               <Group gap="xs">
                 <ThemeIcon color="purple" variant="light" size="sm">
@@ -496,7 +496,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
         {/* Filter Types and Recent Changes */}
         <Grid gutter="md">
           {/* Filter Types Breakdown */}
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Card padding="sm" withBorder>
               <Title order={6} mb="sm">Filter Types</Title>
               {filterTypeChartData.length > 0 ? (
@@ -517,7 +517,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
           </Grid.Col>
 
           {/* Recent Changes */}
-          <Grid.Col span={6}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <Card padding="sm" withBorder>
               <Title order={6} mb="sm">Recent Changes</Title>
               <ScrollArea h={180}>
