@@ -98,7 +98,9 @@ export async function GET(request: NextRequest) {
       'Filter Type',
       'Need Flushing',
       'Notes',
-      'Augmented Care'
+      'Augmented Care',
+      'Low Usage Asset',
+      'Filter Removed'
     ];
 
     // Create template data
@@ -130,6 +132,8 @@ export async function GET(request: NextRequest) {
         row['Need Flushing'] = formatBooleanForDisplay(asset.needFlushing);
         row['Notes'] = asset.notes || '';
         row['Augmented Care'] = formatBooleanForDisplay(asset.augmentedCare);
+        row['Low Usage Asset'] = formatBooleanForDisplay(asset.lowUsageAsset);
+        row['Filter Removed'] = 'FALSE'; // Default to FALSE, user can change to TRUE if needed
         
         templateData.push(row);
       }
@@ -157,6 +161,8 @@ export async function GET(request: NextRequest) {
       sampleRow['Need Flushing'] = 'FALSE';
       sampleRow['Notes'] = 'Sample notes here';
       sampleRow['Augmented Care'] = 'FALSE';
+      sampleRow['Low Usage Asset'] = 'FALSE';
+      sampleRow['Filter Removed'] = 'FALSE';
       
       templateData.push(sampleRow);
     }

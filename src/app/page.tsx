@@ -126,6 +126,7 @@ interface Asset {
   notes: string;
   reasonForFilterChange?: string;
   augmentedCare: boolean | string;
+  lowUsageAsset: boolean | string;
   attachments?: Array<{
     fileName: string;
     fileType: string;
@@ -274,6 +275,7 @@ export default function HomePage() {
   const [filterNeededFilter, setFilterNeededFilter] = useState<string[]>([]);
   const [filtersOnFilter, setFiltersOnFilter] = useState<string[]>([]);
   const [augmentedCareFilter, setAugmentedCareFilter] = useState<string[]>([]);
+  const [lowUsageAssetFilter, setLowUsageAssetFilter] = useState<string[]>([]);
   const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
   const [filterExpiryStatus, setFilterExpiryStatus] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
@@ -359,6 +361,10 @@ export default function HomePage() {
       const assetAugmentedCare = (typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare?.toString().toLowerCase() === 'yes' || asset.augmentedCare?.toString().toLowerCase() === 'true');
       const matchesAugmentedCare = augmentedCareFilter.length > 0 ? augmentedCareFilter.includes(assetAugmentedCare ? 'Yes' : 'No') : true;
       
+      // Low Usage Asset filter
+      const assetLowUsageAsset = (typeof asset.lowUsageAsset === 'boolean' ? asset.lowUsageAsset : asset.lowUsageAsset?.toString().toLowerCase() === 'yes' || asset.lowUsageAsset?.toString().toLowerCase() === 'true');
+      const matchesLowUsageAsset = lowUsageAssetFilter.length > 0 ? lowUsageAssetFilter.includes(assetLowUsageAsset ? 'Yes' : 'No') : true;
+      
       // Filter Expiry Status filter
       let matchesFilterExpiryStatus = true;
       if (filterExpiryStatus) {
@@ -405,9 +411,9 @@ export default function HomePage() {
         }
       }
       
-      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry && matchesFilterExpiryStatus;
+      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesLowUsageAsset && matchesFilterExpiry && matchesFilterExpiryStatus;
     });
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange, filterExpiryStatus]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, lowUsageAssetFilter, filterExpiryRange, filterExpiryStatus]);
 
   // Optimized pagination with useMemo
   const { totalPages, paginatedAssets } = useMemo(() => {
@@ -1336,6 +1342,7 @@ export default function HomePage() {
       needFlushing: 'Needs Flushing',
       notes: 'Notes',
       augmentedCare: 'Augmented Care',
+      lowUsageAsset: 'Low Usage Asset',
       created: 'Created',
       createdBy: 'Created By',
       modified: 'Modified',
@@ -1479,6 +1486,7 @@ export default function HomePage() {
     reasonForFilterChange: string;
     notes: string;
     augmentedCare: boolean;
+    lowUsageAsset: boolean;
   }>({
     mode: 'uncontrolled',
     initialValues: {
@@ -1503,6 +1511,7 @@ export default function HomePage() {
       reasonForFilterChange: '',
       notes: '',
       augmentedCare: false,
+      lowUsageAsset: false,
     },
     validate: {
       assetBarcode: (value) => {
@@ -1534,7 +1543,7 @@ export default function HomePage() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange, filterExpiryStatus]);
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, lowUsageAssetFilter, filterExpiryRange, filterExpiryStatus]);
 
   // Track previous installed date to prevent infinite loops
   const prevInstalledDateRef = useRef<Date | null>(null);
@@ -2306,6 +2315,7 @@ export default function HomePage() {
         'needFlushing',
         'notes',
         'augmentedCare',
+        'lowUsageAsset',
         'created',
         'createdBy',
         'modified',
@@ -2365,7 +2375,7 @@ export default function HomePage() {
             }
           }
           // Special handling for boolean fields - convert to Yes/No
-          if (field === 'filterNeeded' || field === 'filtersOn' || field === 'needFlushing' || field === 'augmentedCare') {
+          if (field === 'filterNeeded' || field === 'filtersOn' || field === 'needFlushing' || field === 'augmentedCare' || field === 'lowUsageAsset') {
             if (typeof value === 'boolean') {
               return value ? 'Yes' : 'No';
             }
@@ -3369,6 +3379,15 @@ export default function HomePage() {
                       size="sm"
                       styles={{ input: { fontSize: '16px' } }}
                     />
+                    <MultiSelect
+                      placeholder="Low Usage Asset"
+                      data={['Yes', 'No']}
+                      value={lowUsageAssetFilter}
+                      onChange={setLowUsageAssetFilter}
+                      clearable
+                      size="sm"
+                      styles={{ input: { fontSize: '16px' } }}
+                    />
                   </Group>
                   
                   {/* Row 6: Date Range - Full width */}
@@ -3505,6 +3524,15 @@ export default function HomePage() {
                   data={['Yes', 'No']}
                   value={augmentedCareFilter}
                   onChange={setAugmentedCareFilter}
+                  clearable
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                <MultiSelect
+                  placeholder="Low Usage Asset?"
+                  data={['Yes', 'No']}
+                  value={lowUsageAssetFilter}
+                  onChange={setLowUsageAssetFilter}
                   clearable
                 />
               </Grid.Col>
@@ -5035,6 +5063,13 @@ export default function HomePage() {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Checkbox
+                    label="Low Usage Asset"
+                    description="Asset is used infrequently"
+                    {...form.getInputProps('lowUsageAsset', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
                     label="Need Flushing"
                     description="Asset requires flushing"
                     {...form.getInputProps('needFlushing', { type: 'checkbox' })}
@@ -5380,6 +5415,13 @@ export default function HomePage() {
                     label="Augmented Care"
                     description="Requires special care or attention"
                     {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Checkbox
+                    label="Low Usage Asset"
+                    description="Asset is used infrequently"
+                    {...form.getInputProps('lowUsageAsset', { type: 'checkbox' })}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -5767,6 +5809,7 @@ export default function HomePage() {
                         reasonForFilterChange: selectedAssetForView.reasonForFilterChange || '',
                         notes: selectedAssetForView.notes || '',
                         augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
+                        lowUsageAsset: typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset?.toString().toLowerCase() === 'true' || selectedAssetForView.lowUsageAsset?.toString().toLowerCase() === 'yes'),
                       });
                       setAssetFiles([]);
                       openEditModal();
@@ -5852,6 +5895,16 @@ export default function HomePage() {
                     size="sm"
                   >
                     {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Text size="xs" c="dimmed" mb={2}>Low Usage Asset</Text>
+                  <Badge 
+                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'yellow' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
@@ -6440,6 +6493,7 @@ export default function HomePage() {
                       filterExpiryDate: selectedAssetForView.filterExpiryDate ? safeDate(selectedAssetForView.filterExpiryDate) : null,
                       notes: selectedAssetForView.notes || '',
                       augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
+                      lowUsageAsset: typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset?.toString().toLowerCase() === 'true' || selectedAssetForView.lowUsageAsset?.toString().toLowerCase() === 'yes'),
                       needFlushing: typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing?.toString().toLowerCase() === 'true' || selectedAssetForView.needFlushing?.toString().toLowerCase() === 'yes'),
                     });
                     setMobileViewOpen(false);
@@ -6520,6 +6574,16 @@ export default function HomePage() {
                     size="sm"
                   >
                     {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Low Usage Asset</Text>
+                  <Badge 
+                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'yellow' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={12}>
@@ -6955,6 +7019,11 @@ export default function HomePage() {
                   label="Augmented Care"
                   description="Requires special care or attention"
                   {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
+                />
+                <Checkbox
+                  label="Low Usage Asset"
+                  description="Asset is used infrequently"
+                  {...form.getInputProps('lowUsageAsset', { type: 'checkbox' })}
                 />
                 <Checkbox
                   label="Need Flushing"

@@ -84,6 +84,7 @@ interface Asset {
   notes: string;
   reasonForFilterChange?: string;
   augmentedCare: boolean | string;
+  lowUsageAsset: boolean | string;
   created: string;
   createdBy: string;
   modified: string;

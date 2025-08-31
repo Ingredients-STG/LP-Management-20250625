@@ -297,20 +297,26 @@ async function updateAsset(existingAsset: any, newData: any, currentUser: string
       'assetType', 'status', 'primaryIdentifier', 'secondaryIdentifier',
       'wing', 'wingInShort', 'room', 'floor', 'floorInWords', 'roomNo', 'roomName',
       'filterNeeded', 'filtersOn', 'filterExpiryDate', 'filterInstalledOn',
-      'filterType', 'needFlushing', 'notes', 'augmentedCare'
+      'filterType', 'needFlushing', 'notes', 'augmentedCare', 'lowUsageAsset', 'reasonForFilterChange'
     ];
     
     let hasUpdates = false;
     
     for (const field of updatableFields) {
-      if (newData[field] !== undefined && newData[field] !== null && newData[field] !== '') {
-        const attributeName = `#${field}`;
-        const attributeValue = `:${field}`;
+      if (newData[field] !== undefined && newData[field] !== null) {
+        // Allow empty strings for filter-related fields (for filter removal functionality)
+        const isFilterField = ['filterType', 'filterInstalledOn', 'filterExpiryDate', 'reasonForFilterChange'].includes(field);
+        const shouldUpdate = newData[field] !== '' || isFilterField;
         
-        updateExpressions.push(`${attributeName} = ${attributeValue}`);
-        expressionAttributeNames[attributeName] = field;
-        expressionAttributeValues[attributeValue] = newData[field];
-        hasUpdates = true;
+        if (shouldUpdate) {
+          const attributeName = `#${field}`;
+          const attributeValue = `:${field}`;
+          
+          updateExpressions.push(`${attributeName} = ${attributeValue}`);
+          expressionAttributeNames[attributeName] = field;
+          expressionAttributeValues[attributeValue] = newData[field];
+          hasUpdates = true;
+        }
       }
     }
     
@@ -497,7 +503,8 @@ export async function POST(req: NextRequest) {
           'Filter Type': 'filterType',
           'Need Flushing': 'needFlushing',
           'Notes': 'notes',
-          'Augmented Care': 'augmentedCare'
+          'Augmented Care': 'augmentedCare',
+          'Low Usage Asset': 'lowUsageAsset'
         };
         // Process each field
         for (const [csvField, dbField] of Object.entries(fieldMapping)) {
@@ -514,7 +521,7 @@ export async function POST(req: NextRequest) {
               if (dateResult.date) {
                 updateData[dbField] = dateResult.date;
               }
-            } else if (dbField === 'filterNeeded' || dbField === 'filtersOn' || dbField === 'needFlushing' || dbField === 'augmentedCare') {
+            } else if (dbField === 'filterNeeded' || dbField === 'filtersOn' || dbField === 'needFlushing' || dbField === 'augmentedCare' || dbField === 'lowUsageAsset') {
               // Handle boolean fields
               updateData[dbField] = parseBoolean(value);
             } else {
@@ -522,6 +529,18 @@ export async function POST(req: NextRequest) {
               updateData[dbField] = sanitizeField(value, dbField);
             }
           }
+        }
+        
+        // Handle special "Filter Removed" functionality
+        const filterRemovedValue = row['Filter Removed'];
+        if (filterRemovedValue && parseBoolean(filterRemovedValue)) {
+          // Clear all filter-related fields when Filter Removed = TRUE
+          updateData.filterType = '';
+          updateData.filterInstalledOn = '';
+          updateData.filterExpiryDate = '';
+          updateData.filtersOn = false;
+          updateData.reasonForFilterChange = '';
+          console.log(`Row ${rowNum}: Filter removal applied - cleared filter fields`);
         }
         
         console.log(`Row ${rowNum}: Update data prepared:`, updateData);
