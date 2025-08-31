@@ -6653,6 +6653,101 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* File Upload Section */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="sm" c="dark">Upload Files</Text>
+              <Text size="sm" c="dimmed" mb="md">
+                Upload documents, images, or other files related to this asset.
+              </Text>
+              
+              <FileInput
+                label="Choose Files"
+                placeholder="Select files to upload"
+                multiple
+                value={assetFiles}
+                onChange={setAssetFiles}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                leftSection={<IconUpload size={16} />}
+                description="PDF, DOC, DOCX, JPG, PNG, GIF, TXT"
+                style={{ marginBottom: '16px' }}
+              />
+              
+              {assetFiles.length > 0 && (
+                <div>
+                  <Text size="sm" fw={500} mb="sm">Selected Files:</Text>
+                  <Stack gap="xs">
+                    {assetFiles.map((file, index) => (
+                      <Group key={index} justify="space-between" p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
+                        <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                          <IconPaperclip size={14} />
+                          <Text size="sm" truncate style={{ flex: 1 }}>{file.name}</Text>
+                          <Text size="xs" c="dimmed">({Math.round(file.size / 1024)} KB)</Text>
+                        </Group>
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="red"
+                          onClick={() => {
+                            const newFiles = assetFiles.filter((_, i) => i !== index);
+                            setAssetFiles(newFiles);
+                          }}
+                          title="Remove file"
+                        >
+                          <IconX size={14} />
+                        </ActionIcon>
+                      </Group>
+                    ))}
+                  </Stack>
+                  
+                  <Button
+                    leftSection={<IconUpload size={16} />}
+                    loading={isUploadingFile}
+                    onClick={async () => {
+                      if (assetFiles.length > 0 && selectedAssetForView?.id) {
+                        setIsUploadingFile(true);
+                        try {
+                          for (const file of assetFiles) {
+                            await handleFileUpload(file, selectedAssetForView.id);
+                          }
+                          setAssetFiles([]);
+                          // Refresh the asset data to show new attachments
+                          const updatedAsset = assets.find(a => a.id === selectedAssetForView.id);
+                          if (updatedAsset) {
+                            setSelectedAssetForView(updatedAsset);
+                          }
+                          notifications.show({
+                            title: 'Success',
+                            message: 'Files uploaded successfully',
+                            color: 'green',
+                            icon: <IconCheck size={16} />,
+                          });
+                        } catch (error) {
+                          console.error('Upload error:', error);
+                          notifications.show({
+                            title: 'Error',
+                            message: 'Failed to upload files',
+                            color: 'red',
+                            icon: <IconX size={16} />,
+                          });
+                        } finally {
+                          setIsUploadingFile(false);
+                        }
+                      }
+                    }}
+                    style={{ marginTop: '16px', width: '100%', minHeight: '48px' }}
+                    disabled={assetFiles.length === 0}
+                  >
+                    Upload Files
+                  </Button>
+                </div>
+              )}
+            </div>
+
 
           </div>
         </div>
