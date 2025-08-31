@@ -1,0 +1,17 @@
+<svg width="400" height="100" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="100" fill="white"/>
+  
+  <!-- St George's Text (Large, Bold, Black) -->
+  <text x="20" y="40" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#000000">St George's</text>
+  
+  <!-- NHS Blue Box (positioned to the right) -->
+  <rect x="320" y="8" width="70" height="35" fill="#005EB8"/>
+  <text x="355" y="32" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle">NHS</text>
+  
+  <!-- University Hospitals Text (Large, Bold, Black) -->
+  <text x="20" y="75" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#000000">University Hospitals</text>
+  
+  <!-- NHS Foundation Trust Text (Blue) -->
+  <text x="20" y="95" font-family="Arial, sans-serif" font-size="16" font-weight="600" fill="#005EB8">NHS Foundation Trust</text>
+</svg>

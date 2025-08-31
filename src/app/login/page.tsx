@@ -32,6 +32,7 @@ import {
   IconAlertCircle,
   IconShield
 } from '@tabler/icons-react';
+import Image from 'next/image';
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string | null>('login');
@@ -194,17 +195,31 @@ export default function AuthPage() {
       <Container size={480} my={40}>
         {/* Header */}
         <Group justify="center" mb={30}>
-          <ThemeIcon color="blue" size={60} radius="md">
-            <IconDroplet size={32} />
-          </ThemeIcon>
+          <Paper 
+            withBorder 
+            p={15} 
+            radius="md" 
+            style={{ 
+              backgroundColor: 'white',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            }}
+          >
+            <Image
+              src="/st-georges-nhs-logo.svg"
+              alt="St Georges NHS Logo"
+              width={300}
+              height={75}
+              style={{ display: 'block' }}
+            />
+          </Paper>
         </Group>
         
-        <Title ta="center" mb={8} style={{ color: '#1971c2', fontSize: '28px', fontWeight: 700 }}>
-          LP Management
+        <Title ta="center" mb={8} style={{ color: '#005EB8', fontSize: '24px', fontWeight: 600 }}>
+          Water Safety Team
         </Title>
         
-        <Text c="dimmed" size="sm" ta="center" mb={30}>
-          Professional Asset Management System
+        <Text c="dimmed" size="sm" ta="center" mb={30} style={{ color: '#666666' }}>
+          Asset Management System
         </Text>
 
         <Paper withBorder shadow="md" p={30} radius="md" style={{ backgroundColor: 'white' }}>
@@ -220,9 +235,17 @@ export default function AuthPage() {
               <Tabs.Tab 
                 value="signup" 
                 leftSection={<IconMail size={16} />}
-                style={{ fontWeight: 500 }}
+                style={{ 
+                  fontWeight: 500, 
+                  opacity: 0.5, 
+                  cursor: 'not-allowed',
+                  pointerEvents: 'none',
+                  backgroundColor: '#e9ecef',
+                  color: '#6c757d'
+                }}
+                disabled
               >
-                Sign Up
+                Sign Up (Disabled)
               </Tabs.Tab>
               <Tabs.Tab 
                 value="forgot" 
@@ -491,7 +514,7 @@ export default function AuthPage() {
         </Paper>
 
         <Text c="dimmed" size="sm" ta="center" mt={30}>
-          © 2024 LP Management. All rights reserved.
+          © 2024 St Georges Water Safety Team. All rights reserved.
         </Text>
         <Text c="dimmed" size="xs" ta="center" mt={5}>
           Secured by AWS Cognito • Enterprise Grade Security

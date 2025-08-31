@@ -469,6 +469,11 @@ export default function HomePage() {
   const [bulkUpdateLoading, setBulkUpdateLoading] = useState(false);
   const [bulkUpdateResults, setBulkUpdateResults] = useState<any>(null);
 
+  // Flushlist Update states
+  const [flushlistFile, setFlushlistFile] = useState<File | null>(null);
+  const [flushlistLoading, setFlushlistLoading] = useState(false);
+  const [flushlistResults, setFlushlistResults] = useState<any>(null);
+
   const [filtersCollapsed, setFiltersCollapsed] = useLocalStorage({ key: 'filtersCollapsed', defaultValue: false });
   const [advancedFiltersCollapsed, setAdvancedFiltersCollapsed] = useLocalStorage({ key: 'advancedFiltersCollapsed', defaultValue: true });
 
@@ -1207,6 +1212,92 @@ export default function HomePage() {
         color: 'red',
         icon: <IconX size={16} />,
       });
+    }
+  };
+
+  // Flushlist Update Functions
+  const downloadFlushlistTemplate = async (format: 'csv' | 'excel' = 'csv') => {
+    try {
+      const response = await fetch(`/api/flushlist-template?format=${format}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateTimeStr = getDateTimeString();
+        a.download = `flushlist-template_${dateTimeStr}.${format === 'excel' ? 'xlsx' : 'csv'}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        notifications.show({
+          title: 'Template Downloaded',
+          message: 'Flushlist template downloaded successfully',
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+      } else {
+        throw new Error('Failed to download template');
+      }
+    } catch (error) {
+      console.error('Error downloading flushlist template:', error);
+      notifications.show({
+        title: 'Download Failed',
+        message: 'Failed to download flushlist template',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    }
+  };
+
+  const handleFlushlistUpdate = async () => {
+    if (!flushlistFile) return;
+
+    setFlushlistLoading(true);
+    setFlushlistResults(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', flushlistFile);
+      formData.append('userEmail', user?.email || user?.username || 'Unknown User');
+
+      const response = await fetch('/api/flushlist-update', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setFlushlistResults(result.results);
+        
+        // Refresh assets data
+        await fetchData();
+        
+        // Show success notification
+        notifications.show({
+          title: 'Flushlist Update Complete',
+          message: `Updated ${result.results.updated} assets successfully`,
+          color: 'green',
+          icon: <IconCheck size={16} />,
+        });
+        
+        // Clear the file
+        setFlushlistFile(null);
+      } else {
+        throw new Error(result.error || 'Flushlist update failed');
+      }
+    } catch (error) {
+      console.error('Error during flushlist update:', error);
+      notifications.show({
+        title: 'Flushlist Update Failed',
+        message: error instanceof Error ? error.message : 'An error occurred during flushlist update',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setFlushlistLoading(false);
     }
   };
 
@@ -4247,6 +4338,147 @@ export default function HomePage() {
               </Stack>
             </Card>
           )}
+        </Stack>
+      </Card>
+      
+      <Card shadow="sm" padding="lg" radius="md" withBorder style={{ borderColor: '#40c057' }}>
+        <Title order={4} mb="md">
+          <Group gap="sm">
+            <IconDroplet size={20} color="#40c057" />
+            Update Flushlist
+          </Group>
+        </Title>
+        <Text size="sm" c="dimmed" mb="md">
+          Upload a list of asset barcodes that need flushing. This will set "Need Flushing = Yes" for uploaded assets and "Need Flushing = No" for all others.
+        </Text>
+        
+        <Stack gap="md">
+          <Group wrap="wrap">
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              color="green"
+              onClick={() => downloadFlushlistTemplate('csv')}
+              size="sm"
+            >
+              Download Template (CSV)
+            </Button>
+            <Button
+              leftSection={<IconDownload size={16} />}
+              variant="outline"
+              color="green"
+              onClick={() => downloadFlushlistTemplate('excel')}
+              size="sm"
+            >
+              Download Template (Excel)
+            </Button>
+          </Group>
+          
+          <FileInput
+            label="Select Flushlist CSV/Excel file"
+            placeholder="Choose file with asset barcodes"
+            value={flushlistFile}
+            onChange={setFlushlistFile}
+            accept=".csv,.xlsx,.xls"
+            leftSection={<IconUpload size={16} />}
+          />
+          
+          <Group wrap="wrap" gap="xs">
+            <Button
+              leftSection={<IconDroplet size={16} />}
+              onClick={handleFlushlistUpdate}
+              loading={flushlistLoading}
+              disabled={!flushlistFile}
+              color="green"
+              size="sm"
+            >
+              Update Flushlist
+            </Button>
+            {flushlistFile && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setFlushlistFile(null);
+                  setFlushlistResults(null);
+                }}
+                size="sm"
+              >
+                Clear
+              </Button>
+            )}
+          </Group>
+          
+          {flushlistResults && (
+            <Card withBorder p="md" bg="green.0">
+              <Title order={5} mb="sm">Flushlist Update Results</Title>
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text size="sm">Total Assets in System:</Text>
+                  <Badge color="blue">{flushlistResults.total}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Assets Updated:</Text>
+                  <Badge color="green">{flushlistResults.updated}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Barcodes in Upload:</Text>
+                  <Badge color="cyan">{flushlistResults.uploadedBarcodes}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Barcodes Not Found:</Text>
+                  <Badge color="orange">{flushlistResults.notFoundCount}</Badge>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm">Errors:</Text>
+                  <Badge color="red">{flushlistResults.errors}</Badge>
+                </Group>
+                
+                {flushlistResults.notFoundBarcodes && flushlistResults.notFoundBarcodes.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="orange">Barcodes Not Found in System:</Text>
+                    <Group gap="xs">
+                      {flushlistResults.notFoundBarcodes.map((barcode: string, index: number) => (
+                        <Badge key={index} color="orange" variant="light" size="sm">
+                          {barcode}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </div>
+                )}
+                
+                {flushlistResults.errorDetails && flushlistResults.errorDetails.length > 0 && (
+                  <div>
+                    <Text size="sm" fw={500} mt="md" mb="xs" c="red">Error Details:</Text>
+                    <Stack gap="xs">
+                      {flushlistResults.errorDetails.map((error: string, index: number) => (
+                        <Text key={index} size="xs" c="red" bg="red.0" p="xs" style={{ borderRadius: 4 }}>
+                          {error}
+                        </Text>
+                      ))}
+                    </Stack>
+                  </div>
+                )}
+              </Stack>
+            </Card>
+          )}
+          
+          <Card withBorder p="md" bg="yellow.0">
+            <Title order={6} mb="sm">How Flushlist Update Works:</Title>
+            <Stack gap="xs">
+              <Text size="xs" c="dimmed">
+                • Upload a file containing only Asset Barcodes (one per row)
+              </Text>
+              <Text size="xs" c="dimmed">
+                • Assets in your file will be marked as "Need Flushing = Yes"
+              </Text>
+              <Text size="xs" c="dimmed">
+                • ALL other assets in the system will be marked as "Need Flushing = No"
+              </Text>
+              <Text size="xs" c="dimmed">
+                • This ensures only the assets in your flushlist require flushing
+              </Text>
+            </Stack>
+          </Card>
         </Stack>
       </Card>
       
