@@ -1053,10 +1053,11 @@ div.mobile-buttons {
     }
     
     .asset-view-modal .asset-section {
-      background: transparent !important;
+      background: white !important;
       border: none !important;
-      border-bottom: none !important;
-      padding: 16px 0 !important;
+      border-bottom: 1px solid #e9ecef !important;
+      padding: 20px 24px !important;
+      margin: 0 0 1px 0 !important;
     }
     
     .asset-view-modal .asset-section-header {
@@ -1072,6 +1073,11 @@ div.mobile-buttons {
     
     .asset-view-modal .mantine-Modal-inner {
       pointer-events: auto !important;
+    }
+    
+    /* Desktop field spacing */
+    .asset-view-modal .mantine-Grid-col {
+      padding: 8px 12px !important;
     }
   }
   
@@ -1149,9 +1155,6 @@ div.mobile-buttons {
   }
   
   /* Clean field styling for mobile */
-  .asset-view-modal .mantine-Grid-col {
-    padding: 8px 0 !important;
-  }
   
   .asset-view-modal .mantine-Text-root[data-size="xs"] {
     font-size: 12px !important;
