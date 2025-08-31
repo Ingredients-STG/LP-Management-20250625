@@ -972,6 +972,389 @@ div.mobile-buttons {
     max-height: calc(100vh - 120px) !important;
     overflow-y: auto !important;
   }
+  
+  /* Asset View Modal Mobile Optimization - Full Screen Takeover */
+  .asset-view-modal .mantine-Modal-root {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: #f8f9fa !important;
+    pointer-events: auto !important;
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-overlay {
+    display: none !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-inner {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    pointer-events: auto !important;
+    display: block !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-content {
+    position: static !important;
+    background: #f8f9fa !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    pointer-events: auto !important;
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-body {
+    position: static !important;
+    background: #f8f9fa !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    pointer-events: auto !important;
+    display: block !important;
+  }
+  
+  /* Keep overlay for desktop */
+  @media screen and (min-width: 769px) {
+    .asset-view-modal .mantine-Modal-overlay {
+      background: rgba(0, 0, 0, 0.75) !important;
+      pointer-events: auto !important;
+      display: block !important;
+    }
+    
+    .asset-view-modal .mantine-Modal-content {
+      position: relative !important;
+      width: auto !important;
+      max-width: 90vw !important;
+      height: auto !important;
+      max-height: 90vh !important;
+      background: #f8f9fa !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+      overflow: hidden !important;
+    }
+    
+    .asset-view-modal .asset-section {
+      background: transparent !important;
+      border: none !important;
+      border-bottom: none !important;
+      padding: 16px 0 !important;
+    }
+    
+    .asset-view-modal .asset-section-header {
+      background: white !important;
+      position: static !important;
+      top: auto !important;
+      z-index: auto !important;
+      border-bottom: 1px solid #e9ecef !important;
+      box-shadow: none !important;
+      border-radius: 12px 12px 0 0 !important;
+      margin: 0 !important;
+    }
+    
+    .asset-view-modal .mantine-Modal-inner {
+      pointer-events: auto !important;
+    }
+  }
+  
+  .asset-view-modal .mantine-Modal-inner {
+    padding: 0 !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    pointer-events: none !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-content {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    background: #f8f9fa !important;
+    box-shadow: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    pointer-events: auto !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-body {
+    padding: 0 !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+    background: #f8f9fa !important;
+  }
+  
+  .asset-view-modal .mantine-Modal-root {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 9999 !important;
+  }
+  
+  /* Mobile form sections styling */
+  .asset-view-modal .asset-section {
+    background: white !important;
+    margin: 0 0 1px 0 !important;
+    padding: 20px 16px !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid #e9ecef !important;
+    pointer-events: auto !important;
+    position: static !important;
+    z-index: auto !important;
+  }
+  
+  .asset-view-modal .asset-section-header {
+    background: white !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    border-bottom: 1px solid #e9ecef !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    pointer-events: auto !important;
+    position: static !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+  
+  .asset-view-modal .mantine-Divider-root {
+    display: none !important;
+  }
+  
+  /* Clean field styling for mobile */
+  .asset-view-modal .mantine-Grid-col {
+    padding: 8px 0 !important;
+  }
+  
+  .asset-view-modal .mantine-Text-root[data-size="xs"] {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #6c757d !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+  
+  .asset-view-modal .mantine-Text-root[data-size="sm"] {
+    font-size: 15px !important;
+    color: #212529 !important;
+    font-weight: 400 !important;
+  }
+  
+  .asset-view-modal .mantine-Badge-root {
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+  }
+  
+  /* Fix touch targets for view modal buttons */
+  .asset-view-modal .mantine-Button-root,
+  .asset-view-modal .mantine-ActionIcon-root {
+    min-height: 48px !important;
+    min-width: 48px !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    position: static !important;
+    z-index: auto !important;
+  }
+  
+  /* Ensure all interactive elements work */
+  .asset-view-modal * {
+    pointer-events: auto !important;
+  }
+  
+  /* Fix general mobile click issues */
+  .mobile-asset-cards .mantine-Card-root {
+    pointer-events: auto !important;
+    position: static !important;
+    z-index: auto !important;
+  }
+  
+  .mobile-asset-cards * {
+    pointer-events: auto !important;
+  }
+  
+  /* Prevent body scroll lock when modal is open */
+  body.mantine-Modal-bodyLocked {
+    overflow: auto !important;
+    position: static !important;
+  }
+  
+
+  
+  /* Apply same styling to edit modal - Full Screen Takeover */
+  .asset-edit-modal .mantine-Modal-root {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    background: #f8f9fa !important;
+    pointer-events: auto !important;
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  
+  .asset-edit-modal .mantine-Modal-overlay {
+    display: none !important;
+  }
+  
+  .asset-edit-modal .mantine-Modal-inner {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    pointer-events: auto !important;
+    display: block !important;
+  }
+  
+  .asset-edit-modal .mantine-Modal-content {
+    position: static !important;
+    background: #f8f9fa !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    pointer-events: auto !important;
+    display: block !important;
+    overflow-y: auto !important;
+  }
+  
+  .asset-edit-modal .mantine-Modal-body {
+    position: static !important;
+    background: #f8f9fa !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    pointer-events: auto !important;
+    display: block !important;
+  }
+  
+  /* Edit modal form sections */
+  .asset-edit-modal form {
+    background: #f8f9fa !important;
+    min-height: 100vh !important;
+    padding: 0 !important;
+  }
+  
+  .asset-edit-modal .mantine-Stack-root {
+    background: #f8f9fa !important;
+    gap: 0 !important;
+  }
+  
+  .asset-edit-modal .mantine-Group-root:first-child {
+    background: white !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    border-bottom: 1px solid #e9ecef !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+  }
+  
+  /* Edit modal field groups */
+  .asset-edit-modal .mantine-Grid-root {
+    background: white !important;
+    margin: 0 0 1px 0 !important;
+    padding: 20px 16px !important;
+    border-bottom: 1px solid #e9ecef !important;
+  }
+  
+  /* Edit modal buttons */
+  .asset-edit-modal .mantine-Button-root,
+  .asset-edit-modal .mantine-ActionIcon-root {
+    min-height: 48px !important;
+    min-width: 48px !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    z-index: 10 !important;
+  }
+  
+
+  
+  /* Keep overlay for desktop - edit modal */
+  @media screen and (min-width: 769px) {
+    .asset-edit-modal .mantine-Modal-overlay {
+      background: rgba(0, 0, 0, 0.75) !important;
+      pointer-events: auto !important;
+      display: block !important;
+    }
+    
+    .asset-edit-modal .mantine-Modal-content {
+      position: relative !important;
+      width: auto !important;
+      max-width: 90vw !important;
+      height: auto !important;
+      max-height: 90vh !important;
+      background: white !important;
+      border-radius: 8px !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .asset-edit-modal form {
+      background: white !important;
+      min-height: auto !important;
+      padding: 16px !important;
+    }
+    
+    .asset-edit-modal .mantine-Stack-root {
+      background: white !important;
+      gap: 16px !important;
+    }
+    
+    .asset-edit-modal .mantine-Grid-root {
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border-bottom: none !important;
+    }
+    
+    .asset-edit-modal .mantine-Group-root:first-child {
+      background: transparent !important;
+      position: relative !important;
+    }
+    
+    .asset-edit-modal .mantine-Modal-inner {
+      pointer-events: auto !important;
+    }
+  }
 }
 
 /* Touch-optimized elements for tablets */

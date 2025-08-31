@@ -74,6 +74,7 @@ import {
   IconX,
   IconEdit,
   IconTrash,
+  IconArrowLeft,
   IconEye,
   IconUpload,
   IconPrinter,
@@ -283,6 +284,12 @@ export default function HomePage() {
   const [selectedAssetAudit, setSelectedAssetAudit] = useState<string>('');
   const [showViewModal, { open: openViewModal, close: closeViewModal }] = useDisclosure(false);
   const [selectedAssetForView, setSelectedAssetForView] = useState<Asset | null>(null);
+  const [mobileViewOpen, setMobileViewOpen] = useState(false);
+  const [mobileEditOpen, setMobileEditOpen] = useState(false);
+  const [mobileDeleteOpen, setMobileDeleteOpen] = useState(false);
+  const [mobileAuditOpen, setMobileAuditOpen] = useState(false);
+  const [mobileSystemAuditOpen, setMobileSystemAuditOpen] = useState(false);
+  const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
   const [filterChanges, setFilterChanges] = useState<any[]>([]);
   const [loadingFilterChanges, setLoadingFilterChanges] = useState(false);
   const [assetTypes, setAssetTypes] = useState<string[]>(['Water Tap', 'Water Cooler', 'LNS Outlet - TMT', 'LNS Shower - TMT']);
@@ -296,6 +303,7 @@ export default function HomePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isUpdatingAsset, setIsUpdatingAsset] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [formKey, setFormKey] = useState(0); // Force form re-render
 
@@ -1560,6 +1568,13 @@ export default function HomePage() {
     }
   }, [showAuditDrawer]);
 
+  // Fetch global audit logs when mobile system audit opens
+  useEffect(() => {
+    if (mobileSystemAuditOpen) {
+      fetchGlobalAuditLogs();
+    }
+  }, [mobileSystemAuditOpen]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -2011,6 +2026,24 @@ export default function HomePage() {
       });
     }
   };
+
+  // Wrapper function for mobile edit form
+  const handleUpdateAsset = async () => {
+    setIsUpdatingAsset(true);
+    try {
+      await handleEditAsset(form.values);
+    } finally {
+      setIsUpdatingAsset(false);
+    }
+  };
+
+  const toggleExpandedEntry = (entryId: string) => {
+    setExpandedEntries(prev => ({
+      ...prev,
+      [entryId]: !prev[entryId]
+    }));
+  };
+
   // Handle removing filter from asset
   const handleRemoveFilter = (asset: Asset) => {
     // Store original values for potential rollback
@@ -3554,8 +3587,11 @@ export default function HomePage() {
                         transition: 'all 0.2s ease',
                       }}
                       onClick={() => {
-                        setSelectedAsset(asset);
-                        openViewModal();
+                        console.log('Mobile card clicked for asset:', asset.assetBarcode);
+                        setSelectedAssetForView(asset);
+                        console.log('Opening mobile view...');
+                        setMobileViewOpen(true);
+                        console.log('Mobile view state should be:', true);
                       }}
                     >
                       <Stack gap="sm">
@@ -3682,71 +3718,12 @@ export default function HomePage() {
                               size="md"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelectedAssetAudit(asset.assetBarcode);
-                                openAuditModal();
+                                setSelectedAssetForView(asset);
+                                setMobileAuditOpen(true);
                               }}
                               title="View Audit Log"
                             >
                               <IconHistory size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="filled"
-                              color="blue"
-                              size="md"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                try {
-                                  setSelectedAsset(asset);
-                                  form.setValues({
-                                    assetBarcode: asset.assetBarcode || '',
-                                    primaryIdentifier: asset.primaryIdentifier || '',
-                                    secondaryIdentifier: asset.secondaryIdentifier || '',
-                                    assetType: asset.assetType || '',
-                                    status: asset.status || 'ACTIVE',
-                                    wing: asset.wing || '',
-                                    wingInShort: asset.wingInShort || '',
-                                    room: asset.room || '',
-                                    floor: asset.floor || '',
-                                    floorInWords: asset.floorInWords || '',
-                                    roomNo: asset.roomNo || '',
-                                    roomName: asset.roomName || '',
-                                    filterNeeded: typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes'),
-                                    filtersOn: typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes'),
-                                    filterExpiryDate: safeDate(asset.filterExpiryDate),
-                                    filterInstalledOn: safeDate(asset.filterInstalledOn),
-                                    needFlushing: typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes'),
-                                    filterType: asset.filterType || '',
-                                    reasonForFilterChange: asset.reasonForFilterChange || '',
-                                    notes: asset.notes || '',
-                                    augmentedCare: typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare?.toString().toLowerCase() === 'true' || asset.augmentedCare?.toString().toLowerCase() === 'yes'),
-                                  });
-                                  setAssetFiles([]);
-                                  openEditModal();
-                                } catch (error) {
-                                  console.error('Error setting form values:', error);
-                                  notifications.show({
-                                    title: 'Error',
-                                    message: 'Failed to load asset data for editing',
-                                    color: 'red',
-                                    icon: <IconX size={16} />,
-                                  });
-                                }
-                              }}
-                              title="Edit Asset"
-                            >
-                              <IconEdit size={16} />
-                            </ActionIcon>
-                            <ActionIcon
-                              variant="filled"
-                              color="red"
-                              size="md"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteAsset(asset);
-                              }}
-                              title="Delete Asset"
-                            >
-                              <IconTrash size={16} />
                             </ActionIcon>
                           </Group>
                         </Group>
@@ -4736,7 +4713,13 @@ export default function HomePage() {
                 variant="light"
                 color="blue"
                 size="lg"
-                onClick={openAuditDrawer}
+                onClick={() => {
+                  if (window.innerWidth <= 768) {
+                    setMobileSystemAuditOpen(true);
+                  } else {
+                    openAuditDrawer();
+                  }
+                }}
                 title="System Audit Trail"
                 className="audit-icon"
               >
@@ -5231,6 +5214,7 @@ export default function HomePage() {
         centered
         scrollAreaComponent={ScrollArea.Autosize}
         withCloseButton={false}
+        className="asset-edit-modal"
       >
 
         <form id="edit-asset-form" key={formKey} onSubmit={form.onSubmit(handleEditAsset)}>
@@ -5675,25 +5659,28 @@ export default function HomePage() {
         styles={{
           content: {
             maxHeight: '90vh',
-            overflowY: 'auto'
+            overflowY: 'hidden'
           },
           body: {
             maxHeight: 'calc(90vh - 60px)',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            padding: '0'
           }
         }}
+        className="asset-view-modal"
       >
         {selectedAssetForView && (
-          <Stack gap="md">
-              {/* Custom Header with Action Buttons */}
-              <Group justify="space-between" align="center" style={{ marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #e0e0e0' }}>
-              <Text fw={600} size="lg">Asset Details</Text>
-              <Group gap="md">
-                <ActionIcon
-                  variant="light"
-                  color="blue"
-                  size="md"
-                  onClick={() => {
+          <div style={{ minHeight: '100%', background: '#f8f9fa' }}>
+              {/* Header with Action Buttons */}
+              <div className="asset-section-header" style={{ background: 'white', padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
+                <Group justify="space-between" align="center" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                  <Text fw={600} size="lg" c="dark">Asset Details</Text>
+                  <Group gap="xs" style={{ flexWrap: 'wrap' }}>
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      size="md"
+                      onClick={() => {
                     try {
                       closeViewModal();
                       form.setValues({
@@ -5766,35 +5753,36 @@ export default function HomePage() {
                   <IconX size={16} />
                 </ActionIcon>
               </Group>
-            </Group>
+                </Group>
+            </div>
 
             {/* Basic Information */}
-            <div>
+            <div className="asset-section">
               <Text fw={600} mb="xs" c="blue">Basic Information</Text>
               <Grid gutter="xs">
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Asset Barcode</Text>
                   <Text fw={500} size="sm">{selectedAssetForView.assetBarcode || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Status</Text>
                   <Badge color={getStatusColor(selectedAssetForView.status)} variant="light" size="sm">
                     {selectedAssetForView.status}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Primary Identifier</Text>
                   <Text fw={500} size="sm">{selectedAssetForView.primaryIdentifier}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Secondary Identifier</Text>
                   <Text size="sm">{selectedAssetForView.secondaryIdentifier || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Asset Type</Text>
                   <Text size="sm">{selectedAssetForView.assetType}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Augmented Care</Text>
                   <Badge 
                     color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'blue' : 'gray'} 
@@ -5804,7 +5792,7 @@ export default function HomePage() {
                     {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Need Flushing</Text>
                   <Badge 
                     color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'orange' : 'gray'} 
@@ -5817,33 +5805,31 @@ export default function HomePage() {
               </Grid>
             </div>
 
-            <Divider />
-
             {/* Location Information */}
-            <div>
+            <div className="asset-section">
               <Text fw={600} mb="xs" c="blue">Location Information</Text>
               <Grid gutter="xs">
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Wing</Text>
                   <Text size="sm">{selectedAssetForView.wing || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Wing (Short)</Text>
                   <Text size="sm">{selectedAssetForView.wingInShort || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Room</Text>
                   <Text size="sm">{selectedAssetForView.room || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Room Name</Text>
                   <Text size="sm">{selectedAssetForView.roomName || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Room Number</Text>
                   <Text size="sm">{selectedAssetForView.roomNo !== null && selectedAssetForView.roomNo !== undefined && selectedAssetForView.roomNo !== '' ? selectedAssetForView.roomNo : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Floor</Text>
                   <Text size="sm">{selectedAssetForView.floor !== null && selectedAssetForView.floor !== undefined && selectedAssetForView.floor !== '' ? selectedAssetForView.floor : 'N/A'}</Text>
                 </Grid.Col>
@@ -5853,8 +5839,6 @@ export default function HomePage() {
                 </Grid.Col>
               </Grid>
             </div>
-
-            <Divider />
 
             {/* Filter Information */}
             {!(
@@ -5866,12 +5850,10 @@ export default function HomePage() {
               !selectedAssetForView.filterExpiryDate &&
               (selectedAssetForView.notes === '' || !selectedAssetForView.notes)
             ) && (
-              <>
-                <Divider />
-                <div>
-                  <Text fw={600} mb="xs" c="blue">Filter Information</Text>
+              <div className="asset-section">
+                <Text fw={600} mb="xs" c="blue">Filter Information</Text>
               <Grid gutter="xs">
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Filter Needed</Text>
                   <Badge 
                     color={(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'orange' : 'green'} 
@@ -5881,7 +5863,7 @@ export default function HomePage() {
                     {(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Filters On</Text>
                   <Badge 
                     color={(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'green' : 'red'} 
@@ -5891,11 +5873,11 @@ export default function HomePage() {
                     {(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Filter Installed On</Text>
                   <Text size="sm">{(() => { const d = safeDate(selectedAssetForView.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Filter Expiry</Text>
                   <div>
                     <Text size="sm">{(() => { const d = safeDate(selectedAssetForView.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
@@ -5911,43 +5893,38 @@ export default function HomePage() {
                     )}
                   </div>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Filter Type</Text>
                   <Text size="sm">{selectedAssetForView.filterType || 'N/A'}</Text>
                 </Grid.Col>
               </Grid>
-                </div>
-              </>
+              </div>
             )}
 
             {selectedAssetForView.notes && (
-              <>
-                <Divider />
-                <div>
-                  <Text fw={600} mb="xs" c="blue">Notes</Text>
-                  <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAssetForView.notes}</Text>
-                </div>
-              </>
+              <div className="asset-section">
+                <Text fw={600} mb="xs" c="blue">Notes</Text>
+                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAssetForView.notes}</Text>
+              </div>
             )}
 
             {/* Metadata */}
-            <Divider />
-            <div>
+            <div className="asset-section">
               <Text fw={600} mb="xs" c="blue">Metadata</Text>
               <Grid gutter="xs">
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Created</Text>
                   <Text size="sm">{selectedAssetForView.created ? formatTimestamp(selectedAssetForView.created) : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Created By</Text>
                   <Text size="sm">{selectedAssetForView.createdBy || 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Modified</Text>
                   <Text size="sm">{selectedAssetForView.modified ? formatTimestamp(selectedAssetForView.modified) : 'N/A'}</Text>
                 </Grid.Col>
-                <Grid.Col span={6}>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Modified By</Text>
                   <Text size="sm">{selectedAssetForView.modifiedBy || 'N/A'}</Text>
                 </Grid.Col>
@@ -5955,10 +5932,8 @@ export default function HomePage() {
             </div>
 
             {selectedAssetForView.attachments && selectedAssetForView.attachments.length > 0 && (
-              <>
-                <Divider />
-                <div>
-                  <Text fw={600} mb="xs" c="blue">Attachments</Text>
+              <div className="asset-section">
+                <Text fw={600} mb="xs" c="blue">Attachments</Text>
                   <Stack gap="xs">
                     {selectedAssetForView.attachments.map((attachment, index) => (
                       <Group key={index} justify="space-between" p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
@@ -5994,13 +5969,11 @@ export default function HomePage() {
                       </Group>
                     ))}
                   </Stack>
-                </div>
-              </>
+              </div>
             )}
 
             {/* Filter Changes History */}
-            <Divider />
-            <div>
+            <div className="asset-section">
               <Group justify="space-between" align="center" mb="xs">
                 <Text fw={600} c="blue">Filter Change History</Text>
                 {loadingFilterChanges && <Loader size="xs" />}
@@ -6074,8 +6047,7 @@ export default function HomePage() {
               )}
             </div>
 
-
-          </Stack>
+          </div>
         )}
       </Modal>
 
@@ -6354,6 +6326,1104 @@ export default function HomePage() {
           placeholder: 'Search assets...',
         }}
       />
+
+      {/* Mobile Asset View - Full Screen */}
+      {mobileViewOpen && selectedAssetForView && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          zIndex: 10000,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'white',
+            padding: '16px',
+            borderBottom: '1px solid #e0e0e0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <Group justify="space-between" align="center">
+              <Text fw={600} size="lg" c="dark">Asset Details</Text>
+              <Group gap="xs">
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  size="lg"
+                  onClick={() => {
+                    // Populate form with current asset data
+                    form.setValues({
+                      assetBarcode: selectedAssetForView.assetBarcode || '',
+                      primaryIdentifier: selectedAssetForView.primaryIdentifier || '',
+                      secondaryIdentifier: selectedAssetForView.secondaryIdentifier || '',
+                      assetType: selectedAssetForView.assetType || '',
+                      status: selectedAssetForView.status || 'ACTIVE',
+                      wing: selectedAssetForView.wing || '',
+                      wingInShort: selectedAssetForView.wingInShort || '',
+                      room: selectedAssetForView.room || '',
+                      floor: selectedAssetForView.floor || '',
+                      floorInWords: selectedAssetForView.floorInWords || '',
+                      roomNo: selectedAssetForView.roomNo || '',
+                      roomName: selectedAssetForView.roomName || '',
+                      filterNeeded: typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : (selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'true' || selectedAssetForView.filterNeeded?.toString().toLowerCase() === 'yes'),
+                      filtersOn: typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes'),
+                      filterType: selectedAssetForView.filterType || '',
+                      filterInstalledOn: selectedAssetForView.filterInstalledOn ? safeDate(selectedAssetForView.filterInstalledOn) : null,
+                      filterExpiryDate: selectedAssetForView.filterExpiryDate ? safeDate(selectedAssetForView.filterExpiryDate) : null,
+                      notes: selectedAssetForView.notes || '',
+                      augmentedCare: typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'true' || selectedAssetForView.augmentedCare?.toString().toLowerCase() === 'yes'),
+                      needFlushing: typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing?.toString().toLowerCase() === 'true' || selectedAssetForView.needFlushing?.toString().toLowerCase() === 'yes'),
+                    });
+                    setMobileViewOpen(false);
+                    setMobileEditOpen(true);
+                  }}
+                  title="Edit Asset"
+                >
+                  <IconEdit size={20} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="red"
+                  size="lg"
+                  onClick={() => {
+                    setMobileViewOpen(false);
+                    setMobileDeleteOpen(true);
+                  }}
+                  title="Delete Asset"
+                >
+                  <IconTrash size={20} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="lg"
+                  onClick={() => {
+                    setMobileViewOpen(false);
+                    setSelectedAssetForView(null);
+                  }}
+                >
+                  <IconX size={20} />
+                </ActionIcon>
+              </Group>
+            </Group>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '0' }}>
+            {/* Basic Information */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Basic Information</Text>
+              <Grid>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Asset Barcode</Text>
+                  <Text fw={500}>{selectedAssetForView.assetBarcode}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Status</Text>
+                  <Badge color={
+                    selectedAssetForView.status === 'ACTIVE' ? 'green' :
+                    selectedAssetForView.status === 'INACTIVE' ? 'red' : 'gray'
+                  }>
+                    {selectedAssetForView.status || 'Unknown'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Primary Identifier</Text>
+                  <Text fw={500}>{selectedAssetForView.primaryIdentifier}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Secondary Identifier</Text>
+                  <Text fw={500}>{selectedAssetForView.secondaryIdentifier || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Asset Type</Text>
+                  <Text fw={500}>{selectedAssetForView.assetType}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Augmented Care</Text>
+                  <Badge 
+                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Need Flushing</Text>
+                  <Badge 
+                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'orange' : 'gray'} 
+                    variant="light" 
+                    size="sm"
+                  >
+                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'Yes' : 'No'}
+                  </Badge>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            {/* Location Information */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Location Information</Text>
+              <Grid>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Wing</Text>
+                  <Text fw={500}>{selectedAssetForView.wing || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Wing (Short)</Text>
+                  <Text fw={500}>{selectedAssetForView.wingInShort || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Room</Text>
+                  <Text fw={500}>{selectedAssetForView.room || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Room Name</Text>
+                  <Text fw={500}>{selectedAssetForView.roomName || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Room Number</Text>
+                  <Text fw={500}>{selectedAssetForView.roomNo !== null && selectedAssetForView.roomNo !== undefined && selectedAssetForView.roomNo !== '' ? selectedAssetForView.roomNo : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Floor</Text>
+                  <Text fw={500}>{selectedAssetForView.floor !== null && selectedAssetForView.floor !== undefined && selectedAssetForView.floor !== '' ? selectedAssetForView.floor : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Floor (In Words)</Text>
+                  <Text fw={500}>{selectedAssetForView.floorInWords || 'N/A'}</Text>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            {/* Filter Information */}
+            {!(
+              !selectedAssetForView.filterNeeded && 
+              !selectedAssetForView.filtersOn && 
+              !selectedAssetForView.filterType &&
+              (!selectedAssetForView.filterInstalledOn || selectedAssetForView.filterInstalledOn === '') &&
+              !selectedAssetForView.filterInstalledOn &&
+              !selectedAssetForView.filterExpiryDate &&
+              (selectedAssetForView.notes === '' || !selectedAssetForView.notes)
+            ) && (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '20px 16px',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <Text fw={600} size="md" mb="md" c="dark">Filter Information</Text>
+                <Grid>
+                  <Grid.Col span={12}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Filter Needed</Text>
+                    <Badge 
+                      color={(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'orange' : 'green'} 
+                      variant="light" 
+                      size="sm"
+                    >
+                      {(typeof selectedAssetForView.filterNeeded === 'boolean' ? selectedAssetForView.filterNeeded : selectedAssetForView.filterNeeded === 'true') ? 'Yes' : 'No'}
+                    </Badge>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Filters On</Text>
+                    <Badge 
+                      color={(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'green' : 'red'} 
+                      variant="light" 
+                      size="sm"
+                    >
+                      {(typeof selectedAssetForView.filtersOn === 'boolean' ? selectedAssetForView.filtersOn : (selectedAssetForView.filtersOn?.toString().toLowerCase() === 'true' || selectedAssetForView.filtersOn?.toString().toLowerCase() === 'yes')) ? 'Yes' : 'No'}
+                    </Badge>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Filter Installed On</Text>
+                    <Text fw={500}>{(() => { const d = safeDate(selectedAssetForView.filterInstalledOn); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Filter Expiry</Text>
+                    <div>
+                      <Text fw={500}>{(() => { const d = safeDate(selectedAssetForView.filterExpiryDate); return d ? d.toLocaleDateString('en-GB') : 'N/A'; })()}</Text>
+                      {safeDate(selectedAssetForView.filterExpiryDate) && (
+                        <Badge 
+                          color={getFilterExpiryStatus(selectedAssetForView.filterExpiryDate, selectedAssetForView.filterInstalledOn).color} 
+                          variant="light" 
+                          size="xs"
+                          mt={4}
+                        >
+                          {getFilterExpiryStatus(selectedAssetForView.filterExpiryDate, selectedAssetForView.filterInstalledOn).text}
+                        </Badge>
+                      )}
+                    </div>
+                  </Grid.Col>
+                  <Grid.Col span={12}>
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Filter Type</Text>
+                    <Text fw={500}>{selectedAssetForView.filterType || 'N/A'}</Text>
+                  </Grid.Col>
+                </Grid>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedAssetForView.notes && (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '20px 16px',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <Text fw={600} size="md" mb="md" c="dark">Notes</Text>
+                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAssetForView.notes}</Text>
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Metadata</Text>
+              <Grid>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Created</Text>
+                  <Text fw={500}>{selectedAssetForView.created ? formatTimestamp(selectedAssetForView.created) : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Created By</Text>
+                  <Text fw={500}>{selectedAssetForView.createdBy || 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Modified</Text>
+                  <Text fw={500}>{selectedAssetForView.modified ? formatTimestamp(selectedAssetForView.modified) : 'N/A'}</Text>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Modified By</Text>
+                  <Text fw={500}>{selectedAssetForView.modifiedBy || 'N/A'}</Text>
+                </Grid.Col>
+              </Grid>
+            </div>
+
+            {/* Attachments */}
+            {selectedAssetForView.attachments && selectedAssetForView.attachments.length > 0 && (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '20px 16px',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <Text fw={600} size="md" mb="md" c="dark">Attachments</Text>
+                <Stack gap="xs">
+                  {selectedAssetForView.attachments.map((attachment, index) => (
+                    <Group key={index} justify="space-between" p="sm" bg="gray.0" style={{ borderRadius: '8px' }}>
+                      <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                        <IconPaperclip size={16} />
+                        <Text size="sm" truncate style={{ flex: 1 }}>{attachment.fileName}</Text>
+                      </Group>
+                      <Group gap="xs" style={{ flexShrink: 0 }}>
+                        <ActionIcon
+                          size="sm"
+                          variant="light"
+                          color="blue"
+                          onClick={() => window.open(attachment.s3Url, '_blank')}
+                          title="View file"
+                        >
+                          <IconEye size={14} />
+                        </ActionIcon>
+                      </Group>
+                    </Group>
+                  ))}
+                </Stack>
+              </div>
+            )}
+
+
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Asset Edit - Full Screen */}
+      {mobileEditOpen && selectedAssetForView && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          zIndex: 10000,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'white',
+            padding: '16px',
+            borderBottom: '1px solid #e0e0e0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <Group justify="space-between" align="center">
+              <Text fw={600} size="lg" c="dark">Edit Asset</Text>
+              <Group gap="xs">
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="lg"
+                  onClick={() => {
+                    setMobileEditOpen(false);
+                    setMobileViewOpen(true);
+                  }}
+                >
+                  <IconArrowLeft size={20} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="lg"
+                  onClick={() => {
+                    setMobileEditOpen(false);
+                    setSelectedAssetForView(null);
+                  }}
+                >
+                  <IconX size={20} />
+                </ActionIcon>
+              </Group>
+            </Group>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '0' }}>
+            {/* Basic Information */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Basic Information</Text>
+              <Stack gap="md">
+                <TextInput
+                  label="Asset Barcode"
+                  placeholder="Enter barcode"
+                  required
+                  {...form.getInputProps('assetBarcode')}
+                />
+                <TextInput
+                  label="Primary Identifier"
+                  placeholder="Enter identifier"
+                  {...form.getInputProps('primaryIdentifier')}
+                />
+                <TextInput
+                  label="Secondary Identifier"
+                  placeholder="Enter secondary identifier"
+                  {...form.getInputProps('secondaryIdentifier')}
+                />
+                <Select
+                  label="Asset Type"
+                  placeholder="Select type"
+                  data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
+                  required
+                  value={form.values.assetType}
+                  onChange={handleAssetTypeSelect}
+                />
+                <Select
+                  label="Status"
+                  data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
+                  required
+                  {...form.getInputProps('status')}
+                />
+                <Checkbox
+                  label="Augmented Care"
+                  description="Requires special care or attention"
+                  {...form.getInputProps('augmentedCare', { type: 'checkbox' })}
+                />
+                <Checkbox
+                  label="Need Flushing"
+                  description="Asset requires flushing"
+                  {...form.getInputProps('needFlushing', { type: 'checkbox' })}
+                />
+              </Stack>
+            </div>
+
+            {/* Location Information */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Location Information</Text>
+              <Stack gap="md">
+                <TextInput
+                  label="Wing"
+                  placeholder="Enter wing"
+                  {...form.getInputProps('wing')}
+                />
+                <TextInput
+                  label="Wing (Short)"
+                  placeholder="Enter wing short form"
+                  {...form.getInputProps('wingInShort')}
+                />
+                <TextInput
+                  label="Room"
+                  placeholder="Enter room"
+                  {...form.getInputProps('room')}
+                />
+                <TextInput
+                  label="Room Name"
+                  placeholder="Enter room name"
+                  {...form.getInputProps('roomName')}
+                />
+                <TextInput
+                  label="Room Number"
+                  placeholder="Enter room number"
+                  {...form.getInputProps('roomNo')}
+                />
+                <TextInput
+                  label="Floor"
+                  placeholder="Enter floor"
+                  {...form.getInputProps('floor')}
+                />
+                <TextInput
+                  label="Floor (In Words)"
+                  placeholder="Enter floor in words"
+                  {...form.getInputProps('floorInWords')}
+                />
+              </Stack>
+            </div>
+
+            {/* Filter Information */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Filter Information</Text>
+              <Stack gap="md">
+                <Checkbox
+                  label="Filter Needed"
+                  description="Does this asset require a filter?"
+                  {...form.getInputProps('filterNeeded', { type: 'checkbox' })}
+                />
+                <Checkbox
+                  label="Filters On"
+                  description="Are filters currently installed?"
+                  {...form.getInputProps('filtersOn', { type: 'checkbox' })}
+                />
+                <DateInput
+                  label="Filter Installed On"
+                  placeholder="Select date"
+                  valueFormat="DD/MM/YYYY"
+                  {...form.getInputProps('filterInstalledOn')}
+                />
+                <DateInput
+                  label="Filter Expiry Date"
+                  placeholder="Select expiry date"
+                  valueFormat="DD/MM/YYYY"
+                  {...form.getInputProps('filterExpiryDate')}
+                />
+                <Select
+                  label="Filter Type"
+                  placeholder="Select filter type"
+                  data={filterTypes}
+                  {...form.getInputProps('filterType')}
+                />
+              </Stack>
+            </div>
+
+            {/* Notes */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Additional Notes</Text>
+              <Textarea
+                label="Notes"
+                placeholder="Additional notes and comments"
+                rows={4}
+                {...form.getInputProps('notes')}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px'
+            }}>
+              <Group gap="md">
+                <Button
+                  variant="light"
+                  onClick={() => {
+                    setMobileEditOpen(false);
+                    setMobileViewOpen(true);
+                  }}
+                  style={{ minHeight: '48px', flex: 1 }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await handleUpdateAsset();
+                      // If successful, go back to view mode
+                      setMobileEditOpen(false);
+                      setMobileViewOpen(true);
+                    } catch (error) {
+                      // Error handling is already in handleUpdateAsset
+                    }
+                  }}
+                  loading={isUpdatingAsset}
+                  style={{ minHeight: '48px', flex: 1 }}
+                >
+                  Save Changes
+                </Button>
+              </Group>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Asset Delete - Full Screen */}
+      {mobileDeleteOpen && selectedAssetForView && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          zIndex: 10000,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'white',
+            padding: '16px',
+            borderBottom: '1px solid #e0e0e0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <Group justify="space-between" align="center">
+              <Text fw={600} size="lg" c="red">Delete Asset</Text>
+              <ActionIcon
+                variant="light"
+                color="gray"
+                size="lg"
+                onClick={() => {
+                  setMobileDeleteOpen(false);
+                  setMobileViewOpen(true);
+                }}
+              >
+                <IconX size={20} />
+              </ActionIcon>
+            </Group>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '0' }}>
+            {/* Warning Section */}
+            <div style={{
+              background: '#fff5f5',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef',
+              borderLeft: '4px solid #e53e3e'
+            }}>
+              <Group gap="sm" mb="md">
+                <IconAlertTriangle size={24} color="#e53e3e" />
+                <Text fw={600} size="md" c="red">Warning: Permanent Action</Text>
+              </Group>
+              <Text size="sm" c="dimmed" mb="sm">
+                You are about to permanently delete this asset. This action cannot be undone.
+              </Text>
+              <Text size="sm" c="dimmed">
+                All associated data including audit logs, attachments, and filter history will be removed.
+              </Text>
+            </div>
+
+            {/* Asset Summary */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="md" c="dark">Asset to be Deleted</Text>
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Asset Barcode:</Text>
+                  <Text fw={500} size="sm">{selectedAssetForView.assetBarcode}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Asset Type:</Text>
+                  <Text fw={500} size="sm">{selectedAssetForView.assetType}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Location:</Text>
+                  <Text fw={500} size="sm">{selectedAssetForView.room || selectedAssetForView.wing || 'N/A'}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" c="dimmed">Status:</Text>
+                  <Badge color={
+                    selectedAssetForView.status === 'ACTIVE' ? 'green' :
+                    selectedAssetForView.status === 'INACTIVE' ? 'red' : 'gray'
+                  }>
+                    {selectedAssetForView.status}
+                  </Badge>
+                </Group>
+              </Stack>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px'
+            }}>
+              <Group gap="md">
+                <Button
+                  variant="light"
+                  onClick={() => {
+                    setMobileDeleteOpen(false);
+                    setMobileViewOpen(true);
+                  }}
+                  style={{ minHeight: '48px', flex: 1 }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="red"
+                  onClick={() => {
+                    // Handle delete logic here - you can implement the actual delete logic
+                    console.log('Delete confirmed for:', selectedAssetForView.assetBarcode);
+                    setMobileDeleteOpen(false);
+                    setSelectedAssetForView(null);
+                  }}
+                  style={{ minHeight: '48px', flex: 1 }}
+                >
+                  Delete Asset
+                </Button>
+              </Group>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Audit Log - Full Screen */}
+      {mobileAuditOpen && selectedAssetForView && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          zIndex: 10000,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'white',
+            padding: '16px',
+            borderBottom: '1px solid #e0e0e0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <Group justify="space-between" align="center">
+              <Text fw={600} size="lg" c="dark">Audit History</Text>
+              <ActionIcon
+                variant="light"
+                color="gray"
+                size="lg"
+                onClick={() => {
+                  setMobileAuditOpen(false);
+                  setSelectedAssetForView(null);
+                }}
+              >
+                <IconX size={20} />
+              </ActionIcon>
+            </Group>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '0' }}>
+            {/* Asset Info Header */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Text fw={600} size="md" mb="sm" c="dark">Asset: {selectedAssetForView.assetBarcode}</Text>
+              <Text size="sm" c="dimmed">{selectedAssetForView.assetType} • {selectedAssetForView.room || selectedAssetForView.wing || 'Location N/A'}</Text>
+            </div>
+
+            {/* Audit Entries */}
+            {auditLog.length > 0 ? (
+              auditLog.map((entry, index) => (
+                <div key={index} style={{
+                  background: 'white',
+                  margin: '0 0 1px 0',
+                  padding: '16px',
+                  borderBottom: '1px solid #e9ecef'
+                }}>
+                  <Group justify="space-between" align="flex-start" mb="sm">
+                    <Group gap="sm">
+                      <ActionIcon
+                        variant="light"
+                        color={
+                          entry.action === 'CREATE' ? 'green' :
+                          entry.action === 'UPDATE' ? 'blue' :
+                          entry.action === 'DELETE' ? 'red' : 'gray'
+                        }
+                        size="sm"
+                      >
+                        {entry.action === 'CREATE' && <IconPlus size={14} />}
+                        {entry.action === 'UPDATE' && <IconEdit size={14} />}
+                        {entry.action === 'DELETE' && <IconTrash size={14} />}
+                        {!['CREATE', 'UPDATE', 'DELETE'].includes(entry.action) && <IconHistory size={14} />}
+                      </ActionIcon>
+                      <div>
+                        <Text fw={500} size="sm">{entry.action}</Text>
+                        <Text size="xs" c="dimmed">{entry.user || 'Unknown User'}</Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {formatTimestamp(entry.timestamp)}
+                    </Text>
+                  </Group>
+                  
+                  {entry.details?.changes && entry.details.changes.length > 0 && (
+                    <Stack gap="xs">
+                      {entry.details.changes.slice(0, 3).map((change: any, changeIndex: number) => (
+                        <Group key={changeIndex} gap="xs" style={{ fontSize: '12px' }}>
+                          <Text size="xs" c="dimmed" style={{ minWidth: '60px' }}>
+                            {change.field}:
+                          </Text>
+                          <Text size="xs" c="red" style={{ textDecoration: 'line-through', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {change.oldValue || 'N/A'}
+                          </Text>
+                          <Text size="xs" c="dimmed">→</Text>
+                          <Text size="xs" c="green" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {change.newValue || 'N/A'}
+                          </Text>
+                        </Group>
+                      ))}
+                      {entry.details.changes.length > 3 && (
+                        <Collapse in={expandedEntries[`asset-${selectedAssetForView?.assetBarcode}-${entry.timestamp}-${index}`] || false}>
+                          <Stack gap="xs" mt="xs">
+                            {entry.details.changes.slice(3).map((change: any, changeIndex: number) => (
+                              <Group key={changeIndex + 3} gap="xs" style={{ fontSize: '12px' }}>
+                                <Text size="xs" c="dimmed" style={{ minWidth: '60px' }}>
+                                  {change.field}:
+                                </Text>
+                                <Text size="xs" c="red" style={{ textDecoration: 'line-through', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {change.oldValue || 'N/A'}
+                                </Text>
+                                <Text size="xs" c="dimmed">→</Text>
+                                <Text size="xs" c="green" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {change.newValue || 'N/A'}
+                                </Text>
+                              </Group>
+                            ))}
+                          </Stack>
+                        </Collapse>
+                      )}
+                      {entry.details.changes.length > 3 && (
+                        <Button
+                          variant="subtle"
+                          size="xs"
+                          onClick={() => toggleExpandedEntry(`asset-${selectedAssetForView?.assetBarcode}-${entry.timestamp}-${index}`)}
+                          leftSection={expandedEntries[`asset-${selectedAssetForView?.assetBarcode}-${entry.timestamp}-${index}`] ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
+                          style={{ alignSelf: 'flex-start', fontSize: '11px', height: '24px', padding: '4px 8px' }}
+                        >
+                          {expandedEntries[`asset-${selectedAssetForView?.assetBarcode}-${entry.timestamp}-${index}`] 
+                            ? 'Show Less' 
+                            : `Show ${entry.details.changes.length - 3} More Changes`
+                          }
+                        </Button>
+                      )}
+                    </Stack>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '40px 16px',
+                textAlign: 'center',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <IconHistory size={48} color="#adb5bd" style={{ marginBottom: '16px' }} />
+                <Text size="md" c="dimmed" fw={500} mb="sm">No Audit History</Text>
+                <Text size="sm" c="dimmed">
+                  No changes have been recorded for this asset yet.
+                </Text>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile System Audit Trail - Full Screen */}
+      {mobileSystemAuditOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#f8f9fa',
+          zIndex: 10000,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          {/* Header */}
+          <div style={{
+            background: 'white',
+            padding: '16px',
+            borderBottom: '1px solid #e0e0e0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
+            <Group justify="space-between" align="center">
+              <Text fw={600} size="lg" c="dark">System Audit Trail</Text>
+              <ActionIcon
+                variant="light"
+                color="gray"
+                size="lg"
+                onClick={() => setMobileSystemAuditOpen(false)}
+              >
+                <IconX size={20} />
+              </ActionIcon>
+            </Group>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '0' }}>
+            {/* Summary Header */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px',
+              borderBottom: '1px solid #e9ecef'
+            }}>
+              <Group justify="space-between" align="center">
+                <Text size="sm" c="dimmed">Recent system activities across all assets</Text>
+                <Badge color="blue" variant="light" size="md">
+                  {globalAuditLog.length} entries
+                </Badge>
+              </Group>
+            </div>
+
+            {/* Audit Entries */}
+            {[...globalAuditLog].sort((a, b) => {
+              const aTime = new Date(a.timestamp.split('Z')[0] + 'Z').getTime();
+              const bTime = new Date(b.timestamp.split('Z')[0] + 'Z').getTime();
+              return bTime - aTime; // Descending order (newest first)
+            }).map((entry, index) => (
+              <div key={`${entry.assetId}-${entry.timestamp}-${index}`} style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '16px',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <Stack gap="sm">
+                  {/* Header with Action and Time */}
+                  <Group justify="space-between" align="flex-start">
+                    <Group gap="sm">
+                      <ActionIcon
+                        variant="light"
+                        color={
+                          entry.action === 'CREATE' ? 'green' :
+                          entry.action === 'UPDATE' ? 'blue' : 'red'
+                        }
+                        size="sm"
+                      >
+                        {entry.action === 'CREATE' && <IconPlus size={14} />}
+                        {entry.action === 'UPDATE' && <IconEdit size={14} />}
+                        {entry.action === 'DELETE' && <IconTrash size={14} />}
+                      </ActionIcon>
+                      <div>
+                        <Text fw={500} size="sm">{entry.action}</Text>
+                        <Text size="xs" c="dimmed">{entry.details?.assetName || 'Unknown Asset'}</Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {formatTimestamp(entry.timestamp)}
+                    </Text>
+                  </Group>
+                  
+                  {/* Asset and User Info */}
+                  <Group gap="xs" wrap="wrap">
+                    <Text size="xs" c="dimmed">Asset:</Text>
+                    <Text size="xs" fw={500}>{entry.details?.assetBarcode || 'Unknown'}</Text>
+                    <Text size="xs" c="dimmed">•</Text>
+                    <Text size="xs" c="dimmed">by {entry.user}</Text>
+                  </Group>
+
+                  {/* Changes Details */}
+                  {entry.details?.changes && entry.details.changes.length > 0 && (
+                    <div>
+                      <Text size="xs" fw={500} mb="xs" c="dimmed">Changes:</Text>
+                      <Stack gap="xs">
+                        {entry.details.changes.slice(0, 3).map((change: any, changeIndex: number) => (
+                          <Paper key={changeIndex} p="xs" bg="gray.0" radius="sm">
+                            <Group gap="xs" style={{ fontSize: '12px' }}>
+                              <Text size="xs" c="dimmed" style={{ minWidth: '60px' }}>
+                                {getFieldDisplayName(change.field)}:
+                              </Text>
+                              <Text size="xs" c="red" style={{ textDecoration: 'line-through', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {formatValue(change.oldValue, true)}
+                              </Text>
+                              <Text size="xs" c="dimmed">→</Text>
+                              <Text size="xs" c="green" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
+                              </Text>
+                            </Group>
+                          </Paper>
+                        ))}
+                        {entry.details.changes.length > 3 && (
+                          <Collapse in={expandedEntries[`${entry.assetId}-${entry.timestamp}-${index}`] || false}>
+                            <Stack gap="xs" mt="xs">
+                              {entry.details.changes.slice(3).map((change: any, changeIndex: number) => (
+                                <Paper key={changeIndex + 3} p="xs" bg="gray.0" radius="sm">
+                                  <Group gap="xs" style={{ fontSize: '12px' }}>
+                                    <Text size="xs" c="dimmed" style={{ minWidth: '60px' }}>
+                                      {getFieldDisplayName(change.field)}:
+                                    </Text>
+                                    <Text size="xs" c="red" style={{ textDecoration: 'line-through', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {formatValue(change.oldValue, true)}
+                                    </Text>
+                                    <Text size="xs" c="dimmed">→</Text>
+                                    <Text size="xs" c="green" style={{ maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {change.newValue !== null ? formatValue(change.newValue) : 'N/A'}
+                                    </Text>
+                                  </Group>
+                                </Paper>
+                              ))}
+                            </Stack>
+                          </Collapse>
+                        )}
+                        {entry.details.changes.length > 3 && (
+                          <Button
+                            variant="subtle"
+                            size="xs"
+                            onClick={() => toggleExpandedEntry(`${entry.assetId}-${entry.timestamp}-${index}`)}
+                            leftSection={expandedEntries[`${entry.assetId}-${entry.timestamp}-${index}`] ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
+                            style={{ alignSelf: 'flex-start', fontSize: '11px', height: '24px', padding: '4px 8px' }}
+                          >
+                            {expandedEntries[`${entry.assetId}-${entry.timestamp}-${index}`] 
+                              ? 'Show Less' 
+                              : `Show ${entry.details.changes.length - 3} More Changes`
+                            }
+                          </Button>
+                        )}
+                      </Stack>
+                    </div>
+                  )}
+
+                  {/* Delete Action Special Message */}
+                  {entry.action === 'DELETE' && (
+                    <Paper p="xs" bg="red.0" radius="sm">
+                      <Text size="xs" c="red" fw={500}>Asset permanently removed from system</Text>
+                    </Paper>
+                  )}
+                </Stack>
+              </div>
+            ))}
+
+            {/* Load More Button */}
+            {globalAuditLogPagination.hasMore && (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '20px 16px',
+                textAlign: 'center',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMoreGlobalAuditLogs}
+                  loading={globalAuditLogPagination.loading}
+                  leftSection={<IconDownload size={14} />}
+                  style={{ minHeight: '44px' }}
+                >
+                  Load More Entries
+                </Button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {globalAuditLog.length === 0 && (
+              <div style={{
+                background: 'white',
+                margin: '0 0 1px 0',
+                padding: '40px 16px',
+                textAlign: 'center',
+                borderBottom: '1px solid #e9ecef'
+              }}>
+                <IconHistory size={48} color="#adb5bd" style={{ marginBottom: '16px' }} />
+                <Text size="md" c="dimmed" fw={500} mb="sm">No Audit Entries</Text>
+                <Text size="sm" c="dimmed">
+                  System activities will appear here as they occur.
+                </Text>
+              </div>
+            )}
+
+            {/* Footer with Refresh */}
+            <div style={{
+              background: 'white',
+              margin: '0 0 1px 0',
+              padding: '20px 16px'
+            }}>
+              <Group justify="space-between" align="center">
+                <Text size="xs" c="dimmed">
+                  Last updated: {new Date().toLocaleTimeString()}
+                </Text>
+                <Button 
+                  size="xs" 
+                  variant="subtle" 
+                  onClick={() => fetchGlobalAuditLogs()}
+                  leftSection={<IconRefresh size={14} />}
+                  style={{ minHeight: '36px' }}
+                >
+                  Refresh
+                </Button>
+              </Group>
+            </div>
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }
