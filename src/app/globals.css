@@ -1046,18 +1046,23 @@ div.mobile-buttons {
       max-width: 90vw !important;
       height: auto !important;
       max-height: 90vh !important;
-      background: #f8f9fa !important;
+      background: white !important;
       border-radius: 12px !important;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
       overflow: hidden !important;
     }
     
-    .asset-view-modal .asset-section {
+    .asset-view-modal .mantine-Modal-body {
+      padding: 24px !important;
       background: white !important;
+    }
+    
+    .asset-view-modal .asset-section {
+      background: transparent !important;
       border: none !important;
-      border-bottom: 1px solid #e9ecef !important;
-      padding: 20px 24px !important;
-      margin: 0 0 1px 0 !important;
+      border-bottom: none !important;
+      padding: 0 !important;
+      margin: 0 0 24px 0 !important;
     }
     
     .asset-view-modal .asset-section-header {
@@ -1067,17 +1072,22 @@ div.mobile-buttons {
       z-index: auto !important;
       border-bottom: 1px solid #e9ecef !important;
       box-shadow: none !important;
-      border-radius: 12px 12px 0 0 !important;
-      margin: 0 !important;
+      border-radius: 0 !important;
+      margin: -24px -24px 24px -24px !important;
+      padding: 16px 24px !important;
     }
     
     .asset-view-modal .mantine-Modal-inner {
       pointer-events: auto !important;
     }
     
-    /* Desktop field spacing */
+    /* Let Mantine handle natural spacing */
     .asset-view-modal .mantine-Grid-col {
-      padding: 8px 12px !important;
+      padding: 4px 8px !important;
+    }
+    
+    .asset-view-modal .mantine-Grid-root {
+      margin: 0 !important;
     }
   }
   

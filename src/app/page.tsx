@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   AppShell,
   Title,
@@ -208,17 +208,17 @@ export default function HomePage() {
     };
 
     const handleForceSync = () => {
-      console.log('Force Sync event received, refreshing main assets data...');
+      // console.log('Force Sync event received, refreshing main assets data...');
       
       // Add a small delay to ensure the database has been updated
       setTimeout(() => {
-        console.log('Triggering refresh after Force Sync...');
+        // console.log('Triggering refresh after Force Sync...');
         setRefreshTrigger(prev => prev + 1);
       }, 1000); // 1 second delay
       
       // If a view modal is open, immediately refresh the selected asset data
       if (selectedAssetForView) {
-        console.log('Force Sync detected with open view modal, refreshing asset data...');
+        // console.log('Force Sync detected with open view modal, refreshing asset data...');
         setTimeout(async () => {
           try {
             // Fetch the updated asset directly
@@ -226,7 +226,7 @@ export default function HomePage() {
             if (response.ok) {
               const result = await response.json();
               if (result.success && result.data) {
-                console.log('Directly refreshed asset data after Force Sync:', result.data.assetBarcode);
+                // console.log('Directly refreshed asset data after Force Sync:', result.data.assetBarcode);
                 setSelectedAssetForView(result.data);
                 // Also refresh filter changes
                 fetchFilterChanges(result.data.assetBarcode);
@@ -249,7 +249,6 @@ export default function HomePage() {
   }, []);
 
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [filteredAssets, setFilteredAssets] = useState<Asset[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalAssets: 0,
     activeAssets: 0,
@@ -310,6 +309,116 @@ export default function HomePage() {
   const [showAuditDrawer, { open: openAuditDrawer, close: closeAuditDrawer }] = useDisclosure(false);
   const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[]>([]);
   
+  // Optimized filtering with useMemo instead of useState + useEffect
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      // Search term filter
+      const matchesSearch = searchTerm ? Object.values(asset).some(value =>
+        value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      ) : true;
+      
+      // Status filter
+      const matchesStatus = statusFilter.length > 0 ? statusFilter.includes(asset.status) : true;
+      
+      // Type filter
+      const matchesType = typeFilter.length > 0 ? typeFilter.includes(asset.assetType) : true;
+      
+      // Wing filter
+      const matchesWing = wingFilter.length > 0 ? wingFilter.includes(asset.wing) : true;
+      
+      // Floor filter
+      const matchesFloor = floorFilter.length > 0 ? floorFilter.includes(asset.floor) : true;
+      
+      // Filter Type filter
+      const matchesFilterType = filterTypeFilter.length > 0 ? filterTypeFilter.includes(asset.filterType) : true;
+      
+      // Need Flushing filter
+      const assetNeedFlushing = (typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true');
+      const matchesNeedFlushing = needFlushingFilter.length > 0 ? needFlushingFilter.includes(assetNeedFlushing ? 'Yes' : 'No') : true;
+      
+      // Filter Needed filter
+      const assetFilterNeeded = (typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded?.toString().toLowerCase() === 'yes' || asset.filterNeeded?.toString().toLowerCase() === 'true');
+      const matchesFilterNeeded = filterNeededFilter.length > 0 ? filterNeededFilter.includes(assetFilterNeeded ? 'Yes' : 'No') : true;
+      
+      // Filters On filter
+      const assetFiltersOn = (typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true');
+      const matchesFiltersOn = filtersOnFilter.length > 0 ? filtersOnFilter.includes(assetFiltersOn ? 'Yes' : 'No') : true;
+      
+      // Filter Expiry date range filter
+      let matchesFilterExpiry = true;
+      if (filterExpiryRange[0] && filterExpiryRange[1]) {
+        const expiryDate = safeDate(asset.filterExpiryDate);
+        if (expiryDate) {
+          matchesFilterExpiry = expiryDate >= filterExpiryRange[0]! && expiryDate <= filterExpiryRange[1]!;
+        } else {
+          matchesFilterExpiry = false;
+        }
+      }
+      
+      // Augmented Care filter
+      const assetAugmentedCare = (typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare?.toString().toLowerCase() === 'yes' || asset.augmentedCare?.toString().toLowerCase() === 'true');
+      const matchesAugmentedCare = augmentedCareFilter.length > 0 ? augmentedCareFilter.includes(assetAugmentedCare ? 'Yes' : 'No') : true;
+      
+      // Filter Expiry Status filter
+      let matchesFilterExpiryStatus = true;
+      if (filterExpiryStatus) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const expiryDate = safeDate(asset.filterExpiryDate);
+        
+        if (expiryDate) {
+          switch (filterExpiryStatus) {
+            case 'expired':
+              matchesFilterExpiryStatus = expiryDate < today;
+              break;
+            case 'this-week':
+              const thisWeekStart = new Date(today);
+              const day = today.getDay();
+              const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+              thisWeekStart.setDate(diff);
+              const thisWeekEnd = new Date(thisWeekStart);
+              thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
+              matchesFilterExpiryStatus = expiryDate >= thisWeekStart && expiryDate <= thisWeekEnd;
+              break;
+            case 'next-week':
+              const nextWeekStart = new Date(today);
+              const nextDay = today.getDay();
+              const nextDiff = today.getDate() - nextDay + (nextDay === 0 ? -6 : 1) + 7;
+              nextWeekStart.setDate(nextDiff);
+              const nextWeekEnd = new Date(nextWeekStart);
+              nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+              matchesFilterExpiryStatus = expiryDate >= nextWeekStart && expiryDate <= nextWeekEnd;
+              break;
+            case 'this-month':
+              const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+              const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+              matchesFilterExpiryStatus = expiryDate >= thisMonthStart && expiryDate <= thisMonthEnd;
+              break;
+            case 'next-month':
+              const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+              const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+              matchesFilterExpiryStatus = expiryDate >= nextMonthStart && expiryDate <= nextMonthEnd;
+              break;
+          }
+        } else {
+          matchesFilterExpiryStatus = false;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry && matchesFilterExpiryStatus;
+    });
+  }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange, filterExpiryStatus]);
+
+  // Optimized pagination with useMemo
+  const { totalPages, paginatedAssets } = useMemo(() => {
+    const total = Math.ceil(filteredAssets.length / itemsPerPage);
+    const paginated = filteredAssets.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+    return { totalPages: total, paginatedAssets: paginated };
+  }, [filteredAssets, currentPage, itemsPerPage]);
+
   // Pagination states for audit logs
   const [auditLogPagination, setAuditLogPagination] = useState<{
     hasMore: boolean;
@@ -1422,100 +1531,8 @@ export default function HomePage() {
     initializeData();
   }, [refreshTrigger]);
 
+  // Reset pagination when filters change
   useEffect(() => {
-    // Filter by search term and active filters
-    setFilteredAssets(assets.filter(asset => {
-      // Search term filter
-      const matchesSearch = searchTerm ? Object.values(asset).some(value =>
-        value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      ) : true;
-      
-      // Status filter
-      const matchesStatus = statusFilter.length > 0 ? statusFilter.includes(asset.status) : true;
-      
-      // Type filter
-      const matchesType = typeFilter.length > 0 ? typeFilter.includes(asset.assetType) : true;
-      
-      // Wing filter
-      const matchesWing = wingFilter.length > 0 ? wingFilter.includes(asset.wing) : true;
-      
-      // Floor filter
-      const matchesFloor = floorFilter.length > 0 ? floorFilter.includes(asset.floor) : true;
-      
-      // Filter Type filter
-      const matchesFilterType = filterTypeFilter.length > 0 ? filterTypeFilter.includes(asset.filterType) : true;
-      
-      // Need Flushing filter
-      const assetNeedFlushing = (typeof asset.needFlushing === 'boolean' ? asset.needFlushing : asset.needFlushing?.toString().toLowerCase() === 'yes' || asset.needFlushing?.toString().toLowerCase() === 'true');
-      const matchesNeedFlushing = needFlushingFilter.length > 0 ? needFlushingFilter.includes(assetNeedFlushing ? 'Yes' : 'No') : true;
-      // Filter Needed filter
-      const assetFilterNeeded = (typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded?.toString().toLowerCase() === 'yes' || asset.filterNeeded?.toString().toLowerCase() === 'true');
-      const matchesFilterNeeded = filterNeededFilter.length > 0 ? filterNeededFilter.includes(assetFilterNeeded ? 'Yes' : 'No') : true;
-      // Filters On filter
-      const assetFiltersOn = (typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true');
-      const matchesFiltersOn = filtersOnFilter.length > 0 ? filtersOnFilter.includes(assetFiltersOn ? 'Yes' : 'No') : true;
-      // Filter Expiry date range filter
-      let matchesFilterExpiry = true;
-      if (filterExpiryRange[0] && filterExpiryRange[1]) {
-        const expiryDate = safeDate(asset.filterExpiryDate);
-        if (expiryDate) {
-          matchesFilterExpiry = expiryDate >= filterExpiryRange[0]! && expiryDate <= filterExpiryRange[1]!;
-        } else {
-          matchesFilterExpiry = false;
-        }
-      }
-      // Augmented Care filter
-      const assetAugmentedCare = (typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : asset.augmentedCare?.toString().toLowerCase() === 'yes' || asset.augmentedCare?.toString().toLowerCase() === 'true');
-      const matchesAugmentedCare = augmentedCareFilter.length > 0 ? augmentedCareFilter.includes(assetAugmentedCare ? 'Yes' : 'No') : true;
-      
-      // Filter Expiry Status filter
-      let matchesFilterExpiryStatus = true;
-      if (filterExpiryStatus) {
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const expiryDate = safeDate(asset.filterExpiryDate);
-        
-        if (expiryDate) {
-          switch (filterExpiryStatus) {
-            case 'expired':
-              matchesFilterExpiryStatus = expiryDate < today;
-              break;
-            case 'this-week':
-              const thisWeekStart = new Date(today);
-              const day = today.getDay();
-              const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-              thisWeekStart.setDate(diff);
-              const thisWeekEnd = new Date(thisWeekStart);
-              thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
-              matchesFilterExpiryStatus = expiryDate >= thisWeekStart && expiryDate <= thisWeekEnd;
-              break;
-            case 'next-week':
-              const nextWeekStart = new Date(today);
-              const nextDay = today.getDay();
-              const nextDiff = today.getDate() - nextDay + (nextDay === 0 ? -6 : 1) + 7;
-              nextWeekStart.setDate(nextDiff);
-              const nextWeekEnd = new Date(nextWeekStart);
-              nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
-              matchesFilterExpiryStatus = expiryDate >= nextWeekStart && expiryDate <= nextWeekEnd;
-              break;
-            case 'this-month':
-              const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-              const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-              matchesFilterExpiryStatus = expiryDate >= thisMonthStart && expiryDate <= thisMonthEnd;
-              break;
-            case 'next-month':
-              const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-              const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-              matchesFilterExpiryStatus = expiryDate >= nextMonthStart && expiryDate <= nextMonthEnd;
-              break;
-          }
-        } else {
-          matchesFilterExpiryStatus = false;
-        }
-      }
-      
-      return matchesSearch && matchesStatus && matchesType && matchesWing && matchesFloor && matchesFilterType && matchesNeedFlushing && matchesFilterNeeded && matchesFiltersOn && matchesAugmentedCare && matchesFilterExpiry && matchesFilterExpiryStatus;
-    }));
     setCurrentPage(1);
   }, [assets, searchTerm, statusFilter, typeFilter, wingFilter, floorFilter, filterTypeFilter, needFlushingFilter, filterNeededFilter, filtersOnFilter, augmentedCareFilter, filterExpiryRange, filterExpiryStatus]);
 
@@ -1575,12 +1592,21 @@ export default function HomePage() {
     }
   }, [mobileSystemAuditOpen]);
 
-  const fetchData = async () => {
+  // Fetch data on component mount
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [assetsResponse, dashboardResponse] = await Promise.all([
+      const [assetsResponse, dashboardResponse, assetTypesResponse, filterTypesResponse] = await Promise.all([
         fetch('/api/assets'),
-        fetch('/api/dashboard')
+        fetch('/api/dashboard'),
+        fetch('/api/asset-types'),
+        fetch('/api/filter-types')
       ]);
       
       // Handle assets response
@@ -1629,6 +1655,48 @@ export default function HomePage() {
         throw new Error('Failed to fetch dashboard stats');
       }
 
+      // Handle asset types response
+      if (assetTypesResponse.ok) {
+        const assetTypesData = await assetTypesResponse.json();
+        if (assetTypesData.success && assetTypesData.data) {
+          // Ensure data is array of strings for compatibility with existing code
+          let assetTypesArray = Array.isArray(assetTypesData.data) 
+            ? assetTypesData.data 
+            : Object.values(assetTypesData.data);
+          
+          // Ensure all items are strings, not objects
+          assetTypesArray = assetTypesArray.map((item: any) => 
+            typeof item === 'string' ? item : (item?.value || item?.label || String(item))
+          );
+          
+          // Remove duplicates and filter out empty values
+          assetTypesArray = [...new Set(assetTypesArray.filter((item: any) => item && item.trim() !== ''))];
+          
+          setAssetTypes(assetTypesArray);
+        }
+      }
+
+      // Handle filter types response
+      if (filterTypesResponse.ok) {
+        const filterTypesData = await filterTypesResponse.json();
+        if (filterTypesData.success && filterTypesData.data) {
+          // Ensure data is array of strings for compatibility with existing code
+          let filterTypesArray = Array.isArray(filterTypesData.data) 
+            ? filterTypesData.data 
+            : Object.values(filterTypesData.data);
+          
+          // Ensure all items are strings, not objects
+          filterTypesArray = filterTypesArray.map((item: any) => 
+            typeof item === 'string' ? item : (item?.value || item?.label || String(item))
+          );
+          
+          // Remove duplicates and filter out empty values
+          filterTypesArray = [...new Set(filterTypesArray.filter((item: any) => item && item.trim() !== ''))];
+          
+          setFilterTypes(filterTypesArray);
+        }
+      }
+
       notifications.show({
         title: 'Success',
         message: 'Asset data loaded successfully!',
@@ -1646,7 +1714,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAssetForView]);
 
   // Removed broken filterAssets function - filtering now handled in useEffect
 
@@ -2457,12 +2525,7 @@ export default function HomePage() {
     </Card>
   );
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
-  const paginatedAssets = filteredAssets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+
 
   const rows = paginatedAssets.map((asset) => {
     const needsFlushing = typeof asset.needFlushing === 'boolean' ? 
@@ -4926,7 +4989,7 @@ export default function HomePage() {
                   <Select
                     label="Asset Type"
                     placeholder="Select type"
-                      data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[{ value: 'ADD_NEW', label: '+ Add New...' }, ...assetTypes.filter(type => type !== 'ADD_NEW')]}
                     required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
@@ -5096,7 +5159,7 @@ export default function HomePage() {
                     <Select
                       label="Filter Type"
                       placeholder="Select filter type"
-                      data={[...filterTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[{ value: 'ADD_NEW', label: '+ Add New...' }, ...filterTypes.filter(type => type !== 'ADD_NEW')]}
                       value={form.values.filterType}
                       onChange={handleFilterTypeSelect}
                     />
@@ -5275,7 +5338,7 @@ export default function HomePage() {
                   <Select
                     label="Asset Type"
                     placeholder="Select type"
-                      data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[{ value: 'ADD_NEW', label: '+ Add New...' }, ...assetTypes.filter(type => type !== 'ADD_NEW')]}
                     required
                       value={form.values.assetType}
                       onChange={handleAssetTypeSelect}
@@ -5445,7 +5508,7 @@ export default function HomePage() {
                     <Select
                       label="Filter Type"
                       placeholder="Select filter type"
-                      data={[...filterTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
+                      data={[{ value: 'ADD_NEW', label: '+ Add New...' }, ...filterTypes.filter(type => type !== 'ADD_NEW')]}
                       value={form.values.filterType}
                       onChange={handleFilterTypeSelect}
                     />
@@ -5663,14 +5726,13 @@ export default function HomePage() {
           },
           body: {
             maxHeight: 'calc(90vh - 60px)',
-            overflowY: 'auto',
-            padding: '0'
+            overflowY: 'auto'
           }
         }}
         className="asset-view-modal"
       >
         {selectedAssetForView && (
-          <div style={{ minHeight: '100%', background: '#f8f9fa' }}>
+          <div style={{ minHeight: '100%' }}>
               {/* Header with Action Buttons */}
               <div className="asset-section-header" style={{ background: 'white', padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
                 <Group justify="space-between" align="center" style={{ flexWrap: 'wrap', gap: '8px' }}>
@@ -6804,6 +6866,8 @@ export default function HomePage() {
             </Group>
           </div>
 
+          {/* Native HTML Controls for Better Mobile Compatibility */}
+
           {/* Content */}
           <div style={{ padding: '0' }}>
             {/* Basic Information */}
@@ -6831,20 +6895,62 @@ export default function HomePage() {
                   placeholder="Enter secondary identifier"
                   {...form.getInputProps('secondaryIdentifier')}
                 />
-                <Select
-                  label="Asset Type"
-                  placeholder="Select type"
-                  data={[...assetTypes.filter(type => type !== 'ADD_NEW'), { value: 'ADD_NEW', label: '+ Add New...' }]}
-                  required
-                  value={form.values.assetType}
-                  onChange={handleAssetTypeSelect}
-                />
-                <Select
-                  label="Status"
-                  data={['ACTIVE', 'INACTIVE', 'MAINTENANCE']}
-                  required
-                  {...form.getInputProps('status')}
-                />
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px' }}>
+                    Asset Type <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <select
+                    value={form.values.assetType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '+ Add New...') {
+                        handleAssetTypeSelect('ADD_NEW');
+                      } else {
+                        handleAssetTypeSelect(value);
+                      }
+                    }}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minHeight: '36px'
+                    }}
+                  >
+                    <option value="">Select type</option>
+                    <option value="+ Add New...">+ Add New...</option>
+                    {assetTypes.filter(type => type && type !== 'ADD_NEW').map((type, index) => (
+                      <option key={index} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px' }}>
+                    Status <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <select
+                    value={form.values.status || ''}
+                    onChange={(e) => form.setFieldValue('status', e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minHeight: '36px'
+                    }}
+                  >
+                    <option value="">Select status</option>
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="MAINTENANCE">MAINTENANCE</option>
+                  </select>
+                </div>
                 <Checkbox
                   label="Augmented Care"
                   description="Requires special care or attention"
@@ -6924,24 +7030,167 @@ export default function HomePage() {
                   description="Are filters currently installed?"
                   {...form.getInputProps('filtersOn', { type: 'checkbox' })}
                 />
-                <DateInput
-                  label="Filter Installed On"
-                  placeholder="Select date"
-                  valueFormat="DD/MM/YYYY"
-                  {...form.getInputProps('filterInstalledOn')}
-                />
-                <DateInput
-                  label="Filter Expiry Date"
-                  placeholder="Select expiry date"
-                  valueFormat="DD/MM/YYYY"
-                  {...form.getInputProps('filterExpiryDate')}
-                />
-                <Select
-                  label="Filter Type"
-                  placeholder="Select filter type"
-                  data={filterTypes}
-                  {...form.getInputProps('filterType')}
-                />
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px' }}>
+                    Filter Installed On
+                  </label>
+                  <input
+                    type="date"
+                    value={form.values.filterInstalledOn ? new Date(form.values.filterInstalledOn).toISOString().split('T')[0] : ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? new Date(e.target.value) : null;
+                      form.setFieldValue('filterInstalledOn', value);
+                      if (value) {
+                        const expiry = calculateFilterExpiry(value);
+                        form.setFieldValue('filterExpiryDate', expiry);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minHeight: '36px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px', color: '#6c757d' }}>
+                    Filter Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.values.filterExpiryDate ? new Date(form.values.filterExpiryDate).toISOString().split('T')[0] : ''}
+                    readOnly
+                    disabled
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: '#f8f9fa',
+                      color: '#6c757d',
+                      cursor: 'not-allowed',
+                      minHeight: '36px'
+                    }}
+                  />
+                </div>
+                <Stack gap="xs">
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px' }}>
+                      Filter Type
+                    </label>
+                    <select
+                      value={form.values.filterType || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '+ Add New...') {
+                          handleFilterTypeSelect('ADD_NEW');
+                        } else {
+                          handleFilterTypeSelect(value);
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #ced4da',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        backgroundColor: 'white',
+                        minHeight: '36px'
+                      }}
+                    >
+                      <option value="">Select filter type</option>
+                      <option value="+ Add New...">+ Add New...</option>
+                      {filterTypes.filter(type => type && type !== 'ADD_NEW').map((type, index) => (
+                        <option key={index} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {showNewFilterTypeInput && (
+                    <Group gap="xs">
+                      <TextInput
+                        placeholder="Enter new filter type"
+                        value={newFilterType}
+                        onChange={(e) => setNewFilterType(e.currentTarget.value)}
+                        style={{ flex: 1 }}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddNewFilterType();
+                          }
+                        }}
+                      />
+                      <Button size="xs" onClick={handleAddNewFilterType}>
+                        Add
+                      </Button>
+                      <Button size="xs" variant="outline" onClick={() => setShowNewFilterTypeInput(false)}>
+                        Cancel
+                      </Button>
+                    </Group>
+                  )}
+                </Stack>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '5px' }}>
+                    Reason for Filter Change
+                  </label>
+                  <select
+                    value={form.values.reasonForFilterChange || ''}
+                    onChange={(e) => form.setFieldValue('reasonForFilterChange', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #ced4da',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: 'white',
+                      minHeight: '36px'
+                    }}
+                  >
+                    <option value="">Select reason</option>
+                    <option value="Expired">Expired</option>
+                    <option value="Remedial">Remedial</option>
+                    <option value="Blocked">Blocked</option>
+                    <option value="Missing">Missing</option>
+                    <option value="New Installation">New Installation</option>
+                  </select>
+                </div>
+                
+                {/* Remove Filter Button */}
+                <Group justify="center" mt="md">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    color="orange"
+                    size="md"
+                    leftSection={<IconX size={16} />}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (selectedAssetForView) {
+                        handleRemoveFilter(selectedAssetForView);
+                      }
+                    }}
+                    disabled={!selectedAssetForView || (
+                      !selectedAssetForView.filterNeeded && 
+                      !selectedAssetForView.filtersOn && 
+                      !selectedAssetForView.filterType &&
+                      !form.values.filterNeeded &&
+                      !form.values.filtersOn &&
+                      !form.values.filterType &&
+                      !selectedAssetForView.filterInstalledOn &&
+                      !selectedAssetForView.filterExpiryDate &&
+                      !form.values.filterInstalledOn &&
+                      !form.values.filterExpiryDate
+                    )}
+                    style={{ minHeight: '48px' }}
+                  >
+                    Remove Filter
+                  </Button>
+                </Group>
               </Stack>
             </div>
 
