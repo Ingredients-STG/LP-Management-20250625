@@ -75,14 +75,20 @@ export async function POST(request: NextRequest) {
     for (const asset of allAssets) {
       try {
         const shouldFlush = uploadedBarcodes.has(asset.assetBarcode);
-        const currentNeedFlushing = asset.needFlushing === true || asset.needFlushing === 'true';
+        // Handle all possible representations of "true" in the database
+        const currentNeedFlushing = asset.needFlushing === true || 
+                                  asset.needFlushing === 'true' || 
+                                  asset.needFlushing === 'True' || 
+                                  asset.needFlushing === 'YES' || 
+                                  asset.needFlushing === 'Yes';
         
-        // Only update if the status needs to change
+        // Always update to ensure correct flush status (complete replacement logic)
+        // Assets in file = needFlushing: true, Assets not in file = needFlushing: false
         if (shouldFlush !== currentNeedFlushing) {
           console.log(`Updating ${asset.assetBarcode}: needFlushing ${currentNeedFlushing} -> ${shouldFlush}`);
           
-          // Update the asset
-          await DynamoDBService.updateAsset(asset.assetBarcode, {
+          // Update the asset using the correct asset ID, not barcode
+          await DynamoDBService.updateAsset(asset.id, {
             needFlushing: shouldFlush,
             modified: new Date().toISOString(),
             modifiedBy: userEmail

@@ -3939,37 +3939,371 @@ export default function HomePage() {
     </Stack>
   );
 
-  const renderReports = () => (
-    <Stack gap="lg">
-      <Title order={2}>Reports & Analytics</Title>
-      <Text c="dimmed">Comprehensive reporting and analytics for your water tap assets.</Text>
+  const renderReports = () => {
+    // Helper function to format date to DD/MM/YYYY
+    const formatDateToDDMMYYYY = (dateString: string | null | undefined) => {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      } catch {
+        return '';
+      }
+    };
+
+    // Helper function to get start and end of current week (Monday to Sunday)
+    const getCurrentWeekRange = () => {
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Adjust for Monday start
       
-      <Grid>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Maintenance Schedule</Title>
-              <Button size="xs" variant="light">View All</Button>
-            </Group>
-            <Text c="dimmed" size="sm">
-              Track upcoming maintenance tasks and filter replacements.
-            </Text>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Card shadow="sm" padding="lg" radius="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Performance Metrics</Title>
-              <Button size="xs" variant="light">Generate Report</Button>
-            </Group>
-            <Text c="dimmed" size="sm">
-              Asset performance and operational efficiency metrics.
-            </Text>
-          </Card>
-        </Grid.Col>
-      </Grid>
-    </Stack>
-  );
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - daysFromMonday);
+      startOfWeek.setHours(0, 0, 0, 0);
+      
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      
+      return { startOfWeek, endOfWeek };
+    };
+
+    // Calculate data for reports - Filter Expiry: expired filters + expiring this week
+    const filterExpiryAssets = assets.filter(asset => {
+      // Must have filter expiry date
+      if (!asset.filterExpiryDate) return false;
+      
+      const expiryDate = new Date(asset.filterExpiryDate);
+      const today = new Date();
+      const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Get current week range (Monday to Sunday)
+      const { startOfWeek, endOfWeek } = getCurrentWeekRange();
+      const isExpiringThisWeek = expiryDate >= startOfWeek && expiryDate <= endOfWeek;
+      
+      // Filter criteria: (expired OR expiring this week) AND Filter Needed = Yes AND Filters On = Yes AND Status = ACTIVE
+      return (
+        (daysUntilExpiry <= 0 || isExpiringThisWeek) && // Already expired OR expiring this week
+        (asset.filterNeeded === true || asset.filterNeeded === 'YES' || asset.filterNeeded === 'true') && // Filter Needed = Yes
+        (asset.filtersOn === true || asset.filtersOn === 'YES' || asset.filtersOn === 'true') && // Filters On = Yes
+        asset.status === 'ACTIVE' // Status = ACTIVE only
+      );
+    }).sort((a, b) => {
+      // Sort by Room field
+      const roomA = (a.room || '').toString().toLowerCase();
+      const roomB = (b.room || '').toString().toLowerCase();
+      return roomA.localeCompare(roomB);
+    });
+
+    const flushAssets = assets.filter(asset => {
+      const needsFlushing = asset.needFlushing === true || asset.needFlushing === 'YES' || asset.needFlushing === 'true';
+      const isLowUsage = asset.lowUsageAsset === true || asset.lowUsageAsset === 'YES' || asset.lowUsageAsset === 'true';
+      const isActiveOrMaintenance = asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE';
+      
+      return (needsFlushing || isLowUsage) && isActiveOrMaintenance;
+    }).sort((a, b) => {
+      // Sort by Wing first, then by Room
+      const wingA = (a.wing || '').toString().toLowerCase();
+      const wingB = (b.wing || '').toString().toLowerCase();
+      const wingComparison = wingA.localeCompare(wingB);
+      
+      if (wingComparison !== 0) {
+        return wingComparison;
+      }
+      
+      // If wings are the same, sort by Room
+      const roomA = (a.room || '').toString().toLowerCase();
+      const roomB = (b.room || '').toString().toLowerCase();
+      return roomA.localeCompare(roomB);
+    });
+
+    // Calculate filter removal assets (same logic as dashboard "Filters to be Removed")
+    const filterRemovalAssets = assets.filter(asset => {
+      const isActiveOrMaintenance = asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE';
+      const filterNeeded = typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
+      const filtersOn = typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes');
+      
+      return isActiveOrMaintenance && !filterNeeded && filtersOn;
+    }).sort((a, b) => {
+      // Sort by Wing first, then by Room
+      const wingA = (a.wing || '').toString().toLowerCase();
+      const wingB = (b.wing || '').toString().toLowerCase();
+      const wingComparison = wingA.localeCompare(wingB);
+      
+      if (wingComparison !== 0) {
+        return wingComparison;
+      }
+      
+      // If wings are the same, sort by Room
+      const roomA = (a.room || '').toString().toLowerCase();
+      const roomB = (b.room || '').toString().toLowerCase();
+      return roomA.localeCompare(roomB);
+    });
+
+    const downloadFilterExpiryList = () => {
+      const data = filterExpiryAssets.map(asset => {
+        const daysUntilExpiryNum = asset.filterExpiryDate ? 
+          Math.ceil((new Date(asset.filterExpiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        const daysUntilExpiry = asset.filterExpiryDate ? daysUntilExpiryNum : '';
+        
+        // Determine expiry status
+        const { startOfWeek, endOfWeek } = getCurrentWeekRange();
+        const expiryDate = new Date(asset.filterExpiryDate);
+        const isExpiringThisWeek = expiryDate >= startOfWeek && expiryDate <= endOfWeek;
+        let expiryStatus = '';
+        
+        if (daysUntilExpiryNum <= 0) {
+          expiryStatus = 'EXPIRED';
+        } else if (isExpiringThisWeek) {
+          expiryStatus = 'EXPIRING THIS WEEK';
+        } else {
+          expiryStatus = 'OTHER';
+        }
+        
+        return {
+          'Asset Barcode': asset.assetBarcode,
+          'Primary Identifier': asset.primaryIdentifier || '',
+          'Asset Type': asset.assetType || '',
+          'Wing': asset.wing || '',
+          'Room': asset.room || '',
+          'Room Name': asset.roomName || '',
+          'Filter Type': asset.filterType || '',
+          'Filter Installed On': formatDateToDDMMYYYY(asset.filterInstalledOn),
+          'Filter Expiry On': formatDateToDDMMYYYY(asset.filterExpiryDate),
+          'Days Until Expiry': daysUntilExpiry,
+          'Expiry Status': expiryStatus,
+          'Status': asset.status || '',
+          'Filter Needed': asset.filterNeeded === true || asset.filterNeeded === 'YES' || asset.filterNeeded === 'true' ? 'Yes' : 'No',
+          'Filters On': asset.filtersOn === true || asset.filtersOn === 'YES' || asset.filtersOn === 'true' ? 'Yes' : 'No',
+          'Augmented Care': asset.augmentedCare === true || asset.augmentedCare === 'YES' ? 'Yes' : 'No'
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Filter Expiry List');
+      
+      const dateTimeStr = getDateTimeString();
+      XLSX.writeFile(wb, `filter-expiry-list_${dateTimeStr}.xlsx`);
+      
+      notifications.show({
+        title: 'Export Complete',
+        message: `Filter expiry list exported successfully (${data.length} assets)`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    };
+
+    const downloadFlushList = () => {
+      const data = flushAssets.map(asset => {
+        const needsFlushing = asset.needFlushing === true || asset.needFlushing === 'YES' || asset.needFlushing === 'true';
+        const isLowUsage = asset.lowUsageAsset === true || asset.lowUsageAsset === 'YES' || asset.lowUsageAsset === 'true';
+        
+        // Determine flushing type based on criteria
+        let flushingType = '';
+        if (needsFlushing && isLowUsage) {
+          flushingType = 'Daily Flushing & Weekly Twice Flushing'; // Both conditions met
+        } else if (needsFlushing) {
+          flushingType = 'Daily Flushing'; // Need Flushing = Yes
+        } else if (isLowUsage) {
+          flushingType = 'Weekly Twice Flushing'; // Low Usage Asset = Yes
+        }
+        
+        return {
+          'Asset Barcode': asset.assetBarcode,
+          'Wing': asset.wingInShort || '',
+          'Room': asset.room || '',
+          'Room Name': asset.roomName || '',
+          'Type of Flushing': flushingType
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Flush List');
+      
+      const dateTimeStr = getDateTimeString();
+      XLSX.writeFile(wb, `flush-list_${dateTimeStr}.xlsx`);
+      
+      notifications.show({
+        title: 'Export Complete',
+        message: `Flush list exported successfully (${data.length} assets)`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    };
+
+    const downloadFilterRemovalList = () => {
+      const data = filterRemovalAssets.map(asset => {
+        return {
+          'Asset Barcode': asset.assetBarcode,
+          'Wing': asset.wingInShort || '',
+          'Room': asset.room || '',
+          'Room Name': asset.roomName || '',
+          'Filter Type': asset.filterType || '',
+          'Filter Installed On': formatDateToDDMMYYYY(asset.filterInstalledOn)
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Filter Removal List');
+      
+      const dateTimeStr = getDateTimeString();
+      XLSX.writeFile(wb, `filter-removal-list_${dateTimeStr}.xlsx`);
+      
+      notifications.show({
+        title: 'Export Complete',
+        message: `Filter removal list exported successfully (${data.length} assets)`,
+        color: 'orange',
+        icon: <IconCheck size={16} />,
+      });
+    };
+
+    return (
+      <Stack gap="lg">
+        <Title order={2}>Reports & Analytics</Title>
+        <Text c="dimmed">Download comprehensive reports for filter maintenance and flushing schedules.</Text>
+        
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: '100%' }}>
+              <Stack gap="md" style={{ height: '100%' }}>
+                <Group justify="space-between" align="flex-start">
+                  <div>
+                    <Group gap="xs" mb="xs">
+                      <IconFilter size={20} color="#1c7ed6" />
+                      <Title order={4}>Filter Expiry List</Title>
+                    </Group>
+                    <Text c="dimmed" size="sm">
+                      ACTIVE assets with EXPIRED or EXPIRING THIS WEEK filters (Filter Needed: Yes, Filters On: Yes)
+                    </Text>
+                  </div>
+                  <Badge 
+                    size="lg" 
+                    variant="light" 
+                    color={filterExpiryAssets.length > 0 ? "red" : "green"}
+                  >
+                    {filterExpiryAssets.length}
+                  </Badge>
+                </Group>
+                
+                <div style={{ flex: 1 }} />
+                
+                <Stack gap="xs">
+                  <Text size="sm" c="dimmed">
+                    Includes: Asset details, filter types, expiry dates, and days remaining
+                  </Text>
+                  <Button 
+                    leftSection={<IconDownload size={16} />}
+                    onClick={downloadFilterExpiryList}
+                    disabled={filterExpiryAssets.length === 0}
+                    fullWidth
+                  >
+                    Download Excel Report
+                  </Button>
+                </Stack>
+              </Stack>
+            </Card>
+          </Grid.Col>
+          
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: '100%' }}>
+              <Stack gap="md" style={{ height: '100%' }}>
+                <Group justify="space-between" align="flex-start">
+                  <div>
+                    <Group gap="xs" mb="xs">
+                      <IconDroplet size={20} color="#40c057" />
+                      <Title order={4}>Flush List</Title>
+                    </Group>
+                    <Text c="dimmed" size="sm">
+                      Assets requiring flushing (Need Flushing: Yes OR Low Usage Asset: Yes)
+                    </Text>
+                  </div>
+                  <Badge 
+                    size="lg" 
+                    variant="light" 
+                    color={flushAssets.length > 0 ? "blue" : "gray"}
+                  >
+                    {flushAssets.length}
+                  </Badge>
+                </Group>
+                
+                <div style={{ flex: 1 }} />
+                
+                <Stack gap="xs">
+                  <Text size="sm" c="dimmed">
+                    Includes: Asset Barcode, Wing, Room, Room Name, and Type of Flushing
+                  </Text>
+                  <Button 
+                    leftSection={<IconDownload size={16} />}
+                    onClick={downloadFlushList}
+                    disabled={flushAssets.length === 0}
+                    color="green"
+                    fullWidth
+                  >
+                    Download Excel Report
+                  </Button>
+                </Stack>
+              </Stack>
+            </Card>
+          </Grid.Col>
+        </Grid>
+
+        {/* Second Row - Filter Removal List */}
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: '100%' }}>
+              <Stack gap="md" style={{ height: '100%' }}>
+                <Group justify="space-between" align="flex-start">
+                  <div>
+                    <Group gap="xs" mb="xs">
+                      <IconFilter size={20} color="#f03e3e" />
+                      <Title order={4}>Filter Removal List</Title>
+                    </Group>
+                    <Text c="dimmed" size="sm">
+                      ACTIVE/MAINTENANCE assets with filters to be removed (Filter Needed: No, Filters On: Yes)
+                    </Text>
+                  </div>
+                  <Badge 
+                    size="lg" 
+                    variant="light" 
+                    color={filterRemovalAssets.length > 0 ? "orange" : "gray"}
+                  >
+                    {filterRemovalAssets.length}
+                  </Badge>
+                </Group>
+                
+                <div style={{ flex: 1 }} />
+                
+                <Stack gap="xs">
+                  <Text size="sm" c="dimmed">
+                    Includes: Asset Barcode, Wing, Room, Room Name, Filter Type, and Installation Date
+                  </Text>
+                  <Button 
+                    leftSection={<IconDownload size={16} />}
+                    onClick={downloadFilterRemovalList}
+                    disabled={filterRemovalAssets.length === 0}
+                    color="orange"
+                    fullWidth
+                  >
+                    Download Excel Report
+                  </Button>
+                </Stack>
+              </Stack>
+            </Card>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            {/* Empty space for future report */}
+          </Grid.Col>
+        </Grid>
+      </Stack>
+    );
+  };
 
   const handleSystemReset = () => {
     modals.openConfirmModal({
