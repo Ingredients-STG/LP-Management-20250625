@@ -47,7 +47,9 @@ import { spotlight } from '@mantine/spotlight';
 import BarcodeScanner from '@/components/BarcodeScanner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SPListItemsCard from '@/components/SPListItemsCard';
+import LPHistoryCard from '@/components/LPHistoryCard';
 import AssetReconciliation from '@/components/AssetReconciliation';
+import LPManagement from '@/components/LPManagement';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { getCurrentUser, formatTimestamp } from '@/lib/utils';
@@ -101,6 +103,7 @@ import {
   IconGitCompare,
   IconDeviceFloppy,
   IconFilterOff,
+  IconDatabase,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -184,6 +187,26 @@ function safeDate(val: any): Date | null {
     }
   } catch {}
   return null;
+}
+
+// Helper function to append new note to existing notes
+function appendNoteToHistory(existingNotes: string, newNote: string, username: string): string {
+  const timestamp = new Date().toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  
+  const noteEntry = `[${timestamp}] ${username}: ${newNote}`;
+  
+  if (!existingNotes || existingNotes.trim() === '') {
+    return noteEntry;
+  }
+  
+  return `${existingNotes}\n\n${noteEntry}`;
 }
 
 // Helper to get date and time string in YYYY-MM-DD_HHMMSS format
@@ -299,6 +322,7 @@ export default function HomePage() {
   const [filterTypes, setFilterTypes] = useState<string[]>(['Standard', 'Advanced', 'Premium', 'Basic']);
   const [showNewFilterTypeInput, setShowNewFilterTypeInput] = useState(false);
   const [newFilterType, setNewFilterType] = useState('');
+  const [newNoteInput, setNewNoteInput] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadResults, setUploadResults] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -1876,8 +1900,15 @@ export default function HomePage() {
         }
       }
 
+      // Handle notes: append new note to existing notes if provided
+      let finalNotes = sanitizedValues.notes || '';
+      if (newNoteInput && newNoteInput.trim()) {
+        finalNotes = appendNoteToHistory(finalNotes, newNoteInput.trim(), user?.email || user?.username || 'Unknown User');
+      }
+
       const assetData = {
         ...sanitizedValues,
+        notes: finalNotes,
         filterExpiryDate: formatDateForAPI(finalFilterExpiryDate),
         filterInstalledOn: formatDateForAPI(sanitizedValues.filterInstalledOn),
       };
@@ -1996,6 +2027,7 @@ export default function HomePage() {
       
       form.reset();
       setAssetFiles([]); // Clear uploaded files
+      setNewNoteInput(''); // Clear new note input
       closeModal();
       
       notifications.show({
@@ -2084,8 +2116,15 @@ export default function HomePage() {
         }
       }
 
+      // Handle notes: append new note to existing notes if provided
+      let finalNotes = sanitizedValues.notes || '';
+      if (newNoteInput && newNoteInput.trim()) {
+        finalNotes = appendNoteToHistory(selectedAssetForView?.notes || '', newNoteInput.trim(), user?.email || user?.username || 'Unknown User');
+      }
+
       const updateData = {
         ...sanitizedValues,
+        notes: finalNotes,
         filterExpiryDate: expiryDate ? formatDateForAPI(expiryDate) : '',
         filterInstalledOn: formatDateForAPI(sanitizedValues.filterInstalledOn),
         attachments: [...(selectedAssetForView?.attachments || []), ...newAttachments], // Merge existing and new attachments
@@ -2177,6 +2216,7 @@ export default function HomePage() {
       closeEditModal();
       setSelectedAssetForView(null);
       setAssetFiles([]); // Clear uploaded files
+      setNewNoteInput(''); // Clear new note input
       form.reset();
       notifications.show({
         title: "Success",
@@ -2682,6 +2722,27 @@ export default function HomePage() {
           <Text size="sm">{asset.assetType}</Text>
         </Table.Td>
         <Table.Td>
+          <Text size="sm">{asset.filterType || 'None'}</Text>
+        </Table.Td>
+        <Table.Td>
+          <Group gap="xs">
+            <Badge 
+              color={(typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded?.toString().toLowerCase() === 'yes' || asset.filterNeeded?.toString().toLowerCase() === 'true') ? 'green' : 'gray'} 
+              variant="light" 
+              size="xs"
+            >
+              {(typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : asset.filterNeeded?.toString().toLowerCase() === 'yes' || asset.filterNeeded?.toString().toLowerCase() === 'true') ? 'Needed' : 'Not Needed'}
+            </Badge>
+            <Badge 
+              color={(typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true') ? 'blue' : 'gray'} 
+              variant="light" 
+              size="xs"
+            >
+              {(typeof asset.filtersOn === 'boolean' ? asset.filtersOn : asset.filtersOn?.toString().toLowerCase() === 'yes' || asset.filtersOn?.toString().toLowerCase() === 'true') ? 'On' : 'Off'}
+            </Badge>
+          </Group>
+        </Table.Td>
+        <Table.Td>
           <Group gap="xs">
             <IconCalendar size={14} />
             <Text size="sm">
@@ -2734,6 +2795,25 @@ export default function HomePage() {
               ) : null;
             })()}
           </Stack>
+        </Table.Td>
+        <Table.Td>
+          <Badge 
+            color={(typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare === 'true' || asset.augmentedCare === 'YES')) ? 'blue' : 'gray'} 
+            variant="light" 
+            size="sm"
+
+          >
+            {(typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare === 'true' || asset.augmentedCare === 'YES')) ? 'Yes' : 'No'}
+          </Badge>
+        </Table.Td>
+        <Table.Td>
+          <Badge 
+            color={(typeof asset.lowUsageAsset === 'boolean' ? asset.lowUsageAsset : (asset.lowUsageAsset === 'true' || asset.lowUsageAsset === 'YES')) ? 'yellow' : 'gray'} 
+            variant="light" 
+            size="sm"
+          >
+            {(typeof asset.lowUsageAsset === 'boolean' ? asset.lowUsageAsset : (asset.lowUsageAsset === 'true' || asset.lowUsageAsset === 'YES')) ? 'Yes' : 'No'}
+          </Badge>
         </Table.Td>
       </Table.Tr>
     );
@@ -3719,14 +3799,18 @@ export default function HomePage() {
                       <Table.Th>Status</Table.Th>
                       <Table.Th>Location</Table.Th>
                       <Table.Th>Type</Table.Th>
+                      <Table.Th>Filter Type</Table.Th>
+                      <Table.Th>Filter Status</Table.Th>
                       <Table.Th>Installed</Table.Th>
                       <Table.Th>Filter Expiry</Table.Th>
+                      <Table.Th>Augmented Care</Table.Th>
+                      <Table.Th>Low Usage</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {rows.length > 0 ? rows : (
                       <Table.Tr>
-                        <Table.Td colSpan={7}>
+                        <Table.Td colSpan={11}>
                           <Group justify="center" py="xl">
                             <Stack align="center" gap="xs">
                               <IconDroplet size={48} color="gray" />
@@ -3865,6 +3949,32 @@ export default function HomePage() {
                                   return d ? d.toLocaleDateString('en-GB') : 'Not installed'; 
                                 })()}
                               </Text>
+                            </Grid.Col>
+                          </Grid>
+                        </Paper>
+
+                        {/* Special Care and Usage Section */}
+                        <Paper p="sm" withBorder radius="md" bg="gray.0">
+                          <Grid gutter="sm">
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>AUGMENTED CARE</Text>
+                              <Badge 
+                                color={(typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare === 'true' || asset.augmentedCare === 'YES')) ? 'blue' : 'gray'} 
+                                variant="filled"
+                                size="md"
+                              >
+                                {(typeof asset.augmentedCare === 'boolean' ? asset.augmentedCare : (asset.augmentedCare === 'true' || asset.augmentedCare === 'YES')) ? 'YES' : 'NO'}
+                              </Badge>
+                            </Grid.Col>
+                            <Grid.Col span={6}>
+                              <Text size="xs" c="dimmed" fw={600} mb={2}>LOW USAGE</Text>
+                              <Badge 
+                                color={(typeof asset.lowUsageAsset === 'boolean' ? asset.lowUsageAsset : (asset.lowUsageAsset === 'true' || asset.lowUsageAsset === 'YES')) ? 'yellow' : 'gray'} 
+                                variant="filled"
+                                size="md"
+                              >
+                                {(typeof asset.lowUsageAsset === 'boolean' ? asset.lowUsageAsset : (asset.lowUsageAsset === 'true' || asset.lowUsageAsset === 'YES')) ? 'YES' : 'NO'}
+                              </Badge>
                             </Grid.Col>
                           </Grid>
                         </Paper>
@@ -5467,6 +5577,17 @@ export default function HomePage() {
               Filter Reconciliation
             </Button>
             <Button
+              variant={activeTab === 'lp-management' ? 'filled' : 'subtle'}
+              leftSection={<IconDatabase size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('lp-management');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              LP Management
+            </Button>
+            <Button
               variant={activeTab === 'settings' ? 'filled' : 'subtle'}
               leftSection={<IconSettings size={16} />}
               justify="start"
@@ -5507,6 +5628,7 @@ export default function HomePage() {
             {activeTab === 'reports' && renderReports()}
             {activeTab === 'bulk-update' && renderBulkUpdate()}
             {activeTab === 'asset-reconciliation' && <AssetReconciliation />}
+            {activeTab === 'lp-management' && <LPManagement />}
             {activeTab === 'settings' && renderSettings()}
           </div>
         </AppShell.Main>
@@ -5807,15 +5929,36 @@ export default function HomePage() {
 
             <Divider />
 
-            {/* Notes */}
+            {/* Notes History */}
             <div>
-              <Title order={5} mb="xs">Additional Notes</Title>
+              <Title order={5} mb="xs">Notes History</Title>
+              
+              {/* Existing Notes Display */}
+              {form.values.notes && form.values.notes.trim() && (
+                <Paper p="sm" withBorder radius="md" bg="gray.0" mb="md">
+                  <Text size="xs" c="dimmed" mb="xs">Previous Notes:</Text>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                      {form.values.notes}
+                    </Text>
+                  </div>
+                </Paper>
+              )}
+              
+              {/* New Note Input */}
               <Textarea
-                label="Notes"
-                placeholder="Additional notes and comments"
-                rows={4}
-                {...form.getInputProps('notes')}
+                label="Add New Note"
+                placeholder="Enter a new note (will be appended to existing notes with timestamp)"
+                rows={3}
+                value={newNoteInput || ''}
+                onChange={(e) => setNewNoteInput(e.target.value)}
               />
+              
+              {newNoteInput && newNoteInput.trim() && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  Note: This will be added to the existing notes history with timestamp and your username.
+                </Text>
+              )}
             </div>
 
             <Divider />
@@ -6195,15 +6338,36 @@ export default function HomePage() {
 
             <Divider />
 
-            {/* Notes */}
+            {/* Notes History */}
             <div>
-              <Title order={5} mb="xs">Additional Notes</Title>
+              <Title order={5} mb="xs">Notes History</Title>
+              
+              {/* Existing Notes Display */}
+              {selectedAssetForView?.notes && selectedAssetForView.notes.trim() && (
+                <Paper p="sm" withBorder radius="md" bg="gray.0" mb="md">
+                  <Text size="xs" c="dimmed" mb="xs">Previous Notes:</Text>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                      {selectedAssetForView.notes}
+                    </Text>
+                  </div>
+                </Paper>
+              )}
+              
+              {/* New Note Input */}
               <Textarea
-                label="Notes"
-                placeholder="Additional notes and comments"
-                rows={4}
-                {...form.getInputProps('notes')}
+                label="Add New Note"
+                placeholder="Enter a new note (will be appended to existing notes with timestamp)"
+                rows={3}
+                value={newNoteInput || ''}
+                onChange={(e) => setNewNoteInput(e.target.value)}
               />
+              
+              {newNoteInput && newNoteInput.trim() && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  Note: This will be added to the existing notes history with timestamp and your username.
+                </Text>
+              )}
             </div>
 
             {/* File Attachments */}
@@ -6456,31 +6620,31 @@ export default function HomePage() {
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Augmented Care</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare === 'true' || selectedAssetForView.augmentedCare === 'YES')) ? 'blue' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare === 'true' || selectedAssetForView.augmentedCare === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Low Usage Asset</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'yellow' : 'gray'} 
+                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset === 'true' || selectedAssetForView.lowUsageAsset === 'YES')) ? 'yellow' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset === 'true' || selectedAssetForView.lowUsageAsset === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6 }}>
                   <Text size="xs" c="dimmed" mb={2}>Need Flushing</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'orange' : 'gray'} 
+                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing === 'true' || selectedAssetForView.needFlushing === 'YES')) ? 'orange' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing === 'true' || selectedAssetForView.needFlushing === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
               </Grid>
@@ -6726,6 +6890,11 @@ export default function HomePage() {
                   </Text>
                 )
               )}
+            </div>
+
+            {/* LP Test History */}
+            <div className="asset-section">
+              <LPHistoryCard assetBarcode={selectedAssetForView.assetBarcode} />
             </div>
 
           </div>
@@ -7135,31 +7304,31 @@ export default function HomePage() {
                 <Grid.Col span={12}>
                   <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Augmented Care</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'blue' : 'gray'} 
+                    color={(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare === 'true' || selectedAssetForView.augmentedCare === 'YES')) ? 'blue' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : selectedAssetForView.augmentedCare === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.augmentedCare === 'boolean' ? selectedAssetForView.augmentedCare : (selectedAssetForView.augmentedCare === 'true' || selectedAssetForView.augmentedCare === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={12}>
                   <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Low Usage Asset</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'yellow' : 'gray'} 
+                    color={(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset === 'true' || selectedAssetForView.lowUsageAsset === 'YES')) ? 'yellow' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : selectedAssetForView.lowUsageAsset === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.lowUsageAsset === 'boolean' ? selectedAssetForView.lowUsageAsset : (selectedAssetForView.lowUsageAsset === 'true' || selectedAssetForView.lowUsageAsset === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
                 <Grid.Col span={12}>
                   <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Need Flushing</Text>
                   <Badge 
-                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'orange' : 'gray'} 
+                    color={(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing === 'true' || selectedAssetForView.needFlushing === 'YES')) ? 'orange' : 'gray'} 
                     variant="light" 
                     size="sm"
                   >
-                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : selectedAssetForView.needFlushing === 'true') ? 'Yes' : 'No'}
+                    {(typeof selectedAssetForView.needFlushing === 'boolean' ? selectedAssetForView.needFlushing : (selectedAssetForView.needFlushing === 'true' || selectedAssetForView.needFlushing === 'YES')) ? 'Yes' : 'No'}
                   </Badge>
                 </Grid.Col>
               </Grid>
@@ -7271,7 +7440,7 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Notes */}
+            {/* Notes History */}
             {selectedAssetForView.notes && (
               <div style={{
                 background: 'white',
@@ -7279,8 +7448,14 @@ export default function HomePage() {
                 padding: '20px 16px',
                 borderBottom: '1px solid #e9ecef'
               }}>
-                <Text fw={600} size="md" mb="md" c="dark">Notes</Text>
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{selectedAssetForView.notes}</Text>
+                <Text fw={600} size="md" mb="md" c="dark">Notes History</Text>
+                <Paper p="sm" withBorder radius="md" bg="gray.0">
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                      {selectedAssetForView.notes}
+                    </Text>
+                  </div>
+                </Paper>
               </div>
             )}
 
@@ -7836,13 +8011,34 @@ export default function HomePage() {
               padding: '20px 16px',
               borderBottom: '1px solid #e9ecef'
             }}>
-              <Text fw={600} size="md" mb="md" c="dark">Additional Notes</Text>
+              <Text fw={600} size="md" mb="md" c="dark">Notes History</Text>
+              
+              {/* Existing Notes Display */}
+              {selectedAssetForView?.notes && selectedAssetForView.notes.trim() && (
+                <Paper p="sm" withBorder radius="md" bg="gray.0" mb="md">
+                  <Text size="xs" c="dimmed" mb="xs">Previous Notes:</Text>
+                  <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                      {selectedAssetForView.notes}
+                    </Text>
+                  </div>
+                </Paper>
+              )}
+              
+              {/* New Note Input */}
               <Textarea
-                label="Notes"
-                placeholder="Additional notes and comments"
-                rows={4}
-                {...form.getInputProps('notes')}
+                label="Add New Note"
+                placeholder="Enter a new note (will be appended with timestamp)"
+                rows={3}
+                value={newNoteInput || ''}
+                onChange={(e) => setNewNoteInput(e.target.value)}
               />
+              
+              {newNoteInput && newNoteInput.trim() && (
+                <Text size="xs" c="dimmed" mt="xs">
+                  Will be added to notes history with timestamp.
+                </Text>
+              )}
             </div>
 
             {/* Action Buttons */}
