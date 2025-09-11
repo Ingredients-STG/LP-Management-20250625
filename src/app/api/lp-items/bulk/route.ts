@@ -99,8 +99,27 @@ export async function POST(request: NextRequest) {
 
     console.log(`Processing ${items.length} LP items from ${source}...`);
 
+    // Check for existing WO Numbers to prevent duplicates
+    const existingItems = await docClient.send(new ScanCommand({
+      TableName: TABLE_NAME,
+      ProjectionExpression: 'woNumber'
+    }));
+    
+    const existingWONumbers = existingItems.Items?.map(item => item.woNumber) || [];
+    
+    // Filter out duplicates
+    const uniqueItems = items.filter(item => {
+      const woNumber = item['WO Number'] || item.woNumber || '';
+      return !existingWONumbers.includes(woNumber);
+    });
+    
+    const duplicateCount = items.length - uniqueItems.length;
+    if (duplicateCount > 0) {
+      console.log(`Found ${duplicateCount} duplicate WO Numbers, processing only ${uniqueItems.length} unique items`);
+    }
+
     const now = new Date().toISOString();
-    const processedItems = items.map((item, index) => {
+    const processedItems = uniqueItems.map((item, index) => {
       // Generate ID if not provided
       const id = item.id || `lp-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
       
@@ -124,6 +143,10 @@ export async function POST(request: NextRequest) {
         bacteriaVariant: item['Bacteria Variant'] || item.bacteriaVariant || '',
         sampledOn: item['Sampled On'] || item.sampledOn || '',
         nextResampleDate: item['Next Resample Date'] || item.nextResampleDate || '',
+        hotTemperature: item['Hot Temperature'] || item.hotTemperature || '',
+        coldTemperature: item['Cold Temperature'] || item.coldTemperature || '',
+        remedialWoNumber: item['Remedial WO Number'] || item.remedialWoNumber || '',
+        remedialCompletedDate: item['Remedial Completed Date'] || item.remedialCompletedDate || '',
         // System fields
         createdAt: item.createdAt || now,
         updatedAt: now,
@@ -136,31 +159,35 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Clear existing items first (optional - you may want to keep this or make it configurable)
-    console.log('Clearing existing LP items...');
-    const scanCommand = new ScanCommand({
-      TableName: TABLE_NAME,
-      ProjectionExpression: 'id'
-    });
-    const existingItems = await docClient.send(scanCommand);
+    // Only clear existing items if explicitly requested (for Power Automate full sync)
+    if (source === 'power-automate-full-sync') {
+      console.log('Clearing existing LP items for full sync...');
+      const scanCommand = new ScanCommand({
+        TableName: TABLE_NAME,
+        ProjectionExpression: 'id'
+      });
+      const existingItems = await docClient.send(scanCommand);
 
-    if (existingItems.Items && existingItems.Items.length > 0) {
-      const deleteRequests = existingItems.Items.map(item => ({
-        DeleteRequest: {
-          Key: { id: item.id }
-        }
-      }));
-
-      // Process deletes in batches
-      for (let i = 0; i < deleteRequests.length; i += 25) {
-        const batch = deleteRequests.slice(i, i + 25);
-        const deleteCommand = new BatchWriteCommand({
-          RequestItems: {
-            [TABLE_NAME]: batch
+      if (existingItems.Items && existingItems.Items.length > 0) {
+        const deleteRequests = existingItems.Items.map(item => ({
+          DeleteRequest: {
+            Key: { id: item.id }
           }
-        });
-        await docClient.send(deleteCommand);
+        }));
+
+        // Process deletes in batches
+        for (let i = 0; i < deleteRequests.length; i += 25) {
+          const batch = deleteRequests.slice(i, i + 25);
+          const deleteCommand = new BatchWriteCommand({
+            RequestItems: {
+              [TABLE_NAME]: batch
+            }
+          });
+          await docClient.send(deleteCommand);
+        }
       }
+    } else {
+      console.log('Appending new LP items (preserving existing data)...');
     }
 
     // Insert new items
@@ -170,8 +197,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${processedItems.length} LP items`,
+      message: `Successfully processed ${processedItems.length} LP items${duplicateCount > 0 ? ` (${duplicateCount} duplicates skipped)` : ''}`,
       count: processedItems.length,
+      duplicatesSkipped: duplicateCount,
       source,
       syncedAt: now
     });
@@ -222,6 +250,67 @@ export async function GET(request: NextRequest) {
       { 
         success: false, 
         error: 'Failed to get bulk sync status',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Clear all LP items (for testing purposes)
+export async function DELETE(request: NextRequest) {
+  try {
+    console.log('Clearing all LP items...');
+    await ensureTableExists();
+
+    // Scan all items to get their IDs
+    const scanCommand = new ScanCommand({
+      TableName: TABLE_NAME,
+      ProjectionExpression: 'id'
+    });
+    const existingItems = await docClient.send(scanCommand);
+
+    if (!existingItems.Items || existingItems.Items.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No LP items to delete',
+        deletedCount: 0
+      });
+    }
+
+    const deleteRequests = existingItems.Items.map(item => ({
+      DeleteRequest: {
+        Key: { id: item.id }
+      }
+    }));
+
+    // Process deletes in batches of 25 (DynamoDB limit)
+    let deletedCount = 0;
+    for (let i = 0; i < deleteRequests.length; i += 25) {
+      const batch = deleteRequests.slice(i, i + 25);
+      const deleteCommand = new BatchWriteCommand({
+        RequestItems: {
+          [TABLE_NAME]: batch
+        }
+      });
+      await docClient.send(deleteCommand);
+      deletedCount += batch.length;
+    }
+
+    console.log(`Successfully deleted ${deletedCount} LP items`);
+
+    return NextResponse.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} LP items`,
+      deletedCount
+    });
+
+  } catch (error) {
+    console.error('Error clearing LP items:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to clear LP items',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

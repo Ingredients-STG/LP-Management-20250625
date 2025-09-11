@@ -22,6 +22,8 @@ import {
   Paper,
   Title,
   ScrollArea,
+  FileInput,
+  Progress,
 } from '@mantine/core';
 import {
   IconRefresh,
@@ -37,9 +39,13 @@ import {
   IconSearch,
   IconFilter,
   IconCalendar,
+  IconUpload,
+  IconFileSpreadsheet,
+  IconTemplate,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { DatePickerInput } from '@mantine/dates';
+import * as XLSX from 'xlsx';
 
 interface LPItem {
   id: string;
@@ -61,6 +67,11 @@ interface LPItem {
   bacteriaVariant: string;
   sampledOn: string;
   nextResampleDate: string;
+  // Additional recording fields
+  hotTemperature: string;
+  coldTemperature: string;
+  remedialWoNumber: string;
+  remedialCompletedDate: string;
   // System fields
   createdAt: string;
   updatedAt: string;
@@ -79,7 +90,19 @@ export default function LPManagement({}: LPManagementProps) {
   const [selectedItem, setSelectedItem] = useState<LPItem | null>(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [viewModalOpened, setViewModalOpened] = useState(false);
+  const [uploadModalOpened, setUploadModalOpened] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [extractedData, setExtractedData] = useState<any[]>([]);
+  
+  // Template upload state
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [templateUploading, setTemplateUploading] = useState(false);
+  const [templateUploadModalOpened, setTemplateUploadModalOpened] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -99,6 +122,10 @@ export default function LPManagement({}: LPManagementProps) {
     bacteriaVariant: '',
     sampledOn: '',
     nextResampleDate: '',
+    hotTemperature: '',
+    coldTemperature: '',
+    remedialWoNumber: '',
+    remedialCompletedDate: '',
   });
 
   // Filter state
@@ -110,10 +137,278 @@ export default function LPManagement({}: LPManagementProps) {
   const [singleDate, setSingleDate] = useState<Date | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const sampleTypes = ['Original', 'Resample', 'Follow-up', 'Remedial'];
-  const testTypes = ['LA', 'PA', 'Total Viable Count', 'Other'];
-  const bacteriaVariants = ['SPP', 'SG1', 'SG2', 'SG3', 'Other'];
-  const wings = ['LNS', 'ROS', 'MXF', 'STJ', 'Other'];
+  // Dynamic filter options based on actual LP Items data
+  const sampleTypes = Array.from(new Set(lpItems.map(item => item.sampleType).filter(Boolean))).sort();
+  const testTypes = Array.from(new Set(lpItems.map(item => item.testType).filter(Boolean))).sort();
+  const bacteriaVariants = Array.from(new Set(lpItems.map(item => item.bacteriaVariant).filter(Boolean))).sort();
+  const wings = Array.from(new Set(lpItems.map(item => item.wing).filter(Boolean))).sort();
+
+  // Helper functions for Excel data extraction (based on Power Automate script)
+  const extractValue = (text: string, startText: string, endText: string): string => {
+    if (!text) return "";
+    const startIndex = text.indexOf(startText);
+    if (startIndex === -1) return "";
+    const adjustedStartIndex = startIndex + startText.length;
+    const endIndex = text.indexOf(endText, adjustedStartIndex);
+    return endIndex === -1
+      ? text.substring(adjustedStartIndex).trim()
+      : text.substring(adjustedStartIndex, endIndex).trim();
+  };
+
+  const extractBetween = (text: string, startText: string, endText: string): string => {
+    if (!text) return "";
+    const startIndex = text.indexOf(startText);
+    if (startIndex === -1) return "";
+    const adjustedStartIndex = startIndex + startText.length;
+    const endIndex = text.indexOf(endText, adjustedStartIndex);
+    return endIndex === -1
+      ? text.substring(adjustedStartIndex).trim()
+      : text.substring(adjustedStartIndex, endIndex).trim();
+  };
+
+  const formatDate = (dateString: string | Date | null | undefined): string => {
+    if (!dateString) return "";
+    
+    if (dateString instanceof Date) {
+      return dateString.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+    }
+    
+    if (typeof dateString === "string") {
+      const [datePart] = dateString.split(" ");
+      const [day, month, year] = datePart.split("/");
+      if (day && month && year) {
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`; // Convert to YYYY-MM-DD
+      }
+    }
+    
+    return dateString.toString();
+  };
+
+  const getTestType = (description: string): string => {
+    if (!description) return "";
+    
+    if (description.toLowerCase().startsWith("legionella")) {
+      return "LA";
+    } else if (description.toLowerCase().startsWith("pseudomonas")) {
+      return "PA";
+    }
+    
+    return "";
+  };
+
+  // Download template for bulk upload
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'WO Number': '123456',
+        'Created Date': '15/01/2025',
+        'Room/Ward Name': 'Room 101',
+        'Room Number': 'LNS-5.077',
+        'Wing': 'LNS',
+        'Asset Barcode': 'B12345',
+        'Positive Count (Pre)': '50',
+        'Positive Count (Post)': '0',
+        'Sample Number': '001',
+        'Lab Name': 'Lab A',
+        'Certificate Number': 'CERT123',
+        'Sample Type': 'Original',
+        'Test Type': 'LA',
+        'Sample Temperature': '37',
+        'Bacteria Variant': 'SPP',
+        'Sampled On': '15/01/2025',
+        'Next Resample Date': '15/02/2025',
+        'Hot Temperature': '45',
+        'Cold Temperature': '15',
+        'Remedial WO Number': '789012',
+        'Remedial Completed Date': '20/01/2025'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'LP Items Template');
+    
+    // Auto-size columns
+    const cols = Object.keys(templateData[0]).map(() => ({ wch: 20 }));
+    worksheet['!cols'] = cols;
+    
+    XLSX.writeFile(workbook, 'LP_Items_Template.xlsx');
+    
+    notifications.show({
+      title: 'Success',
+      message: 'Template downloaded successfully!',
+      color: 'green',
+      icon: <IconCheck size={16} />,
+    });
+  };
+
+  // Convert dd/mm/yyyy to yyyy-mm-dd format
+  const convertDateFormat = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    // Check if it's already in yyyy-mm-dd format
+    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return dateString;
+    }
+    
+    // Convert dd/mm/yyyy to yyyy-mm-dd
+    if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [day, month, year] = dateString.split('/');
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    // Handle Excel date numbers
+    if (typeof dateString === 'number') {
+      const date = new Date((dateString - 25569) * 86400 * 1000);
+      return date.toISOString().split('T')[0];
+    }
+    
+    return dateString;
+  };
+
+  // Process template file (simple Excel to JSON conversion)
+  const processTemplateFile = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          
+          // Convert template data to LP items format
+          const processedData = jsonData.map((row: any) => ({
+            woNumber: row['WO Number']?.toString() || '',
+            createdDate: convertDateFormat(row['Created Date']) || '',
+            room: row['Room/Ward Name'] || row['Room'] || '', // Support both old and new field names
+            location: row['Room Number'] || row['Location'] || '', // Support both old and new field names
+            wing: row['Wing'] || '',
+            assetBarcode: row['Asset Barcode'] || '',
+            positiveCountPre: row['Positive Count (Pre)']?.toString() || '0',
+            positiveCountPost: row['Positive Count (Post)']?.toString() || '0',
+            sampleNumber: row['Sample Number']?.toString() || '',
+            labName: row['Lab Name'] || '',
+            certificateNumber: row['Certificate Number'] || '',
+            sampleType: row['Sample Type'] || '',
+            testType: row['Test Type'] || '',
+            sampleTemperature: row['Sample Temperature']?.toString() || '',
+            bacteriaVariant: row['Bacteria Variant'] || '',
+            sampledOn: convertDateFormat(row['Sampled On']) || '',
+            nextResampleDate: convertDateFormat(row['Next Resample Date']) || '',
+            hotTemperature: row['Hot Temperature']?.toString() || '',
+            coldTemperature: row['Cold Temperature']?.toString() || '',
+            remedialWoNumber: row['Remedial WO Number']?.toString() || '',
+            remedialCompletedDate: convertDateFormat(row['Remedial Completed Date']) || '',
+          }));
+          
+          resolve(processedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Check for duplicates based on WO Number
+  const checkForDuplicates = async (newItems: any[]): Promise<{ duplicates: string[], unique: any[] }> => {
+    const existingWONumbers = lpItems.map(item => item.woNumber);
+    const newWONumbers = newItems.map(item => item.woNumber);
+    
+    const duplicates: string[] = [];
+    const unique: any[] = [];
+    
+    newItems.forEach(item => {
+      if (existingWONumbers.includes(item.woNumber)) {
+        duplicates.push(item.woNumber);
+      } else if (!newWONumbers.slice(0, newWONumbers.indexOf(item.woNumber)).includes(item.woNumber)) {
+        // Also check for duplicates within the new items themselves
+        unique.push(item);
+      } else {
+        duplicates.push(item.woNumber);
+      }
+    });
+    
+    return { duplicates, unique };
+  };
+
+  // Process Excel file and extract LP data
+  const processExcelFile = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          // Skip header row and process data
+          const processedData: any[] = [];
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i] as any[];
+            
+            // Skip empty rows
+            if (!row || row.every(cell => !cell)) continue;
+            
+            // Extract data based on your Power Automate logic
+            const instructions = row[9] as string || ""; // Column 10 (Instructions)
+            const description = row[8] as string || ""; // Column 9 (Description)
+            const createdDate = formatDate(row[2] as string); // Column 3 (Created Date)
+            // Final correct mapping based on your specification:
+            // Wing: "LNS" (extract just the prefix), Room Number: "LNS-1.191", Room/Ward Name: "Transitional & Special Care"
+            const wingFull = row[11] || ""; // Column 12 - Wing full value
+            const wing = wingFull.split('-')[0] || wingFull; // Extract just "LNS" part before the dash
+            const location = row[12] || ""; // Column 13 - Room Number (specific identifier like "LNS-1.191")
+            const room = row[13] || ""; // Column 14 - Room/Ward Name (descriptive name like "Transitional & Special Care")
+            
+            const assetBarcode = extractValue(instructions, "Asset number: ", " ");
+            const positivePre = parseInt(extractValue(instructions, "Positive Count (Pre): ", " ")) || 0;
+            const positivePost = parseInt(extractValue(instructions, "Positive Count (Post): ", " ")) || 0;
+            const sampleNumber = parseInt(extractBetween(description, "(", " +")) || 0;
+            const labName = extractBetween(description, "+ ", ")");
+            const certificateNumber = extractValue(instructions, "Certificate ID: ", " ");
+            const sampleType = extractValue(instructions, "Sample Type: ", " ");
+            const testType = getTestType(description);
+            const sampleTemperature = extractValue(instructions, "Sample Temperature: ", " ");
+            const bacteriaVariant = extractValue(instructions, "Bacteria Variant: ", " ");
+            const sampledOn = formatDate(extractValue(instructions, "Sampled On: ", " "));
+            const nextResampleDate = formatDate(extractValue(instructions, "Next Resample Date: ", " "));
+            
+            processedData.push({
+              woNumber: (parseInt(row[1] as string) || 0).toString(),
+              createdDate,
+              room,
+              location,
+              wing,
+              assetBarcode,
+              positiveCountPre: positivePre.toString(),
+              positiveCountPost: positivePost.toString(),
+              sampleNumber: sampleNumber.toString(),
+              labName,
+              certificateNumber,
+              sampleType,
+              testType,
+              sampleTemperature,
+              bacteriaVariant,
+              sampledOn,
+              nextResampleDate,
+            });
+          }
+          
+          resolve(processedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
 
   // Filter function
   const filteredLPItems = lpItems.filter((item) => {
@@ -134,7 +429,10 @@ export default function LPManagement({}: LPManagementProps) {
         item.bacteriaVariant,
         item.positiveCountPre,
         item.positiveCountPost,
-        item.sampleTemperature
+        item.sampleTemperature,
+        item.hotTemperature,
+        item.coldTemperature,
+        item.remedialWoNumber
       ];
       
       const matchesSearch = searchableFields.some(field => 
@@ -164,8 +462,12 @@ export default function LPManagement({}: LPManagementProps) {
       const sampledDate = item.sampledOn ? new Date(item.sampledOn) : null;
       if (!sampledDate) return false;
       
-      if (dateRange[0] && sampledDate < dateRange[0]) return false;
-      if (dateRange[1] && sampledDate > dateRange[1]) return false;
+      // Convert dateRange values to Date objects for comparison
+      const startDate = dateRange[0] ? (dateRange[0] instanceof Date ? dateRange[0] : new Date(dateRange[0])) : null;
+      const endDate = dateRange[1] ? (dateRange[1] instanceof Date ? dateRange[1] : new Date(dateRange[1])) : null;
+      
+      if (startDate && sampledDate < startDate) return false;
+      if (endDate && sampledDate > endDate) return false;
     }
 
     // Single date filter
@@ -173,7 +475,11 @@ export default function LPManagement({}: LPManagementProps) {
       const sampledDate = item.sampledOn ? new Date(item.sampledOn) : null;
       if (!sampledDate) return false;
       
-      const singleDateString = singleDate.toDateString();
+      // Ensure singleDate is a proper Date object
+      const singleDateObj = singleDate instanceof Date ? singleDate : new Date(singleDate);
+      if (isNaN(singleDateObj.getTime())) return false; // Invalid date
+      
+      const singleDateString = singleDateObj.toDateString();
       const sampledDateString = sampledDate.toDateString();
       if (singleDateString !== sampledDateString) return false;
     }
@@ -261,6 +567,205 @@ export default function LPManagement({}: LPManagementProps) {
     }
   };
 
+  // Handle Excel file upload and processing (Planet extraction)
+  const handleFileUpload = async () => {
+    if (!uploadFile) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select an Excel file first',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadProgress(10);
+
+      // Process Excel file
+      const extractedData = await processExcelFile(uploadFile);
+      setExtractedData(extractedData);
+      setUploadProgress(30);
+
+      if (extractedData.length === 0) {
+        notifications.show({
+          title: 'Warning',
+          message: 'No valid data found in the Excel file',
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+        setUploading(false);
+        return;
+      }
+
+      // Check for duplicates
+      const { duplicates, unique } = await checkForDuplicates(extractedData);
+      setUploadProgress(50);
+
+      if (duplicates.length > 0) {
+        notifications.show({
+          title: 'Duplicates Found',
+          message: `Found ${duplicates.length} duplicate WO Numbers: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}. Only unique items will be uploaded.`,
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+      }
+
+      if (unique.length === 0) {
+        notifications.show({
+          title: 'No New Items',
+          message: 'All items already exist in the database (based on WO Number)',
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+        setUploading(false);
+        return;
+      }
+
+      // Send unique data to API for bulk upload
+      const response = await fetch('/api/lp-items/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: unique,
+          source: 'planet-extraction', // Specify source as planet extraction
+          createdBy: 'current-user', // This should come from auth context
+        }),
+      });
+
+      setUploadProgress(90);
+
+      if (!response.ok) {
+        throw new Error('Failed to upload LP items');
+      }
+
+      const result = await response.json();
+      setUploadProgress(100);
+
+      notifications.show({
+        title: 'Success',
+        message: `Successfully uploaded ${result.count || unique.length} unique LP items${duplicates.length > 0 ? ` (${duplicates.length} duplicates skipped)` : ''}`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      // Reset upload state and refresh data
+      setUploadModalOpened(false);
+      setUploadFile(null);
+      setExtractedData([]);
+      fetchLPItems();
+    } catch (error) {
+      console.error('Error uploading Excel file:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to process and upload Excel file',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // Handle template file upload
+  const handleTemplateUpload = async () => {
+    if (!templateFile) {
+      notifications.show({
+        title: 'Error',
+        message: 'Please select a template file first',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+      return;
+    }
+
+    try {
+      setTemplateUploading(true);
+
+      // Process template file
+      const templateData = await processTemplateFile(templateFile);
+
+      if (templateData.length === 0) {
+        notifications.show({
+          title: 'Warning',
+          message: 'No valid data found in the template file',
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+        setTemplateUploading(false);
+        return;
+      }
+
+      // Check for duplicates
+      const { duplicates, unique } = await checkForDuplicates(templateData);
+
+      if (duplicates.length > 0) {
+        notifications.show({
+          title: 'Duplicates Found',
+          message: `Found ${duplicates.length} duplicate WO Numbers: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}. Only unique items will be uploaded.`,
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+      }
+
+      if (unique.length === 0) {
+        notifications.show({
+          title: 'No New Items',
+          message: 'All items already exist in the database (based on WO Number)',
+          color: 'yellow',
+          icon: <IconAlertCircle size={16} />,
+        });
+        setTemplateUploading(false);
+        return;
+      }
+
+      // Send unique data to API for bulk upload
+      const response = await fetch('/api/lp-items/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: unique,
+          source: 'template-upload', // Specify source as template upload
+          createdBy: 'current-user', // This should come from auth context
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload template data');
+      }
+
+      const result = await response.json();
+
+      notifications.show({
+        title: 'Success',
+        message: `Successfully uploaded ${result.count || unique.length} unique LP items${duplicates.length > 0 ? ` (${duplicates.length} duplicates skipped)` : ''}`,
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+
+      // Reset upload state and refresh data
+      setTemplateUploadModalOpened(false);
+      setTemplateFile(null);
+      fetchLPItems();
+    } catch (error) {
+      console.error('Error uploading template file:', error);
+      notifications.show({
+        title: 'Error',
+        message: 'Failed to process and upload template file',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
   // Handle delete
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this LP item?')) {
@@ -317,6 +822,10 @@ export default function LPManagement({}: LPManagementProps) {
         bacteriaVariant: item.bacteriaVariant,
         sampledOn: item.sampledOn ? item.sampledOn.split('T')[0] : '',
         nextResampleDate: item.nextResampleDate ? item.nextResampleDate.split('T')[0] : '',
+        hotTemperature: item.hotTemperature,
+        coldTemperature: item.coldTemperature,
+        remedialWoNumber: item.remedialWoNumber,
+        remedialCompletedDate: item.remedialCompletedDate ? item.remedialCompletedDate.split('T')[0] : '',
       });
     } else {
       setIsEditing(false);
@@ -338,6 +847,10 @@ export default function LPManagement({}: LPManagementProps) {
         bacteriaVariant: '',
         sampledOn: '',
         nextResampleDate: '',
+        hotTemperature: '',
+        coldTemperature: '',
+        remedialWoNumber: '',
+        remedialCompletedDate: '',
       });
     }
     setModalOpened(true);
@@ -395,6 +908,27 @@ export default function LPManagement({}: LPManagementProps) {
               loading={refreshing}
             >
               Refresh
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<IconDownload size={16} />}
+              onClick={downloadTemplate}
+            >
+              Download Template
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<IconTemplate size={16} />}
+              onClick={() => setTemplateUploadModalOpened(true)}
+            >
+              Upload Template
+            </Button>
+            <Button
+              variant="light"
+              leftSection={<IconUpload size={16} />}
+              onClick={() => setUploadModalOpened(true)}
+            >
+              Extract from Planet
             </Button>
             <Button
               leftSection={<IconPlus size={16} />}
@@ -523,13 +1057,12 @@ export default function LPManagement({}: LPManagementProps) {
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
                   <DatePickerInput
-                    type="single"
-                    label="Single Date"
+                    label="Date (Sampled On)"
                     placeholder="Select date"
                     value={singleDate}
                     onChange={setSingleDate}
-                    leftSection={<IconCalendar size={16} />}
                     clearable
+                    leftSection={<IconCalendar size={16} />}
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
@@ -555,6 +1088,44 @@ export default function LPManagement({}: LPManagementProps) {
           <Text fw={500}>LP Items ({filteredLPItems.length} of {lpItems.length})</Text>
         </Group>
 
+
+        {/* Active Filters Display */}
+        {(searchQuery || filterSampleType || filterTestType || filterWing || dateRange[0] || dateRange[1] || singleDate) && (
+          <Group mb="md" gap="xs">
+            <Text size="sm" c="dimmed">Active filters:</Text>
+            {searchQuery && (
+              <Badge variant="light" color="blue" size="sm">
+                Search: "{searchQuery}"
+              </Badge>
+            )}
+            {filterSampleType && (
+              <Badge variant="light" color="green" size="sm">
+                Sample Type: {filterSampleType}
+              </Badge>
+            )}
+            {filterTestType && (
+              <Badge variant="light" color="orange" size="sm">
+                Test Type: {filterTestType}
+              </Badge>
+            )}
+            {filterWing && (
+              <Badge variant="light" color="purple" size="sm">
+                Wing: {filterWing}
+              </Badge>
+            )}
+            {dateRange[0] && dateRange[1] && (
+              <Badge variant="light" color="cyan" size="sm">
+                Date Range: {(dateRange[0] instanceof Date ? dateRange[0] : new Date(dateRange[0])).toLocaleDateString()} - {(dateRange[1] instanceof Date ? dateRange[1] : new Date(dateRange[1])).toLocaleDateString()}
+              </Badge>
+            )}
+            {singleDate && (
+              <Badge variant="light" color="teal" size="sm">
+                Date: {singleDate instanceof Date ? singleDate.toLocaleDateString() : new Date(singleDate).toLocaleDateString()}
+              </Badge>
+            )}
+          </Group>
+        )}
+
         <ScrollArea>
           <Table striped highlightOnHover>
             <Table.Thead>
@@ -566,6 +1137,7 @@ export default function LPManagement({}: LPManagementProps) {
                 <Table.Th>Test Type</Table.Th>
                 <Table.Th>Pre Count</Table.Th>
                 <Table.Th>Post Count</Table.Th>
+                <Table.Th>Status</Table.Th>
                 <Table.Th>Sampled On</Table.Th>
                 <Table.Th>Next Resample</Table.Th>
                 <Table.Th>Actions</Table.Th>
@@ -608,6 +1180,15 @@ export default function LPManagement({}: LPManagementProps) {
                     <Table.Td>
                       <Badge variant="light" color={parseInt(item.positiveCountPost) > 100 ? 'red' : 'green'}>
                         {item.positiveCountPost} CFU
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge 
+                        variant="light" 
+                        color={(!item.remedialWoNumber || item.remedialWoNumber === 'N/A') ? 'orange' : 'green'}
+                        size="sm"
+                      >
+                        {(!item.remedialWoNumber || item.remedialWoNumber === 'N/A') ? 'In Progress' : 'Completed'}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
@@ -655,7 +1236,7 @@ export default function LPManagement({}: LPManagementProps) {
                 ))
               ) : (
                 <Table.Tr>
-                  <Table.Td colSpan={10}>
+                  <Table.Td colSpan={11}>
                     <Stack align="center" gap="xs" py="xl">
                       <IconDatabase size={48} color="gray" />
                       <Text c="dimmed">
@@ -720,7 +1301,7 @@ export default function LPManagement({}: LPManagementProps) {
             </Grid.Col>
             <Grid.Col span={6}>
               <TextInput
-                label="Room/Ward"
+                label="Room/Ward Name"
                 placeholder="Enter room or ward name"
                 value={formData.room}
                 onChange={(e) => setFormData({ ...formData, room: e.target.value })}
@@ -728,8 +1309,8 @@ export default function LPManagement({}: LPManagementProps) {
             </Grid.Col>
             <Grid.Col span={6}>
               <TextInput
-                label="Location"
-                placeholder="Enter specific location (e.g., LNS-5.077)"
+                label="Room Number"
+                placeholder="Enter specific room number (e.g., LNS-1.191)"
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               />
@@ -835,6 +1416,39 @@ export default function LPManagement({}: LPManagementProps) {
                 onChange={(e) => setFormData({ ...formData, nextResampleDate: e.target.value })}
               />
             </Grid.Col>
+            <Grid.Col span={6}>
+              <TextInput
+                label="Hot Temperature (°C)"
+                placeholder="Enter hot temperature"
+                value={formData.hotTemperature}
+                onChange={(e) => setFormData({ ...formData, hotTemperature: e.target.value })}
+              />
+            </Grid.Col>
+            <Grid.Col span={6}>
+              <TextInput
+                label="Cold Temperature (°C)"
+                placeholder="Enter cold temperature"
+                value={formData.coldTemperature}
+                onChange={(e) => setFormData({ ...formData, coldTemperature: e.target.value })}
+              />
+            </Grid.Col>
+            <Grid.Col span={6}>
+              <TextInput
+                label="Remedial WO Number"
+                placeholder="Enter remedial work order number"
+                value={formData.remedialWoNumber}
+                onChange={(e) => setFormData({ ...formData, remedialWoNumber: e.target.value })}
+              />
+            </Grid.Col>
+            <Grid.Col span={6}>
+              <TextInput
+                label="Remedial Completed Date"
+                placeholder="YYYY-MM-DD"
+                type="date"
+                value={formData.remedialCompletedDate}
+                onChange={(e) => setFormData({ ...formData, remedialCompletedDate: e.target.value })}
+              />
+            </Grid.Col>
           </Grid>
 
           <Group justify="flex-end" mt="md">
@@ -859,12 +1473,26 @@ export default function LPManagement({}: LPManagementProps) {
           <Stack gap="md">
             <Group justify="space-between">
               <Text fw={600} size="lg">Asset: {selectedItem.assetBarcode}</Text>
-              <Badge 
-                variant="light" 
-                color={selectedItem.sampleType === 'Original' ? 'blue' : 'orange'}
-              >
-                {selectedItem.sampleType}
-              </Badge>
+              <Group gap="xs">
+                <Badge 
+                  variant="light" 
+                  color={selectedItem.sampleType === 'Original' ? 'blue' : 'orange'}
+                >
+                  {selectedItem.sampleType}
+                </Badge>
+                <Badge 
+                  variant="light" 
+                  color={selectedItem.remedialWoNumber && selectedItem.remedialWoNumber !== 'N/A' ? 'green' : 'orange'}
+                >
+                  {selectedItem.remedialWoNumber && selectedItem.remedialWoNumber !== 'N/A' ? 'Completed' : 'In Progress'}
+                </Badge>
+                <Badge 
+                  variant="light" 
+                  color="purple"
+                >
+                  {selectedItem.testType}
+                </Badge>
+              </Group>
             </Group>
 
             <Divider />
@@ -879,11 +1507,11 @@ export default function LPManagement({}: LPManagementProps) {
                 <Text fw={500}>{parseFloat(selectedItem.woNumber).toString()}</Text>
               </Grid.Col>
               <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Room/Ward</Text>
+                <Text size="sm" c="dimmed">Room/Ward Name</Text>
                 <Text fw={500}>{selectedItem.room || 'N/A'}</Text>
               </Grid.Col>
               <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Location</Text>
+                <Text size="sm" c="dimmed">Room Number</Text>
                 <Text fw={500}>{selectedItem.location || 'N/A'}</Text>
               </Grid.Col>
               <Grid.Col span={6}>
@@ -949,6 +1577,24 @@ export default function LPManagement({}: LPManagementProps) {
                   {selectedItem.nextResampleDate ? new Date(selectedItem.nextResampleDate).toLocaleDateString('en-GB') : 'N/A'}
                 </Text>
               </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Hot Temperature</Text>
+                <Text fw={500}>{selectedItem.hotTemperature ? `${selectedItem.hotTemperature}°C` : 'N/A'}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Cold Temperature</Text>
+                <Text fw={500}>{selectedItem.coldTemperature ? `${selectedItem.coldTemperature}°C` : 'N/A'}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Remedial WO Number</Text>
+                <Text fw={500}>{selectedItem.remedialWoNumber || 'N/A'}</Text>
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <Text size="sm" c="dimmed">Remedial Completed Date</Text>
+                <Text fw={500}>
+                  {selectedItem.remedialCompletedDate ? new Date(selectedItem.remedialCompletedDate).toLocaleDateString('en-GB') : 'N/A'}
+                </Text>
+              </Grid.Col>
             </Grid>
 
             <Divider />
@@ -995,6 +1641,139 @@ export default function LPManagement({}: LPManagementProps) {
             </Group>
           </Stack>
         )}
+      </Modal>
+
+      {/* Planet Extraction Modal */}
+      <Modal
+        opened={uploadModalOpened}
+        onClose={() => {
+          if (!uploading) {
+            setUploadModalOpened(false);
+            setUploadFile(null);
+            setExtractedData([]);
+            setUploadProgress(0);
+          }
+        }}
+        title="Extract from Planet Excel File"
+        size="lg"
+        closeOnClickOutside={!uploading}
+        closeOnEscape={!uploading}
+      >
+        <Stack gap="md">
+          <Alert icon={<IconFileSpreadsheet size={16} />} color="blue" variant="light">
+            Upload a Planet Excel file (.xlsx, .xls) containing LP data. The system will automatically extract and process the data based on your Power Automate column mapping. Duplicate WO Numbers will be automatically detected and skipped.
+          </Alert>
+
+          <FileInput
+            label="Select Excel File"
+            placeholder="Choose an Excel file..."
+            accept=".xlsx,.xls"
+            value={uploadFile}
+            onChange={setUploadFile}
+            leftSection={<IconFileSpreadsheet size={16} />}
+            disabled={uploading}
+          />
+
+          {uploading && (
+            <Stack gap="xs">
+              <Text size="sm" fw={500}>Processing file...</Text>
+              <Progress value={uploadProgress} animated />
+              <Text size="xs" c="dimmed">
+                {uploadProgress < 50 ? 'Reading Excel file...' : 
+                 uploadProgress < 90 ? 'Uploading to database...' : 
+                 'Finalizing...'}
+              </Text>
+            </Stack>
+          )}
+
+          {extractedData.length > 0 && !uploading && (
+            <Alert icon={<IconCheck size={16} />} color="green" variant="light">
+              Found {extractedData.length} valid LP items in the Excel file. Ready to upload.
+            </Alert>
+          )}
+
+          <Group justify="flex-end" mt="md">
+            <Button 
+              variant="subtle" 
+              onClick={() => {
+                setUploadModalOpened(false);
+                setUploadFile(null);
+                setExtractedData([]);
+                setUploadProgress(0);
+              }}
+              disabled={uploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFileUpload}
+              disabled={!uploadFile || uploading}
+              loading={uploading}
+              leftSection={<IconUpload size={16} />}
+            >
+              Extract & Upload
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Template Upload Modal */}
+      <Modal
+        opened={templateUploadModalOpened}
+        onClose={() => {
+          if (!templateUploading) {
+            setTemplateUploadModalOpened(false);
+            setTemplateFile(null);
+          }
+        }}
+        title="Upload Template File"
+        size="lg"
+        closeOnClickOutside={!templateUploading}
+        closeOnEscape={!templateUploading}
+      >
+        <Stack gap="md">
+          <Alert icon={<IconTemplate size={16} />} color="green" variant="light">
+            Upload a filled template Excel file (.xlsx, .xls) containing LP data. Use the "Download Template" button to get the correct format. Duplicate WO Numbers will be automatically detected and skipped.
+          </Alert>
+
+          <FileInput
+            label="Select Template File"
+            placeholder="Choose a filled template file..."
+            accept=".xlsx,.xls"
+            value={templateFile}
+            onChange={setTemplateFile}
+            leftSection={<IconTemplate size={16} />}
+            disabled={templateUploading}
+          />
+
+          {templateUploading && (
+            <Stack gap="xs">
+              <Text size="sm" fw={500}>Processing template file...</Text>
+              <Loader size="sm" />
+            </Stack>
+          )}
+
+          <Group justify="flex-end" mt="md">
+            <Button 
+              variant="subtle" 
+              onClick={() => {
+                setTemplateUploadModalOpened(false);
+                setTemplateFile(null);
+              }}
+              disabled={templateUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleTemplateUpload}
+              disabled={!templateFile || templateUploading}
+              loading={templateUploading}
+              leftSection={<IconUpload size={16} />}
+            >
+              Upload Template
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Stack>
   );
