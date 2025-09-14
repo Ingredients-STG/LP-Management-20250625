@@ -79,6 +79,11 @@ export async function PUT(
     }
 
     const now = new Date().toISOString();
+    
+    // Calculate status based on remedialWoNumber
+    const status = (!body.remedialWoNumber || body.remedialWoNumber === '' || body.remedialWoNumber === 'N/A') 
+      ? 'In Progress' 
+      : 'Completed';
 
     // Use PutCommand instead of UpdateCommand for simpler full item replacement
     const command = new PutCommand({
@@ -86,6 +91,7 @@ export async function PUT(
       Item: {
         ...body,
         id,
+        status: status,
         updatedAt: now,
         modifiedBy: body.modifiedBy || 'system'
       }

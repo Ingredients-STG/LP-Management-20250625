@@ -289,4 +289,121 @@ export const getCurrentUserEmail = (): string => {
     }
   }
   return 'system@local';
+};
+
+// Asset matching utilities
+export interface Asset {
+  id?: string;
+  assetBarcode: string;
+  status: string;
+  assetType: string;
+  primaryIdentifier: string;
+  secondaryIdentifier: string;
+  wing: string;
+  wingInShort: string;
+  room: string;
+  floor: string;
+  floorInWords: string;
+  roomNo: string;
+  roomName: string;
+  filterNeeded: boolean | string;
+  filtersOn: boolean | string;
+  filterExpiryDate: string;
+  filterInstalledOn: string;
+  needFlushing: boolean | string;
+  filterType: string;
+  notes: string;
+  reasonForFilterChange?: string;
+  augmentedCare: boolean | string;
+  lowUsageAsset: boolean | string;
+  attachments?: Array<{
+    fileName: string;
+    fileType: string;
+    s3Url: string;
+    uploadedAt: string;
+  }>;
+  created: string;
+  createdBy: string;
+  modified: string;
+  modifiedBy: string;
+}
+
+/**
+ * Find an asset by barcode with enhanced matching logic
+ * 1. First tries exact barcode match
+ * 2. If no match, searches through asset notes for the barcode
+ * This handles cases where asset barcodes have been changed over time
+ */
+export const findAssetByBarcode = (barcode: string, assets: Asset[]): Asset | null => {
+  console.log('findAssetByBarcode called with:', { barcode, assetsCount: assets?.length });
+  
+  if (!barcode || !assets || assets.length === 0) {
+    console.log('Early return: missing barcode or assets');
+    return null;
+  }
+
+  // Step 1: Try exact barcode match
+  const exactMatch = assets.find(asset => {
+    const match = asset.assetBarcode && asset.assetBarcode.toLowerCase() === barcode.toLowerCase();
+    if (match) {
+      console.log('Found exact match:', asset.assetBarcode);
+    }
+    return match;
+  });
+  
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // Step 2: Search through asset notes for the barcode
+  const noteMatch = assets.find(asset => {
+    if (!asset.notes) return false;
+    
+    // Search for the barcode in notes (case-insensitive)
+    const notesText = asset.notes.toLowerCase();
+    const searchBarcode = barcode.toLowerCase();
+    
+    // Look for the barcode as a standalone word or with common separators
+    const barcodeRegex = new RegExp(`\\b${searchBarcode}\\b`, 'i');
+    const match = barcodeRegex.test(notesText);
+    if (match) {
+      console.log('Found note match:', asset.assetBarcode, 'in notes:', asset.notes);
+    }
+    return match;
+  });
+
+  console.log('No match found for barcode:', barcode);
+  return noteMatch || null;
+};
+
+/**
+ * Get all assets that match a barcode (including historical matches)
+ * Useful for finding all related assets when barcodes have changed
+ */
+export const findAllAssetsByBarcode = (barcode: string, assets: Asset[]): Asset[] => {
+  if (!barcode || !assets || assets.length === 0) {
+    return [];
+  }
+
+  const matches: Asset[] = [];
+  const searchBarcode = barcode.toLowerCase();
+
+  assets.forEach(asset => {
+    // Check exact barcode match
+    if (asset.assetBarcode && asset.assetBarcode.toLowerCase() === searchBarcode) {
+      matches.push(asset);
+      return;
+    }
+
+    // Check notes for barcode reference
+    if (asset.notes) {
+      const notesText = asset.notes.toLowerCase();
+      const barcodeRegex = new RegExp(`\\b${searchBarcode}\\b`, 'i');
+      if (barcodeRegex.test(notesText)) {
+        matches.push(asset);
+      }
+    }
+  });
+
+  return matches;
 }; 

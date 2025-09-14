@@ -256,6 +256,21 @@ export class DynamoDBService {
     try {
       const assets = await this.getAllAssets();
       
+      // Fetch LP items directly from DynamoDB
+      let lpItems: any[] = [];
+      try {
+        console.log('Fetching LP items for dashboard...');
+        const lpItemsCommand = new ScanCommand({
+          TableName: 'LPItems'
+        });
+        const lpItemsResult = await dynamodb.send(lpItemsCommand);
+        lpItems = lpItemsResult.Items || [];
+        console.log(`Found ${lpItems.length} LP items for dashboard`);
+      } catch (lpError) {
+        console.warn('Failed to fetch LP items for dashboard:', lpError);
+        // Continue without LP items data
+      }
+      
       const stats = {
         totalAssets: assets.length,
         activeAssets: assets.filter(a => a.status === 'ACTIVE').length,
@@ -271,6 +286,7 @@ export class DynamoDBService {
         assetTypeBreakdown: {} as { [key: string]: number },
         wingBreakdown: {} as { [key: string]: number },
         filtersNeededByWing: {} as { [key: string]: number },
+        lpItems: lpItems, // Add LP items data
       };
 
       // Calculate breakdowns

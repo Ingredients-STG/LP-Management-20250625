@@ -123,6 +123,12 @@ export async function POST(request: NextRequest) {
       // Generate ID if not provided
       const id = item.id || `lp-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
       
+      // Calculate status based on remedialWoNumber
+      const remedialWoNumber = item['Remedial WO Number'] || item.remedialWoNumber || '';
+      const status = (!remedialWoNumber || remedialWoNumber === '' || remedialWoNumber === 'N/A') 
+        ? 'In Progress' 
+        : 'Completed';
+      
       return {
         id,
         itemInternalId: item.ItemInternalId || item.itemInternalId || '',
@@ -145,8 +151,9 @@ export async function POST(request: NextRequest) {
         nextResampleDate: item['Next Resample Date'] || item.nextResampleDate || '',
         hotTemperature: item['Hot Temperature'] || item.hotTemperature || '',
         coldTemperature: item['Cold Temperature'] || item.coldTemperature || '',
-        remedialWoNumber: item['Remedial WO Number'] || item.remedialWoNumber || '',
+        remedialWoNumber: remedialWoNumber,
         remedialCompletedDate: item['Remedial Completed Date'] || item.remedialCompletedDate || '',
+        status: status,
         // System fields
         createdAt: item.createdAt || now,
         updatedAt: now,

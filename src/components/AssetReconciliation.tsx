@@ -28,6 +28,7 @@ import {
 import { DatePickerInput, DateInput } from '@mantine/dates';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import * as XLSX from 'xlsx';
 import {
   IconCheck,
   IconX,
@@ -42,7 +43,8 @@ import {
   IconTrash,
   IconEdit,
   IconDeviceFloppy,
-  IconFilter
+  IconFilter,
+  IconFileExport
 } from '@tabler/icons-react';
 
 interface SPListItem {
@@ -1114,6 +1116,43 @@ export default function AssetReconciliation() {
     pending: reconciliationItems.filter(item => item.reconciliationStatus === 'pending').length,
   };
 
+  // Export filtered reconciliation data to Excel
+  const exportToExcel = () => {
+    const exportData = filteredItems.map(item => ({
+      'ID': item.spListItem.id,
+      'Location': item.spListItem.Location || 'N/A',
+      'Filter Installed Date': item.spListItem.FilterInstalledDate || 'N/A',
+      'Filter Type': item.spListItem.FilterType || 'N/A',
+      'Asset Barcode': item.spListItem.AssetBarcode || 'N/A',
+      'Reason for Filter Change': item.spListItem.ReasonForFilterChange || 'N/A',
+      'Reconciliation Status': item.reconciliationStatus || 'N/A',
+      'Matched Asset Barcode': item.matchedAsset?.assetBarcode || 'N/A',
+      'Matched Asset Wing': item.matchedAsset?.wing || 'N/A',
+      'Matched Asset Room': item.matchedAsset?.room || 'N/A',
+      'Matched Asset Room Name': item.matchedAsset?.roomName || 'N/A',
+      'Created At': item.spListItem.createdAt ? new Date(item.spListItem.createdAt).toLocaleString('en-GB') : 'N/A',
+      'Updated At': item.spListItem.updatedAt ? new Date(item.spListItem.updatedAt).toLocaleString('en-GB') : 'N/A'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Filter Reconciliation');
+    
+    // Auto-size columns
+    const cols = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+    worksheet['!cols'] = cols;
+    
+    const fileName = `Filter_Reconciliation_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    
+    notifications.show({
+      title: 'Export Successful',
+      message: `${filteredItems.length} reconciliation items exported to ${fileName}`,
+      color: 'green',
+      icon: <IconCheck size={16} />,
+    });
+  };
+
   if (loading) {
     return (
       <Container size="xl" py="xl">
@@ -1135,9 +1174,19 @@ export default function AssetReconciliation() {
               Reconcile SPListItems data with Main Asset register
             </Text>
           </div>
-          <Button leftSection={<IconRefresh size={16} />} onClick={fetchData}>
-            Refresh Data
-          </Button>
+          <Group>
+            <Button 
+              variant="light" 
+              leftSection={<IconFileExport size={16} />} 
+              onClick={exportToExcel}
+              disabled={filteredItems.length === 0}
+            >
+              Export to Excel
+            </Button>
+            <Button leftSection={<IconRefresh size={16} />} onClick={fetchData}>
+              Refresh Data
+            </Button>
+          </Group>
         </Group>
 
         {/* Date Range Filter - Mobile Optimized */}

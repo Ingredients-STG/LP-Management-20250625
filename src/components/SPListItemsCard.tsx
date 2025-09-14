@@ -255,8 +255,37 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
     key: `filter-${type}-${index}` // Add unique key
   }));
 
-  const formatChartDate = (dateStr: string, period: string) => {
+  const formatChartDate = (dateStr: string, period: string, preset: string = '') => {
     const date = new Date(dateStr);
+    
+    // Handle preset date ranges - always show daily format for better granularity
+    if (preset) {
+      switch (preset) {
+        case 'today':
+        case 'yesterday':
+          return date.toLocaleDateString('en-GB', { 
+            day: '2-digit', 
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        case 'thisWeek':
+        case 'lastWeek':
+          return date.toLocaleDateString('en-GB', { 
+            weekday: 'short',
+            day: 'numeric'
+          });
+        case 'thisMonth':
+        case 'lastMonth':
+          // Daily format for monthly presets: "15/01"
+          return date.toLocaleDateString('en-GB', { 
+            day: '2-digit', 
+            month: '2-digit' 
+          });
+        default:
+          break;
+      }
+    }
     
     // Handle "All Time" period
     if (period === 'all') {
@@ -298,7 +327,7 @@ export default function SPListItemsCard({ data, loading = false, onRefresh }: SP
 
   // Create unique time series data with proper keys
   const timeSeriesData = analytics.changesOverTime.reduce((acc, item, index) => {
-    const formattedDate = formatChartDate(item.date, selectedPeriod);
+    const formattedDate = formatChartDate(item.date, selectedPeriod, dateRangePreset);
     const uniqueKey = `${item.date}-${index}`;
     
     // Check if we already have this formatted date

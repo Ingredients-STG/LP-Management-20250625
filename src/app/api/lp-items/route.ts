@@ -109,6 +109,11 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
     const id = `lp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Calculate status based on remedialWoNumber
+    const status = (!body.remedialWoNumber || body.remedialWoNumber === '' || body.remedialWoNumber === 'N/A') 
+      ? 'In Progress' 
+      : 'Completed';
 
     const item = {
       id,
@@ -134,6 +139,7 @@ export async function POST(request: NextRequest) {
       coldTemperature: body.coldTemperature || '',
       remedialWoNumber: body.remedialWoNumber || '',
       remedialCompletedDate: body.remedialCompletedDate || '',
+      status: status,
       createdAt: now,
       updatedAt: now,
       createdBy: modifiedBy || 'system',

@@ -37,7 +37,7 @@ import {
   Drawer,
 } from '@mantine/core';
 import { DateInput, DatePickerInput } from '@mantine/dates';
-import { BarChart, PieChart } from '@mantine/charts';
+import { BarChart, PieChart, LineChart } from '@mantine/charts';
 import { Spotlight } from '@mantine/spotlight';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -104,6 +104,7 @@ import {
   IconDeviceFloppy,
   IconFilterOff,
   IconDatabase,
+  IconFlask,
 } from '@tabler/icons-react';
 
 interface Asset {
@@ -151,6 +152,7 @@ interface DashboardStats {
   assetTypeBreakdown?: { [key: string]: number };
   wingBreakdown?: { [key: string]: number };
   filtersNeededByWing?: { [key: string]: number };
+  lpItems?: any[];
   spListItems?: {
     items: any[];
     analytics: any;
@@ -302,6 +304,8 @@ export default function HomePage() {
   const [filterExpiryRange, setFilterExpiryRange] = useState<[Date | null, Date | null]>([null, null]);
   const [filterExpiryStatus, setFilterExpiryStatus] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
+  // Temperature graph filter - default to All Wings
+  const [temperatureGraphWingFilter, setTemperatureGraphWingFilter] = useState<string>('All Wings');
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
@@ -3278,7 +3282,203 @@ export default function HomePage() {
           </Grid.Col>
         </Grid>
 
+        {/* Temperature Graph Card */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+          <Group justify="space-between" mb="md">
+            <div>
+              <Title order={4}>Temperature Trends</Title>
+              <Text size="xs" c="dimmed">Note: Only temperatures &gt; 0°C are plotted (handles cold-only/hot-only assets)</Text>
+            </div>
+            <Select
+              placeholder="Select Wing"
+              value={temperatureGraphWingFilter}
+              onChange={(value) => setTemperatureGraphWingFilter(value || '')}
+              data={[
+                { value: '', label: 'All Wings' },
+                ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
+                  value: wing,
+                  label: wing
+                }))
+              ]}
+              clearable
+              style={{ minWidth: 150 }}
+            />
+          </Group>
+          {(() => {
+            // Get LP items data for temperature graph
+            const lpItems: any[] = stats.lpItems || [];
+            
+            // Filter by wing if selected (default to All Wings)
+            const filteredLpItems = temperatureGraphWingFilter && temperatureGraphWingFilter !== 'All Wings'
+              ? lpItems.filter((item: any) => item.wing === temperatureGraphWingFilter)
+              : lpItems;
+            
+            // Group by created date and calculate average temperatures
+            const temperatureData = filteredLpItems
+              .filter((item: any) => {
+                const hotTemp = parseFloat(item.hotTemperature || '0');
+                const coldTemp = parseFloat(item.coldTemperature || '0');
+                return !isNaN(hotTemp) && hotTemp > 0 || !isNaN(coldTemp) && coldTemp > 0;
+              })
+              .reduce((acc: { [key: string]: { date: string; hotTemps: number[]; coldTemps: number[] } }, item: any) => {
+                const date = item.createdDate ? new Date(item.createdDate).toISOString().split('T')[0] : 'Unknown';
+                if (!acc[date]) {
+                  acc[date] = { date, hotTemps: [], coldTemps: [] };
+                }
+                const hotTemp = parseFloat(item.hotTemperature || '0');
+                const coldTemp = parseFloat(item.coldTemperature || '0');
+                
+                // Only add temperatures > 0 to avoid plotting 0°C values
+                // This handles cases where assets only have hot OR cold water
+                if (!isNaN(hotTemp) && hotTemp > 0) {
+                  acc[date].hotTemps.push(hotTemp);
+                }
+                if (!isNaN(coldTemp) && coldTemp > 0) {
+                  acc[date].coldTemps.push(coldTemp);
+                }
+                return acc;
+              }, {} as { [key: string]: { date: string; hotTemps: number[]; coldTemps: number[] } });
+            
+            const chartData = Object.values(temperatureData)
+              .map((data: { date: string; hotTemps: number[]; coldTemps: number[] }) => ({
+                date: data.date,
+                // Only calculate average if we have actual temperature readings > 0
+                hotTemperature: data.hotTemps.length > 0 ? data.hotTemps.reduce((a: number, b: number) => a + b, 0) / data.hotTemps.length : null,
+                coldTemperature: data.coldTemps.length > 0 ? data.coldTemps.reduce((a: number, b: number) => a + b, 0) / data.coldTemps.length : null
+              }))
+              .filter(data => data.hotTemperature !== null || data.coldTemperature !== null) // Only include dates with actual temperature data
+              .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            return chartData.length > 0 ? (
+              <LineChart
+                h={300}
+                data={chartData}
+                dataKey="date"
+                series={[
+                  { name: 'hotTemperature', color: 'red.6', label: 'Hot Temperature (°C)' },
+                  { name: 'coldTemperature', color: 'blue.6', label: 'Cold Temperature (°C)' }
+                ]}
+                curveType="linear"
+                withLegend
+                legendProps={{ verticalAlign: 'bottom' }}
+                connectNulls={false} // Don't connect lines across null values
+              />
+            ) : (
+              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text c="dimmed">No temperature data available for {temperatureGraphWingFilter === 'All Wings' ? 'all wings' : temperatureGraphWingFilter || 'selected wing'}</Text>
+              </div>
+            );
+          })()}
+        </Card>
 
+        {/* Test Statistics Card */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder>
+          <Title order={4} mb="md">LP Test Statistics</Title>
+          <Grid gutter="md">
+            {(() => {
+              const lpItems: any[] = stats.lpItems || [];
+              const totalTests = lpItems.length;
+              
+              // Only Pre Tests: has pre value > 0 and (post is empty/null or post = 0)
+              const onlyPreTests = lpItems.filter((item: any) => {
+                const preValue = parseFloat(item.positiveCountPre || '0');
+                const postValue = parseFloat(item.positiveCountPost || '0');
+                return preValue > 0 && postValue === 0;
+              }).length;
+              
+              // Only Post Tests: has post value > 0 and (pre is empty/null or pre = 0)
+              const onlyPostTests = lpItems.filter((item: any) => {
+                const preValue = parseFloat(item.positiveCountPre || '0');
+                const postValue = parseFloat(item.positiveCountPost || '0');
+                return postValue > 0 && preValue === 0;
+              }).length;
+              
+              // Both Pre & Post: has both pre and post values > 0
+              const bothPrePostTests = lpItems.filter((item: any) => {
+                const preValue = parseFloat(item.positiveCountPre || '0');
+                const postValue = parseFloat(item.positiveCountPost || '0');
+                return preValue > 0 && postValue > 0;
+              }).length;
+              
+              // Completed: status is 'Completed'
+              const completedTests = lpItems.filter((item: any) => item.status === 'Completed').length;
+              
+              // In Progress: status is 'In Progress'
+              const inProgressTests = lpItems.filter((item: any) => item.status === 'In Progress').length;
+              
+              return (
+                <>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">Total Tests</Text>
+                          <Text size="xl" fw={700} c="blue">{totalTests}</Text>
+                        </div>
+                        <IconFlask size={24} color="var(--mantine-color-blue-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">Only Pre Tests</Text>
+                          <Text size="xl" fw={700} c="orange">{onlyPreTests}</Text>
+                        </div>
+                        <IconFlask size={24} color="var(--mantine-color-orange-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">Only Post Tests</Text>
+                          <Text size="xl" fw={700} c="cyan">{onlyPostTests}</Text>
+                        </div>
+                        <IconFlask size={24} color="var(--mantine-color-cyan-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">Both Pre & Post</Text>
+                          <Text size="xl" fw={700} c="violet">{bothPrePostTests}</Text>
+                        </div>
+                        <IconFlask size={24} color="var(--mantine-color-violet-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">Completed</Text>
+                          <Text size="xl" fw={700} c="green">{completedTests}</Text>
+                        </div>
+                        <IconCheck size={24} color="var(--mantine-color-green-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                  <Grid.Col span={{ base: 12, sm: 6, md: 4 }}>
+                    <Paper p="md" withBorder>
+                      <Group justify="space-between">
+                        <div>
+                          <Text size="sm" c="dimmed">In Progress</Text>
+                          <Text size="xl" fw={700} c="orange">{inProgressTests}</Text>
+                        </div>
+                        <IconClock size={24} color="var(--mantine-color-orange-6)" />
+                      </Group>
+                    </Paper>
+                  </Grid.Col>
+                </>
+              );
+            })()}
+          </Grid>
+        </Card>
 
         {/* SPListItems Card */}
         <SPListItemsCard 
@@ -5426,6 +5626,7 @@ export default function HomePage() {
     setFilterNeededFilter([]);
     setFiltersOnFilter([]);
     setAugmentedCareFilter([]);
+    setLowUsageAssetFilter([]);
     setFilterExpiryRange([null, null]);
     setFilterExpiryStatus('');
   };
@@ -5628,7 +5829,15 @@ export default function HomePage() {
             {activeTab === 'reports' && renderReports()}
             {activeTab === 'bulk-update' && renderBulkUpdate()}
             {activeTab === 'asset-reconciliation' && <AssetReconciliation />}
-            {activeTab === 'lp-management' && <LPManagement />}
+            {activeTab === 'lp-management' && (
+              <LPManagement 
+                assets={assets}
+                onAssetClick={(asset) => {
+                  setSelectedAssetForView(asset);
+                  openViewModal();
+                }}
+              />
+            )}
             {activeTab === 'settings' && renderSettings()}
           </div>
         </AppShell.Main>

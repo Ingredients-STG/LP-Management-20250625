@@ -24,6 +24,8 @@ import {
   ScrollArea,
   FileInput,
   Progress,
+  Box,
+  ThemeIcon,
 } from '@mantine/core';
 import {
   IconRefresh,
@@ -42,10 +44,15 @@ import {
   IconUpload,
   IconFileSpreadsheet,
   IconTemplate,
+  IconFileExport,
+  IconMapPin,
+  IconBuilding,
+  IconInfoCircle,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { DatePickerInput } from '@mantine/dates';
 import * as XLSX from 'xlsx';
+import { findAssetByBarcode, type Asset } from '@/lib/utils';
 
 interface LPItem {
   id: string;
@@ -72,6 +79,7 @@ interface LPItem {
   coldTemperature: string;
   remedialWoNumber: string;
   remedialCompletedDate: string;
+  status: string;
   // System fields
   createdAt: string;
   updatedAt: string;
@@ -81,9 +89,12 @@ interface LPItem {
   reconciliationStatus?: string;
 }
 
-interface LPManagementProps {}
+interface LPManagementProps {
+  assets: Asset[];
+  onAssetClick: (asset: Asset) => void;
+}
 
-export default function LPManagement({}: LPManagementProps) {
+export default function LPManagement({ assets, onAssetClick }: LPManagementProps) {
   const [lpItems, setLpItems] = useState<LPItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,6 +114,8 @@ export default function LPManagement({}: LPManagementProps) {
   const [templateFile, setTemplateFile] = useState<File | null>(null);
   const [templateUploading, setTemplateUploading] = useState(false);
   const [templateUploadModalOpened, setTemplateUploadModalOpened] = useState(false);
+
+  // Asset overview modal state - now handled by parent component
 
   // Form state
   const [formData, setFormData] = useState({
@@ -126,6 +139,7 @@ export default function LPManagement({}: LPManagementProps) {
     coldTemperature: '',
     remedialWoNumber: '',
     remedialCompletedDate: '',
+    status: 'In Progress',
   });
 
   // Filter state
@@ -133,6 +147,7 @@ export default function LPManagement({}: LPManagementProps) {
   const [filterSampleType, setFilterSampleType] = useState<string>('');
   const [filterTestType, setFilterTestType] = useState<string>('');
   const [filterWing, setFilterWing] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('');
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [singleDate, setSingleDate] = useState<Date | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -170,18 +185,47 @@ export default function LPManagement({}: LPManagementProps) {
     if (!dateString) return "";
     
     if (dateString instanceof Date) {
-      return dateString.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+      return dateString.toISOString(); // Return ISO format for proper storage
     }
     
     if (typeof dateString === "string") {
       const [datePart] = dateString.split(" ");
       const [day, month, year] = datePart.split("/");
       if (day && month && year) {
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`; // Convert to YYYY-MM-DD
+        const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        return date.toISOString(); // Convert to ISO format
       }
     }
     
+    // Try to parse as date and convert to ISO
+    try {
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    } catch (error) {
+      console.warn('Could not parse date in formatDate:', dateString);
+    }
+    
     return dateString.toString();
+  };
+
+  // Helper function to display dates in user-friendly format (dd/mm/yyyy)
+  const displayDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return "";
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString;
+    }
   };
 
   const getTestType = (description: string): string => {
@@ -242,28 +286,89 @@ export default function LPManagement({}: LPManagementProps) {
     });
   };
 
-  // Convert dd/mm/yyyy to yyyy-mm-dd format
-  const convertDateFormat = (dateString: string): string => {
+  // Export filtered LP items to Excel
+  const exportToExcel = () => {
+    const exportData = filteredLPItems.map(item => ({
+      'WO Number': item.woNumber,
+      'Created Date': displayDate(item.createdDate),
+      'Room/Ward Name': item.room,
+      'Room Number': item.location,
+      'Wing': item.wing,
+      'Asset Barcode': item.assetBarcode,
+      'Positive Count (Pre)': item.positiveCountPre,
+      'Positive Count (Post)': item.positiveCountPost,
+      'Sample Number': item.sampleNumber,
+      'Lab Name': item.labName,
+      'Certificate Number': item.certificateNumber,
+      'Sample Type': item.sampleType,
+      'Test Type': item.testType,
+      'Sample Temperature': item.sampleTemperature,
+      'Bacteria Variant': item.bacteriaVariant,
+      'Sampled On': displayDate(item.sampledOn),
+      'Next Resample Date': displayDate(item.nextResampleDate),
+      'Hot Temperature': item.hotTemperature,
+      'Cold Temperature': item.coldTemperature,
+      'Remedial WO Number': item.remedialWoNumber,
+      'Remedial Completed Date': displayDate(item.remedialCompletedDate),
+      'Status': item.status
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'LP Items Export');
+    
+    // Auto-size columns
+    const cols = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+    worksheet['!cols'] = cols;
+    
+    const fileName = `LP_Items_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    
+    notifications.show({
+      title: 'Export Successful',
+      message: `${filteredLPItems.length} LP items exported to ${fileName}`,
+      color: 'green',
+      icon: <IconCheck size={16} />,
+    });
+  };
+
+  // Convert dd/mm/yyyy to ISO date format for proper DynamoDB storage and sorting
+  const convertDateFormat = (dateString: string | number | null | undefined): string => {
     if (!dateString) return '';
     
-    // Check if it's already in yyyy-mm-dd format
-    if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      return dateString;
-    }
-    
-    // Convert dd/mm/yyyy to yyyy-mm-dd
-    if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-      const [day, month, year] = dateString.split('/');
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-    
-    // Handle Excel date numbers
+    // Handle Excel date numbers first
     if (typeof dateString === 'number') {
       const date = new Date((dateString - 25569) * 86400 * 1000);
-      return date.toISOString().split('T')[0];
+      return date.toISOString();
     }
     
-    return dateString;
+    // Convert to string for pattern matching
+    const dateStr = String(dateString).trim();
+    if (!dateStr) return '';
+    
+    // Check if it's already in yyyy-mm-dd format
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return new Date(dateStr).toISOString();
+    }
+    
+    // Convert dd/mm/yyyy to ISO format
+    if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      const [day, month, year] = dateStr.split('/');
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      return date.toISOString();
+    }
+    
+    // Try to parse as a date and convert to ISO
+    try {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+    } catch (error) {
+      console.warn('Could not parse date:', dateStr);
+    }
+    
+    return dateStr;
   };
 
   // Process template file (simple Excel to JSON conversion)
@@ -301,6 +406,7 @@ export default function LPManagement({}: LPManagementProps) {
             coldTemperature: row['Cold Temperature']?.toString() || '',
             remedialWoNumber: row['Remedial WO Number']?.toString() || '',
             remedialCompletedDate: convertDateFormat(row['Remedial Completed Date']) || '',
+            status: (!row['Remedial WO Number'] || row['Remedial WO Number'] === '' || row['Remedial WO Number'] === 'N/A') ? 'In Progress' : 'Completed',
           }));
           
           resolve(processedData);
@@ -397,6 +503,7 @@ export default function LPManagement({}: LPManagementProps) {
               bacteriaVariant,
               sampledOn,
               nextResampleDate,
+              status: 'In Progress', // Default status for Planet extraction
             });
           }
           
@@ -410,8 +517,9 @@ export default function LPManagement({}: LPManagementProps) {
     });
   };
 
-  // Filter function
-  const filteredLPItems = lpItems.filter((item) => {
+  // Filter and sort function
+  const filteredLPItems = lpItems
+    .filter((item) => {
     // Search query - searches across all text fields
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -457,6 +565,11 @@ export default function LPManagement({}: LPManagementProps) {
       return false;
     }
 
+    // Status filter
+    if (filterStatus && item.status !== filterStatus) {
+      return false;
+    }
+
     // Date range filter (sampled on date)
     if (dateRange[0] || dateRange[1]) {
       const sampledDate = item.sampledOn ? new Date(item.sampledOn) : null;
@@ -485,6 +598,12 @@ export default function LPManagement({}: LPManagementProps) {
     }
 
     return true;
+  })
+  .sort((a, b) => {
+    // Sort by WO Number in descending order (largest number first)
+    const woNumberA = parseInt(a.woNumber) || 0;
+    const woNumberB = parseInt(b.woNumber) || 0;
+    return woNumberB - woNumberA;
   });
 
   // Clear all filters
@@ -493,6 +612,7 @@ export default function LPManagement({}: LPManagementProps) {
     setFilterSampleType('');
     setFilterTestType('');
     setFilterWing('');
+    setFilterStatus('');
     setDateRange([null, null]);
     setSingleDate(null);
   };
@@ -521,6 +641,31 @@ export default function LPManagement({}: LPManagementProps) {
     }
   };
 
+  // Find asset by barcode using existing assets data
+  const findAssetByBarcodeLocal = (barcode: string): Asset | null => {
+    // Use the utility function with the assets passed from parent
+    return findAssetByBarcode(barcode, assets);
+  };
+
+  // Handle asset barcode click
+  const handleAssetBarcodeClick = (barcode: string) => {
+    console.log('Clicking asset barcode:', barcode);
+    
+    const asset = findAssetByBarcodeLocal(barcode);
+    console.log('Found asset:', asset);
+    
+    if (asset) {
+      onAssetClick(asset);
+    } else {
+      notifications.show({
+        title: 'Asset Not Found',
+        message: `No asset found with barcode: ${barcode}`,
+        color: 'orange',
+        icon: <IconAlertCircle size={16} />,
+      });
+    }
+  };
+
   // Load data on component mount
   useEffect(() => {
     fetchLPItems();
@@ -539,6 +684,11 @@ export default function LPManagement({}: LPManagementProps) {
         },
         body: JSON.stringify({
           ...formData,
+          // Convert date fields to ISO format for proper storage
+          sampledOn: formData.sampledOn ? new Date(formData.sampledOn).toISOString() : '',
+          nextResampleDate: formData.nextResampleDate ? new Date(formData.nextResampleDate).toISOString() : '',
+          remedialCompletedDate: formData.remedialCompletedDate ? new Date(formData.remedialCompletedDate).toISOString() : '',
+          // Status will be calculated on the server side based on remedialWoNumber
           modifiedBy: 'current-user', // This should come from auth context
         }),
       });
@@ -826,6 +976,7 @@ export default function LPManagement({}: LPManagementProps) {
         coldTemperature: item.coldTemperature,
         remedialWoNumber: item.remedialWoNumber,
         remedialCompletedDate: item.remedialCompletedDate ? item.remedialCompletedDate.split('T')[0] : '',
+        status: item.status,
       });
     } else {
       setIsEditing(false);
@@ -851,6 +1002,7 @@ export default function LPManagement({}: LPManagementProps) {
         coldTemperature: '',
         remedialWoNumber: '',
         remedialCompletedDate: '',
+        status: 'In Progress',
       });
     }
     setModalOpened(true);
@@ -931,6 +1083,14 @@ export default function LPManagement({}: LPManagementProps) {
               Extract from Planet
             </Button>
             <Button
+              variant="light"
+              leftSection={<IconFileExport size={16} />}
+              onClick={exportToExcel}
+              disabled={filteredLPItems.length === 0}
+            >
+              Export to Excel
+            </Button>
+            <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => handleOpenModal()}
             >
@@ -939,10 +1099,6 @@ export default function LPManagement({}: LPManagementProps) {
           </Group>
         </Group>
 
-        <Alert icon={<IconAlertCircle size={16} />} color="blue" variant="light">
-          This data is synchronized from SharePoint using Power Automate. 
-          Manual changes will be reflected in the system immediately.
-        </Alert>
       </Card>
 
       {/* Statistics */}
@@ -971,11 +1127,9 @@ export default function LPManagement({}: LPManagementProps) {
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Paper p="md" withBorder>
-            <Text size="xs" tt="uppercase" fw={700} c="dimmed">High Risk (>100 CFU)</Text>
-            <Text fw={700} size="xl" c="red">
-              {filteredLPItems.filter(item => 
-                parseInt(item.positiveCountPost) > 100 || parseInt(item.positiveCountPre) > 100
-              ).length}
+            <Text size="xs" tt="uppercase" fw={700} c="dimmed">In Progress</Text>
+            <Text fw={700} size="xl" c="orange">
+              {filteredLPItems.filter(item => item.status === 'In Progress').length}
             </Text>
           </Paper>
         </Grid.Col>
@@ -1000,7 +1154,7 @@ export default function LPManagement({}: LPManagementProps) {
             >
               Filters
             </Button>
-            {(searchQuery || filterSampleType || filterTestType || filterWing || dateRange[0] || dateRange[1] || singleDate) && (
+            {(searchQuery || filterSampleType || filterTestType || filterWing || filterStatus || dateRange[0] || dateRange[1] || singleDate) && (
               <Button
                 variant="light"
                 color="gray"
@@ -1056,6 +1210,20 @@ export default function LPManagement({}: LPManagementProps) {
                   />
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                  <Select
+                    label="Status"
+                    placeholder="All statuses"
+                    value={filterStatus}
+                    onChange={(value) => setFilterStatus(value || '')}
+                    data={[
+                      { value: '', label: 'All statuses' },
+                      { value: 'In Progress', label: 'In Progress' },
+                      { value: 'Completed', label: 'Completed' }
+                    ]}
+                    clearable
+                  />
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
                   <DatePickerInput
                     label="Date (Sampled On)"
                     placeholder="Select date"
@@ -1090,7 +1258,7 @@ export default function LPManagement({}: LPManagementProps) {
 
 
         {/* Active Filters Display */}
-        {(searchQuery || filterSampleType || filterTestType || filterWing || dateRange[0] || dateRange[1] || singleDate) && (
+        {(searchQuery || filterSampleType || filterTestType || filterWing || filterStatus || dateRange[0] || dateRange[1] || singleDate) && (
           <Group mb="md" gap="xs">
             <Text size="sm" c="dimmed">Active filters:</Text>
             {searchQuery && (
@@ -1111,6 +1279,11 @@ export default function LPManagement({}: LPManagementProps) {
             {filterWing && (
               <Badge variant="light" color="purple" size="sm">
                 Wing: {filterWing}
+              </Badge>
+            )}
+            {filterStatus && (
+              <Badge variant="light" color={filterStatus === 'In Progress' ? 'orange' : 'green'} size="sm">
+                Status: {filterStatus}
               </Badge>
             )}
             {dateRange[0] && dateRange[1] && (
@@ -1148,7 +1321,17 @@ export default function LPManagement({}: LPManagementProps) {
                 filteredLPItems.map((item) => (
                   <Table.Tr key={item.id}>
                     <Table.Td>
-                      <Text fw={500}>{item.assetBarcode}</Text>
+                      <Text 
+                        fw={500} 
+                        c="blue" 
+                        style={{ 
+                          cursor: 'pointer', 
+                          textDecoration: 'underline'
+                        }}
+                        onClick={() => handleAssetBarcodeClick(item.assetBarcode)}
+                      >
+                        {item.assetBarcode}
+                      </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text fw={500}>{parseFloat(item.woNumber).toString()}</Text>
@@ -1185,20 +1368,20 @@ export default function LPManagement({}: LPManagementProps) {
                     <Table.Td>
                       <Badge 
                         variant="light" 
-                        color={(!item.remedialWoNumber || item.remedialWoNumber === 'N/A') ? 'orange' : 'green'}
+                        color={item.status === 'In Progress' ? 'orange' : 'green'}
                         size="sm"
                       >
-                        {(!item.remedialWoNumber || item.remedialWoNumber === 'N/A') ? 'In Progress' : 'Completed'}
+                        {item.status}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm">
-                        {item.sampledOn ? new Date(item.sampledOn).toLocaleDateString('en-GB') : 'N/A'}
+                        {displayDate(item.sampledOn) || 'N/A'}
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm">
-                        {item.nextResampleDate ? new Date(item.nextResampleDate).toLocaleDateString('en-GB') : 'N/A'}
+                        {displayDate(item.nextResampleDate) || 'N/A'}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -1482,9 +1665,9 @@ export default function LPManagement({}: LPManagementProps) {
                 </Badge>
                 <Badge 
                   variant="light" 
-                  color={selectedItem.remedialWoNumber && selectedItem.remedialWoNumber !== 'N/A' ? 'green' : 'orange'}
+                  color={selectedItem.status === 'Completed' ? 'green' : 'orange'}
                 >
-                  {selectedItem.remedialWoNumber && selectedItem.remedialWoNumber !== 'N/A' ? 'Completed' : 'In Progress'}
+                  {selectedItem.status}
                 </Badge>
                 <Badge 
                   variant="light" 
@@ -1568,13 +1751,13 @@ export default function LPManagement({}: LPManagementProps) {
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Sampled On</Text>
                 <Text fw={500}>
-                  {selectedItem.sampledOn ? new Date(selectedItem.sampledOn).toLocaleDateString('en-GB') : 'N/A'}
+                  {displayDate(selectedItem.sampledOn) || 'N/A'}
                 </Text>
               </Grid.Col>
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Next Resample Date</Text>
                 <Text fw={500}>
-                  {selectedItem.nextResampleDate ? new Date(selectedItem.nextResampleDate).toLocaleDateString('en-GB') : 'N/A'}
+                  {displayDate(selectedItem.nextResampleDate) || 'N/A'}
                 </Text>
               </Grid.Col>
               <Grid.Col span={6}>
@@ -1592,7 +1775,7 @@ export default function LPManagement({}: LPManagementProps) {
               <Grid.Col span={6}>
                 <Text size="sm" c="dimmed">Remedial Completed Date</Text>
                 <Text fw={500}>
-                  {selectedItem.remedialCompletedDate ? new Date(selectedItem.remedialCompletedDate).toLocaleDateString('en-GB') : 'N/A'}
+                  {displayDate(selectedItem.remedialCompletedDate) || 'N/A'}
                 </Text>
               </Grid.Col>
             </Grid>
@@ -1775,6 +1958,9 @@ export default function LPManagement({}: LPManagementProps) {
           </Group>
         </Stack>
       </Modal>
+
+
+      {/* Asset Overview Modal is now handled by parent component */}
     </Stack>
   );
 }

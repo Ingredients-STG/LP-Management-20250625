@@ -44,8 +44,8 @@ export async function GET(
       throw error;
     }
 
-    // Scan for items with matching asset barcode
-    const command = new ScanCommand({
+    // First, scan for items with exact asset barcode match
+    const exactCommand = new ScanCommand({
       TableName: TABLE_NAME,
       FilterExpression: 'assetBarcode = :assetBarcode',
       ExpressionAttributeValues: {
@@ -53,8 +53,58 @@ export async function GET(
       }
     });
 
-    const result = await docClient.send(command);
-    const items = result.Items || [];
+    const exactResult = await docClient.send(exactCommand);
+    let items = exactResult.Items || [];
+
+    // If no exact matches found, try to find assets that might have this barcode in notes
+    if (items.length === 0) {
+      console.log(`No exact matches found for ${assetBarcode}, searching for assets with barcode in notes...`);
+      
+      try {
+        // Fetch all assets to search through their notes
+        const assetsCommand = new ScanCommand({
+          TableName: 'water-tap-assets'
+        });
+        const assetsResult = await docClient.send(assetsCommand);
+        const assets = assetsResult.Items || [];
+
+        // Find assets that have this barcode in their notes
+        const matchingAssets = assets.filter(asset => {
+          if (!asset.notes) return false;
+          const notesText = asset.notes.toLowerCase();
+          const searchBarcode = assetBarcode.toLowerCase();
+          const barcodeRegex = new RegExp(`\\b${searchBarcode}\\b`, 'i');
+          return barcodeRegex.test(notesText);
+        });
+
+        if (matchingAssets.length > 0) {
+          console.log(`Found ${matchingAssets.length} assets with barcode ${assetBarcode} in notes`);
+          
+          // Get the current asset barcodes from these matching assets
+          const currentBarcodes = matchingAssets.map(asset => asset.assetBarcode).filter(Boolean);
+          
+          // Search for LP items with these current barcodes
+          for (const currentBarcode of currentBarcodes) {
+            const historyCommand = new ScanCommand({
+              TableName: TABLE_NAME,
+              FilterExpression: 'assetBarcode = :assetBarcode',
+              ExpressionAttributeValues: {
+                ':assetBarcode': currentBarcode
+              }
+            });
+            
+            const historyResult = await docClient.send(historyCommand);
+            if (historyResult.Items && historyResult.Items.length > 0) {
+              items = items.concat(historyResult.Items);
+              console.log(`Found ${historyResult.Items.length} LP history items for current barcode: ${currentBarcode}`);
+            }
+          }
+        }
+      } catch (assetError) {
+        console.warn('Error searching assets for barcode in notes:', assetError);
+        // Continue with exact matches only
+      }
+    }
 
     // Sort by sampled date (most recent first)
     items.sort((a, b) => {
