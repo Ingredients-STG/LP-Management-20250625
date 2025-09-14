@@ -15,13 +15,16 @@ const TABLE_NAME = 'ScheduledReports';
 // Ensure the ScheduledReports table exists
 async function ensureTableExists() {
   try {
+    console.log('ensureTableExists: Checking if table exists...');
     await client.send(new DescribeTableCommand({
       TableName: TABLE_NAME,
     }));
+    console.log('ensureTableExists: Table exists');
     return true;
   } catch (error: any) {
+    console.log('ensureTableExists: Error checking table:', error.name, error.message);
     if (error.name === 'ResourceNotFoundException') {
-      console.log('ScheduledReports table does not exist, creating it...');
+      console.log('ensureTableExists: Table does not exist, creating it...');
       try {
         const createTableCommand = new CreateTableCommand({
           TableName: TABLE_NAME,
@@ -58,18 +61,25 @@ async function ensureTableExists() {
           ],
         });
 
+        console.log('ensureTableExists: Sending create table command...');
         await client.send(createTableCommand);
-        console.log('ScheduledReports table created successfully');
+        console.log('ensureTableExists: Table created successfully');
         
         // Wait a moment for the table to be ready
+        console.log('ensureTableExists: Waiting for table to be ready...');
         await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('ensureTableExists: Table should be ready now');
         return true;
       } catch (createError) {
-        console.error('Error creating ScheduledReports table:', createError);
+        console.error('ensureTableExists: Error creating table:', createError);
+        console.error('Create error details:', {
+          name: createError instanceof Error ? createError.name : 'Unknown',
+          message: createError instanceof Error ? createError.message : 'Unknown error',
+        });
         return false;
       }
     }
-    console.error('Error checking ScheduledReports table:', error);
+    console.error('ensureTableExists: Unexpected error checking table:', error);
     return false;
   }
 }
@@ -120,27 +130,42 @@ function calculateNextRun(frequency: string, startDate: string): string {
 // GET - List all scheduled reports
 export async function GET() {
   try {
+    console.log('GET /api/scheduled-reports: Starting request');
+    console.log('AWS Region:', process.env.AWS_REGION || 'eu-west-2');
+    
     // Ensure table exists before trying to scan it
+    console.log('GET /api/scheduled-reports: Ensuring table exists...');
     const tableExists = await ensureTableExists();
     if (!tableExists) {
+      console.error('GET /api/scheduled-reports: Table creation failed');
       return NextResponse.json(
         { error: 'Failed to create or access ScheduledReports table' },
         { status: 500 }
       );
     }
 
+    console.log('GET /api/scheduled-reports: Table exists, scanning...');
     const command = new ScanCommand({
       TableName: TABLE_NAME,
     });
 
     const response = await docClient.send(command);
     const reports = response.Items || [];
-
+    
+    console.log(`GET /api/scheduled-reports: Found ${reports.length} reports`);
     return NextResponse.json(reports);
   } catch (error) {
-    console.error('Error fetching scheduled reports:', error);
+    console.error('GET /api/scheduled-reports: Error fetching scheduled reports:', error);
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: 'Failed to fetch scheduled reports' },
+      { 
+        error: 'Failed to fetch scheduled reports',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
