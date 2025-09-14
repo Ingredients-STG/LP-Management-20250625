@@ -1,0 +1,25 @@
+{
+  "name": "lp-management-scheduled-backup",
+  "version": "1.0.0",
+  "description": "Scheduled backup Lambda function for LP Management system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.840.0",
+    "@aws-sdk/client-ses": "^3.840.0",
+    "@aws-sdk/client-s3": "^3.840.0",
+    "@aws-sdk/lib-dynamodb": "^3.839.0",
+    "xlsx": "^0.18.5"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "backup",
+    "dynamodb",
+    "ses"
+  ],
+  "author": "LP Management Team",
+  "license": "MIT"
+}

@@ -48,6 +48,7 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import SPListItemsCard from '@/components/SPListItemsCard';
 import LPHistoryCard from '@/components/LPHistoryCard';
+import EmailReportsManager from '@/components/EmailReportsManager';
 import AssetReconciliation from '@/components/AssetReconciliation';
 import LPManagement from '@/components/LPManagement';
 import { useAuth } from '@/contexts/AuthContext';
@@ -305,7 +306,9 @@ export default function HomePage() {
   const [filterExpiryStatus, setFilterExpiryStatus] = useState<string>('');
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   // Temperature graph filter - default to All Wings
-  const [temperatureGraphWingFilter, setTemperatureGraphWingFilter] = useState<string>('All Wings');
+  const [temperatureGraphWingFilter, setTemperatureGraphWingFilter] = useState<string>('');
+  // Temperature graph period filter
+  const [temperatureGraphPeriodFilter, setTemperatureGraphPeriodFilter] = useState<string>('90');
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [showAuditModal, { open: openAuditModal, close: closeAuditModal }] = useDisclosure(false);
@@ -3289,29 +3292,54 @@ export default function HomePage() {
               <Title order={4}>Temperature Trends</Title>
               <Text size="xs" c="dimmed">Note: Only temperatures &gt; 0°C are plotted (handles cold-only/hot-only assets)</Text>
             </div>
-            <Select
-              placeholder="Select Wing"
-              value={temperatureGraphWingFilter}
-              onChange={(value) => setTemperatureGraphWingFilter(value || '')}
-              data={[
-                { value: '', label: 'All Wings' },
-                ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
-                  value: wing,
-                  label: wing
-                }))
-              ]}
-              clearable
-              style={{ minWidth: 150 }}
-            />
+            <Group>
+              <Select
+                placeholder="Select Period"
+                value={temperatureGraphPeriodFilter}
+                onChange={(value) => setTemperatureGraphPeriodFilter(value || '90')}
+                data={[
+                  { value: '30', label: 'Last 30 days' },
+                  { value: '90', label: 'Last 90 days' },
+                  { value: '180', label: 'Last 6 months' },
+                  { value: '365', label: 'Last year' }
+                ]}
+                style={{ minWidth: 150 }}
+              />
+              <Select
+                placeholder="Select Wing"
+                value={temperatureGraphWingFilter}
+                onChange={(value) => setTemperatureGraphWingFilter(value || '')}
+                data={[
+                  { value: '', label: 'All Wings' },
+                  ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
+                    value: wing,
+                    label: wing
+                  }))
+                ]}
+                clearable
+                style={{ minWidth: 150 }}
+              />
+            </Group>
           </Group>
           {(() => {
             // Get LP items data for temperature graph
             const lpItems: any[] = stats.lpItems || [];
             
-            // Filter by wing if selected (default to All Wings)
-            const filteredLpItems = temperatureGraphWingFilter && temperatureGraphWingFilter !== 'All Wings'
-              ? lpItems.filter((item: any) => item.wing === temperatureGraphWingFilter)
-              : lpItems;
+            // Filter by wing and period
+            const daysBack = parseInt(temperatureGraphPeriodFilter || '90');
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+            
+            const filteredLpItems = lpItems.filter((item: any) => {
+              // Filter by wing if selected
+              const wingMatch = !temperatureGraphWingFilter || item.wing === temperatureGraphWingFilter;
+              
+              // Filter by date period
+              const itemDate = item.createdDate ? new Date(item.createdDate) : null;
+              const dateMatch = !itemDate || itemDate >= cutoffDate;
+              
+              return wingMatch && dateMatch;
+            });
             
             // Group by created date and calculate average temperatures
             const temperatureData = filteredLpItems
@@ -5789,6 +5817,17 @@ export default function HomePage() {
               LP Management
             </Button>
             <Button
+              variant={activeTab === 'backup' ? 'filled' : 'subtle'}
+              leftSection={<IconMail size={16} />}
+              justify="start"
+              onClick={() => {
+                setActiveTab('backup');
+                if (opened) toggle(); // Close mobile menu after selection
+              }}
+            >
+              Email Reports
+            </Button>
+            <Button
               variant={activeTab === 'settings' ? 'filled' : 'subtle'}
               leftSection={<IconSettings size={16} />}
               justify="start"
@@ -5838,6 +5877,7 @@ export default function HomePage() {
                 }}
               />
             )}
+            {activeTab === 'backup' && <EmailReportsManager />}
             {activeTab === 'settings' && renderSettings()}
           </div>
         </AppShell.Main>
