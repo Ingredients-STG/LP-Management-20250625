@@ -21,6 +21,10 @@ frontend:
         - env | grep -e AMPLIFY_ACCESS_KEY_ID >> .env.production || echo "AMPLIFY_ACCESS_KEY_ID not found"
         - env | grep -e AMPLIFY_SECRET_ACCESS_KEY >> .env.production || echo "AMPLIFY_SECRET_ACCESS_KEY not found"
         - env | grep -e AMPLIFY_AWS_REGION >> .env.production || echo "AMPLIFY_AWS_REGION not found"
+        - echo "AWS_ACCESS_KEY_ID=$AMPLIFY_ACCESS_KEY_ID" >> .env.production
+        - echo "AWS_SECRET_ACCESS_KEY=$AMPLIFY_SECRET_ACCESS_KEY" >> .env.production
+        - echo "AWS_REGION=$AMPLIFY_AWS_REGION" >> .env.production
+        - echo "SES_FROM_EMAIL=noreply@water.facilities-stg.co.uk" >> .env.production
         - echo "Environment variables added to .env.production:"
         - cat .env.production || echo "No environment variables found"
         - echo "Starting Next.js build..."
