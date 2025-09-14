@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'eu-west-2',
@@ -10,12 +11,83 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = 'ScheduledReports';
 
+// Ensure the ScheduledReports table exists
+async function ensureTableExists() {
+  try {
+    await client.send(new DescribeTableCommand({
+      TableName: TABLE_NAME,
+    }));
+    return true;
+  } catch (error: any) {
+    if (error.name === 'ResourceNotFoundException') {
+      console.log('ScheduledReports table does not exist, creating it...');
+      try {
+        const createTableCommand = new CreateTableCommand({
+          TableName: TABLE_NAME,
+          KeySchema: [
+            {
+              AttributeName: 'id',
+              KeyType: 'HASH', // Partition key
+            },
+          ],
+          AttributeDefinitions: [
+            {
+              AttributeName: 'id',
+              AttributeType: 'S', // String
+            },
+          ],
+          BillingMode: 'PAY_PER_REQUEST', // On-demand billing
+          StreamSpecification: {
+            StreamEnabled: true,
+            StreamViewType: 'NEW_AND_OLD_IMAGES',
+          },
+          Tags: [
+            {
+              Key: 'Environment',
+              Value: 'Production',
+            },
+            {
+              Key: 'Application',
+              Value: 'LP-Management',
+            },
+            {
+              Key: 'Purpose',
+              Value: 'ScheduledReports',
+            },
+          ],
+        });
+
+        await client.send(createTableCommand);
+        console.log('ScheduledReports table created successfully');
+        
+        // Wait a moment for the table to be ready
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return true;
+      } catch (createError) {
+        console.error('Error creating ScheduledReports table:', createError);
+        return false;
+      }
+    }
+    console.error('Error checking ScheduledReports table:', error);
+    return false;
+  }
+}
+
 // GET - Get a specific scheduled report
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Ensure table exists before trying to get the report
+    const tableExists = await ensureTableExists();
+    if (!tableExists) {
+      return NextResponse.json(
+        { error: 'Failed to create or access ScheduledReports table' },
+        { status: 500 }
+      );
+    }
+
     const { id } = await params;
     const command = new GetCommand({
       TableName: TABLE_NAME,
@@ -47,6 +119,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Ensure table exists before trying to update the report
+    const tableExists = await ensureTableExists();
+    if (!tableExists) {
+      return NextResponse.json(
+        { error: 'Failed to create or access ScheduledReports table' },
+        { status: 500 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { isActive, name, databases, frequency, startDate, recipients } = body;
@@ -125,6 +206,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Ensure table exists before trying to delete the report
+    const tableExists = await ensureTableExists();
+    if (!tableExists) {
+      return NextResponse.json(
+        { error: 'Failed to create or access ScheduledReports table' },
+        { status: 500 }
+      );
+    }
+
     const { id } = await params;
     const command = new DeleteCommand({
       TableName: TABLE_NAME,
