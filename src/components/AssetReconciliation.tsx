@@ -23,7 +23,8 @@ import {
   Modal,
   Grid,
   Textarea,
-  Box
+  Box,
+  Pagination
 } from '@mantine/core';
 import { DatePickerInput, DateInput } from '@mantine/dates';
 import { useDisclosure } from '@mantine/hooks';
@@ -119,6 +120,12 @@ export default function AssetReconciliation() {
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
   const [showReconciled, setShowReconciled] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
+  const [allReconciliationItems, setAllReconciliationItems] = useState<ReconciliationItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [dateRangePreset, setDateRangePreset] = useState<string>('');
@@ -230,6 +237,11 @@ export default function AssetReconciliation() {
     }
   }, [dateRange]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStatus, showReconciled]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -299,7 +311,7 @@ export default function AssetReconciliation() {
   };
 
   const createReconciliationItems = (spItems: SPListItem[], assetItems: Asset[]) => {
-    const reconciliationData: ReconciliationItem[] = spItems
+    const allReconciliationData: ReconciliationItem[] = spItems
       .filter(spItem => {
         // Filter out already reconciled items unless user wants to see them
         if (!showReconciled && spItem.reconciliationStatus === 'synced') {
@@ -381,7 +393,25 @@ export default function AssetReconciliation() {
         };
       });
 
-    setReconciliationItems(reconciliationData);
+    // Store all items and update pagination
+    setAllReconciliationItems(allReconciliationData);
+    setTotalItems(allReconciliationData.length);
+    setCurrentPage(1); // Reset to first page when data changes
+    
+    // Apply pagination to current page
+    updatePagination(allReconciliationData, 1);
+  };
+
+  const updatePagination = (allItems: ReconciliationItem[], page: number) => {
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = allItems.slice(startIndex, endIndex);
+    setReconciliationItems(paginatedItems);
+    setCurrentPage(page);
+  };
+
+  const handlePageChange = (page: number) => {
+    updatePagination(allReconciliationItems, page);
   };
 
   const checkLocationMatch = (spItem: SPListItem, asset: Asset): boolean => {
@@ -1091,8 +1121,8 @@ export default function AssetReconciliation() {
     }
   };
 
-  // Filter items based on search and status
-  const filteredItems = reconciliationItems.filter(item => {
+  // Filter items based on search and status from all items
+  const filteredAllItems = allReconciliationItems.filter(item => {
     const matchesSearch = searchTerm === '' || 
       item.spListItem.Location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.spListItem.AssetBarcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1104,21 +1134,26 @@ export default function AssetReconciliation() {
     return matchesSearch && matchesStatus;
   });
 
+  // Apply pagination to filtered items
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const filteredItems = filteredAllItems.slice(startIndex, endIndex);
+
   const stats = {
-    total: reconciliationItems.length,
-    synced: reconciliationItems.filter(item => item.spListItem.reconciliationStatus === 'synced').length,
-    confirmed: reconciliationItems.filter(item => 
+    total: filteredAllItems.length,
+    synced: filteredAllItems.filter(item => item.spListItem.reconciliationStatus === 'synced').length,
+    confirmed: filteredAllItems.filter(item => 
       item.reconciliationStatus === 'confirmed' && 
       item.spListItem.reconciliationStatus !== 'synced'
     ).length,
-    mismatch: reconciliationItems.filter(item => item.reconciliationStatus === 'mismatch').length,
-    notFound: reconciliationItems.filter(item => item.reconciliationStatus === 'not_found').length,
-    pending: reconciliationItems.filter(item => item.reconciliationStatus === 'pending').length,
+    mismatch: filteredAllItems.filter(item => item.reconciliationStatus === 'mismatch').length,
+    notFound: filteredAllItems.filter(item => item.reconciliationStatus === 'not_found').length,
+    pending: filteredAllItems.filter(item => item.reconciliationStatus === 'pending').length,
   };
 
   // Export filtered reconciliation data to Excel
   const exportToExcel = () => {
-    const exportData = filteredItems.map(item => ({
+    const exportData = filteredAllItems.map(item => ({
       'ID': item.spListItem.id,
       'Location': item.spListItem.Location || 'N/A',
       'Filter Installed Date': item.spListItem.FilterInstalledDate || 'N/A',
@@ -1904,6 +1939,22 @@ export default function AssetReconciliation() {
             </Stack>
           </Box>
 
+          {/* Pagination */}
+          {filteredAllItems.length > itemsPerPage && (
+            <Card withBorder p="md">
+              <Group justify="space-between" align="center">
+                <Text size="sm" c="dimmed">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredAllItems.length)} of {filteredAllItems.length} items
+                </Text>
+                <Pagination
+                  value={currentPage}
+                  onChange={handlePageChange}
+                  total={Math.ceil(filteredAllItems.length / itemsPerPage)}
+                  size="sm"
+                />
+              </Group>
+            </Card>
+          )}
 
         </Card>
 

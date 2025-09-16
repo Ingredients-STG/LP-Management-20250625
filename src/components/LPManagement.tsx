@@ -26,6 +26,7 @@ import {
   Progress,
   Box,
   ThemeIcon,
+  Pagination,
 } from '@mantine/core';
 import {
   IconRefresh,
@@ -151,6 +152,12 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [singleDate, setSingleDate] = useState<Date | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
+  const [allLpItems, setAllLpItems] = useState<LPItem[]>([]);
 
   // Dynamic filter options based on actual LP Items data
   const sampleTypes = Array.from(new Set(lpItems.map(item => item.sampleType).filter(Boolean))).sort();
@@ -288,7 +295,7 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
 
   // Export filtered LP items to Excel
   const exportToExcel = () => {
-    const exportData = filteredLPItems.map(item => ({
+    const exportData = filteredAllLPItems.map(item => ({
       'WO Number': item.woNumber,
       'Created Date': displayDate(item.createdDate),
       'Room/Ward Name': item.room,
@@ -517,8 +524,8 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
     });
   };
 
-  // Filter and sort function
-  const filteredLPItems = lpItems
+  // Filter and sort function - work with all items first
+  const filteredAllLPItems = allLpItems
     .filter((item) => {
     // Search query - searches across all text fields
     if (searchQuery) {
@@ -606,6 +613,11 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
     return woNumberB - woNumberA;
   });
 
+  // Apply pagination to filtered items
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const filteredLPItems = filteredAllLPItems.slice(startIndex, endIndex);
+
   // Clear all filters
   const clearFilters = () => {
     setSearchQuery('');
@@ -626,7 +638,15 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
         throw new Error('Failed to fetch LP items');
       }
       const data = await response.json();
-      setLpItems(data.items || []);
+      const allItems = data.items || [];
+      
+      // Store all items and update pagination
+      setAllLpItems(allItems);
+      setTotalItems(allItems.length);
+      setCurrentPage(1); // Reset to first page when data changes
+      
+      // Apply pagination to current page
+      updatePagination(allItems, 1);
     } catch (error) {
       console.error('Error fetching LP items:', error);
       notifications.show({
@@ -639,6 +659,18 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const updatePagination = (allItems: LPItem[], page: number) => {
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = allItems.slice(startIndex, endIndex);
+    setLpItems(paginatedItems);
+    setCurrentPage(page);
+  };
+
+  const handlePageChange = (page: number) => {
+    updatePagination(allLpItems, page);
   };
 
   // Find asset by barcode using existing assets data
@@ -670,6 +702,11 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
   useEffect(() => {
     fetchLPItems();
   }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterSampleType, filterTestType, filterWing, filterStatus, dateRange, singleDate]);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -1080,13 +1117,13 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
               leftSection={<IconUpload size={16} />}
               onClick={() => setUploadModalOpened(true)}
             >
-              Extract from Planet
+              Import from Planet
             </Button>
             <Button
               variant="light"
               leftSection={<IconFileExport size={16} />}
               onClick={exportToExcel}
-              disabled={filteredLPItems.length === 0}
+              disabled={filteredAllLPItems.length === 0}
             >
               Export to Excel
             </Button>
@@ -1106,14 +1143,14 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Paper p="md" withBorder>
             <Text size="xs" tt="uppercase" fw={700} c="dimmed">Total Items</Text>
-            <Text fw={700} size="xl">{filteredLPItems.length}</Text>
+            <Text fw={700} size="xl">{filteredAllLPItems.length}</Text>
           </Paper>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Paper p="md" withBorder>
             <Text size="xs" tt="uppercase" fw={700} c="dimmed">Original Samples</Text>
             <Text fw={700} size="xl" c="blue">
-              {filteredLPItems.filter(item => item.sampleType === 'Original').length}
+              {filteredAllLPItems.filter(item => item.sampleType === 'Original').length}
             </Text>
           </Paper>
         </Grid.Col>
@@ -1121,7 +1158,7 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
           <Paper p="md" withBorder>
             <Text size="xs" tt="uppercase" fw={700} c="dimmed">Resamples</Text>
             <Text fw={700} size="xl" c="orange">
-              {filteredLPItems.filter(item => item.sampleType === 'Resample').length}
+              {filteredAllLPItems.filter(item => item.sampleType === 'Resample').length}
             </Text>
           </Paper>
         </Grid.Col>
@@ -1129,7 +1166,7 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
           <Paper p="md" withBorder>
             <Text size="xs" tt="uppercase" fw={700} c="dimmed">In Progress</Text>
             <Text fw={700} size="xl" c="orange">
-              {filteredLPItems.filter(item => item.status === 'In Progress').length}
+              {filteredAllLPItems.filter(item => item.status === 'In Progress').length}
             </Text>
           </Paper>
         </Grid.Col>
@@ -1454,6 +1491,23 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
           </Table>
         </ScrollArea>
       </Card>
+
+      {/* Pagination */}
+      {filteredAllLPItems.length > itemsPerPage && (
+        <Card withBorder p="md">
+          <Group justify="space-between" align="center">
+            <Text size="sm" c="dimmed">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredAllLPItems.length)} of {filteredAllLPItems.length} items
+            </Text>
+            <Pagination
+              value={currentPage}
+              onChange={handlePageChange}
+              total={Math.ceil(filteredAllLPItems.length / itemsPerPage)}
+              size="sm"
+            />
+          </Group>
+        </Card>
+      )}
 
       {/* Add/Edit Modal */}
       <Modal
@@ -1837,7 +1891,7 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
             setUploadProgress(0);
           }
         }}
-        title="Extract from Planet Excel File"
+        title="Import from Planet Excel File"
         size="lg"
         closeOnClickOutside={!uploading}
         closeOnEscape={!uploading}

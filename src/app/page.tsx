@@ -307,8 +307,12 @@ export default function HomePage() {
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   // Temperature graph filter - default to All Wings
   const [temperatureGraphWingFilter, setTemperatureGraphWingFilter] = useState<string>('');
-  // Positive detection trends filter - default to All Wings
+  // Positive detection trends filters
   const [positiveDetectionWingFilter, setPositiveDetectionWingFilter] = useState<string>('');
+  const [positiveDetectionTestTypeFilter, setPositiveDetectionTestTypeFilter] = useState<string>('Both');
+  const [positiveDetectionSampleTypeFilter, setPositiveDetectionSampleTypeFilter] = useState<string>('All');
+  const [positiveDetectionDateRangeFilter, setPositiveDetectionDateRangeFilter] = useState<string>('90');
+  const [customDateRange, setCustomDateRange] = useState<[Date | null, Date | null]>([null, null]);
   // Temperature graph period filter
   const [temperatureGraphPeriodFilter, setTemperatureGraphPeriodFilter] = useState<string>('90');
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
@@ -3406,90 +3410,270 @@ export default function HomePage() {
           <Group justify="space-between" mb="md">
             <div>
               <Title order={4}>Positive Detection Trends</Title>
-              <Text size="xs" c="dimmed">Trend of positive detections across wings over time</Text>
+              <Text size="xs" c="dimmed">Trend of positive detections with customizable filters</Text>
             </div>
-            <Select
-              placeholder="Select Wing"
-              value={positiveDetectionWingFilter}
-              onChange={(value) => setPositiveDetectionWingFilter(value || '')}
-              data={[
-                { value: '', label: 'All Wings' },
-                ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
-                  value: wing,
-                  label: wing
-                }))
-              ]}
-              clearable
-              style={{ minWidth: 150 }}
-            />
+            <Group>
+              <Select
+                placeholder="Select Wing"
+                value={positiveDetectionWingFilter}
+                onChange={(value) => setPositiveDetectionWingFilter(value || '')}
+                data={[
+                  { value: '', label: 'All Wings' },
+                  ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
+                    value: wing,
+                    label: wing
+                  }))
+                ]}
+                clearable
+                style={{ minWidth: 120 }}
+              />
+              <Select
+                placeholder="Test Type"
+                value={positiveDetectionTestTypeFilter}
+                onChange={(value) => setPositiveDetectionTestTypeFilter(value || 'LA')}
+                data={[
+                  { value: 'LA', label: 'Legionella (LA)' },
+                  { value: 'PA', label: 'Pseudomonas (PA)' },
+                  { value: 'Both', label: 'Both LA/PA' }
+                ]}
+                style={{ minWidth: 140 }}
+              />
+              <Select
+                placeholder="Sample Type"
+                value={positiveDetectionSampleTypeFilter}
+                onChange={(value) => setPositiveDetectionSampleTypeFilter(value || 'All')}
+                data={[
+                  { value: 'All', label: 'All Types' },
+                  { value: 'Pre', label: 'Only Pre' },
+                  { value: 'Post', label: 'Only Post' },
+                  { value: 'Both', label: 'Pre & Post' }
+                ]}
+                style={{ minWidth: 120 }}
+              />
+              <Select
+                placeholder="Date Range"
+                value={positiveDetectionDateRangeFilter}
+                onChange={(value) => setPositiveDetectionDateRangeFilter(value || '90')}
+                data={[
+                  { value: '30', label: 'Last 30 Days' },
+                  { value: '90', label: 'Last 90 Days' },
+                  { value: '180', label: 'Last 6 Months' },
+                  { value: '365', label: 'Last Year' },
+                  { value: 'custom', label: 'Custom Range' }
+                ]}
+                style={{ minWidth: 130 }}
+              />
+              {positiveDetectionDateRangeFilter === 'custom' && (
+                <DatePickerInput
+                  type="range"
+                  placeholder="Select date range"
+                  value={customDateRange}
+                  onChange={(value) => setCustomDateRange(value as [Date | null, Date | null])}
+                  style={{ minWidth: 200 }}
+                />
+              )}
+            </Group>
           </Group>
           {(() => {
             const lpItems: any[] = stats.lpItems || [];
-            const filteredLpItems = positiveDetectionWingFilter && positiveDetectionWingFilter !== 'All Wings'
-              ? lpItems.filter((item: any) => item.wing === positiveDetectionWingFilter)
-              : lpItems;
             
-            // Group by month and wing, count positive detections
-            const monthlyData = filteredLpItems.reduce((acc: { [key: string]: { [key: string]: number } }, item: any) => {
-              if (!item.sampledOn) return acc;
+            // Apply filters
+            let filteredLpItems = lpItems.filter((item: any) => {
+              // Wing filter
+              const wingMatch = !positiveDetectionWingFilter || item.wing === positiveDetectionWingFilter;
               
-              const date = new Date(item.sampledOn);
-              const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-              const wing = item.wing || 'Unknown';
+              // Test type filter
+              const testTypeMatch = !positiveDetectionTestTypeFilter || 
+                positiveDetectionTestTypeFilter === 'Both' || 
+                item.testType === positiveDetectionTestTypeFilter;
               
-              if (!acc[monthKey]) {
-                acc[monthKey] = {};
-              }
-              
-              // Count positive detections (pre > 0 or post > 0)
+              // Sample type filter
               const preValue = parseFloat(item.positiveCountPre || '0');
               const postValue = parseFloat(item.positiveCountPost || '0');
-              const isPositive = preValue > 0 || postValue > 0;
+              let sampleTypeMatch = true;
               
-              if (isPositive) {
-                acc[monthKey][wing] = (acc[monthKey][wing] || 0) + 1;
+              if (positiveDetectionSampleTypeFilter === 'Pre') {
+                sampleTypeMatch = preValue > 0 && postValue === 0;
+              } else if (positiveDetectionSampleTypeFilter === 'Post') {
+                sampleTypeMatch = preValue === 0 && postValue > 0;
+              } else if (positiveDetectionSampleTypeFilter === 'Both') {
+                sampleTypeMatch = preValue > 0 && postValue > 0;
+              }
+              // 'All' matches everything (sampleTypeMatch = true)
+              
+              // Date range filter
+              let dateMatch = true;
+              if (positiveDetectionDateRangeFilter === 'custom') {
+                if (customDateRange[0] && customDateRange[1]) {
+                  const itemDate = item.sampledOn ? new Date(item.sampledOn) : null;
+                  if (itemDate) {
+                    // Set time to start of day for start date and end of day for end date
+                    const startDate = new Date(customDateRange[0]);
+                    startDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(customDateRange[1]);
+                    endDate.setHours(23, 59, 59, 999);
+                    dateMatch = itemDate >= startDate && itemDate <= endDate;
+                  } else {
+                    dateMatch = false; // No date means no match
+                  }
+                } else {
+                  dateMatch = false; // No custom range selected means no match
+                }
+              } else {
+                const daysBack = parseInt(positiveDetectionDateRangeFilter || '90');
+                const cutoffDate = new Date();
+                cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+                const itemDate = item.sampledOn ? new Date(item.sampledOn) : null;
+                dateMatch = !itemDate || itemDate >= cutoffDate;
               }
               
-              return acc;
-            }, {});
+              return wingMatch && testTypeMatch && sampleTypeMatch && dateMatch;
+            });
+            
+            // Debug logging
+            console.log('Positive Detection Trends Debug:', {
+              totalItems: lpItems.length,
+              filteredItems: filteredLpItems.length,
+              customDateRange,
+              dateRangeFilter: positiveDetectionDateRangeFilter,
+              sampleTypeFilter: positiveDetectionSampleTypeFilter,
+              testTypeFilter: positiveDetectionTestTypeFilter,
+              wingFilter: positiveDetectionWingFilter,
+              timeGrouping: positiveDetectionDateRangeFilter === 'custom' ? 'daily' : 'monthly',
+              sampleData: lpItems.slice(0, 3).map(item => ({
+                sampledOn: item.sampledOn,
+                testType: item.testType,
+                wing: item.wing,
+                positiveCountPre: item.positiveCountPre,
+                positiveCountPost: item.positiveCountPost
+              }))
+            });
+            
+            // Group by month and count positive detections
+            // Determine what series to show based on filters
+            let seriesToShow: string[] = [];
+            let seriesConfig: any[] = [];
+            
+            if (positiveDetectionTestTypeFilter === 'Both') {
+              // Show separate lines for LA and PA
+              seriesToShow = ['LA', 'PA'];
+              seriesConfig = [
+                { name: 'LA', color: 'red.6', label: 'Legionella (LA)' },
+                { name: 'PA', color: 'blue.6', label: 'Pseudomonas (PA)' }
+              ];
+            } else if (positiveDetectionSampleTypeFilter === 'All') {
+              // Show separate lines for Pre, Post, and Both
+              seriesToShow = ['Pre', 'Post', 'Both'];
+              seriesConfig = [
+                { name: 'Pre', color: 'green.6', label: 'Only Pre' },
+                { name: 'Post', color: 'orange.6', label: 'Only Post' },
+                { name: 'Both', color: 'purple.6', label: 'Both Pre & Post' }
+              ];
+            } else {
+              // Single line based on current filters
+              const seriesName = positiveDetectionTestTypeFilter === 'Both' ? 'LA/PA' : positiveDetectionTestTypeFilter;
+              seriesToShow = ['detections'];
+              seriesConfig = [
+                { 
+                  name: 'detections', 
+                  color: positiveDetectionTestTypeFilter === 'LA' ? 'red.6' : 
+                         positiveDetectionTestTypeFilter === 'PA' ? 'blue.6' : 'green.6',
+                  label: `${seriesName} Positive Detections`
+                }
+              ];
+            }
+            
+            // Group by time period (daily for custom range, monthly for preset ranges) and count positive detections for each series
+            const monthlyData: any = {};
+            
+            filteredLpItems.forEach((item: any) => {
+              if (!item.sampledOn) return;
+              
+              const date = new Date(item.sampledOn);
+              // Use daily grouping for custom date range, monthly for preset ranges
+              const timeKey = positiveDetectionDateRangeFilter === 'custom' 
+                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+              
+              if (!monthlyData[timeKey]) {
+                monthlyData[timeKey] = {};
+                seriesToShow.forEach(series => {
+                  monthlyData[timeKey][series] = 0;
+                });
+              }
+              
+              // Determine which series this item belongs to
+              if (positiveDetectionTestTypeFilter === 'Both') {
+                // Count by test type
+                if (item.testType === 'LA') {
+                  monthlyData[timeKey]['LA']++;
+                } else if (item.testType === 'PA') {
+                  monthlyData[timeKey]['PA']++;
+                }
+              } else if (positiveDetectionSampleTypeFilter === 'All') {
+                // Count by sample type
+                const preValue = parseFloat(item.positiveCountPre || '0');
+                const postValue = parseFloat(item.positiveCountPost || '0');
+                
+                if (preValue > 0 && postValue > 0) {
+                  monthlyData[timeKey]['Both']++;
+                } else if (preValue > 0) {
+                  monthlyData[timeKey]['Pre']++;
+                } else if (postValue > 0) {
+                  monthlyData[timeKey]['Post']++;
+                }
+              } else {
+                // Single series
+                monthlyData[timeKey]['detections']++;
+              }
+            });
             
             // Convert to chart data format
             const chartData = Object.entries(monthlyData)
-              .map(([month, wingData]) => {
-                const dataPoint: any = { month };
-                Object.entries(wingData).forEach(([wing, count]) => {
-                  dataPoint[wing] = count;
-                });
-                return dataPoint;
-              })
-              .sort((a: any, b: any) => a.month.localeCompare(b.month));
-            
-            // Get all unique wings for series
-            const allWings = Array.from(new Set(
-              Object.values(monthlyData).flatMap(wingData => Object.keys(wingData))
-            ));
-            
-            const series = allWings.map(wing => ({
-              name: wing,
-              color: `hsl(${Math.random() * 360}, 70%, 50%)`
-            }));
+              .map(([timeKey, data]: [string, any]) => ({
+                timeKey,
+                ...data
+              }))
+              .sort((a: any, b: any) => a.timeKey.localeCompare(b.timeKey));
             
             return chartData.length > 0 ? (
-              <BarChart
+              <LineChart
                 h={300}
                 data={chartData}
-                dataKey="month"
-                series={series}
+                dataKey="timeKey"
+                series={seriesConfig}
+                curveType="linear"
                 withLegend
                 legendProps={{ verticalAlign: 'bottom' }}
+                connectNulls={false}
                 tooltipProps={{
-                  labelFormatter: (value) => `Month: ${value}`,
+                  labelFormatter: (value) => {
+                    if (positiveDetectionDateRangeFilter === 'custom') {
+                      // Format daily data: 2025-08-15 -> Aug 15, 2025
+                      const date = new Date(value);
+                      return date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      });
+                    } else {
+                      // Format monthly data: 2025-08 -> Aug 2025
+                      const [year, month] = value.split('-');
+                      const date = new Date(parseInt(year), parseInt(month) - 1);
+                      return date.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        year: 'numeric' 
+                      });
+                    }
+                  },
                   formatter: (value, name) => [`${value} detections`, name]
                 }}
               />
             ) : (
               <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Text c="dimmed">No positive detection data available for {positiveDetectionWingFilter === 'All Wings' ? 'all wings' : positiveDetectionWingFilter || 'selected wing'}</Text>
+                <Text c="dimmed">
+                  No positive detection data available for the selected filters
+                </Text>
               </div>
             );
           })()}
@@ -3536,7 +3720,7 @@ export default function HomePage() {
                     <Paper p="md" withBorder>
                       <Group justify="space-between">
                         <div>
-                          <Text size="sm" c="dimmed">Total Tests</Text>
+                          <Text size="sm" c="dimmed">Total Positive Detections</Text>
                           <Text size="xl" fw={700} c="blue">{totalTests}</Text>
                         </div>
                         <IconFlask size={24} color="var(--mantine-color-blue-6)" />

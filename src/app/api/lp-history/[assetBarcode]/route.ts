@@ -107,6 +107,51 @@ export async function GET(
       } else {
         console.log(`No assets found with barcode ${assetBarcode} in notes`);
       }
+
+      // ALSO search for assets where the searched barcode is the current barcode
+      // and find tests for any barcodes mentioned in that asset's notes
+      console.log(`Searching for assets with current barcode ${assetBarcode} and extracting barcodes from their notes...`);
+      
+      const currentAsset = assets.find(asset => asset.assetBarcode === assetBarcode);
+      if (currentAsset && currentAsset.notes) {
+        console.log(`Found asset with current barcode ${assetBarcode}, checking notes for other barcodes...`);
+        
+        // Extract all barcodes from the notes (format: B followed by 5 digits)
+        const barcodeRegex = /\bB\d{5}\b/g;
+        const notesBarcodes = currentAsset.notes.match(barcodeRegex) || [];
+        const uniqueNotesBarcodes = [...new Set(notesBarcodes)]; // Remove duplicates
+        
+        if (uniqueNotesBarcodes.length > 0) {
+          console.log(`Found barcodes in notes: ${uniqueNotesBarcodes.join(', ')}`);
+          
+          // Search for LP items with these barcodes from notes
+          for (const notesBarcode of uniqueNotesBarcodes) {
+            if (notesBarcode !== assetBarcode) { // Don't search for the same barcode again
+              const historyCommand = new ScanCommand({
+                TableName: TABLE_NAME,
+                FilterExpression: 'assetBarcode = :assetBarcode',
+                ExpressionAttributeValues: {
+                  ':assetBarcode': notesBarcode
+                }
+              });
+              
+              const historyResult = await docClient.send(historyCommand);
+              if (historyResult.Items && historyResult.Items.length > 0) {
+                // Only add items that aren't already in the results (avoid duplicates)
+                const newItems = historyResult.Items.filter(newItem => 
+                  !items.some(existingItem => existingItem.id === newItem.id)
+                );
+                items = items.concat(newItems);
+                console.log(`Found ${historyResult.Items.length} LP history items for notes barcode: ${notesBarcode} (${newItems.length} new items)`);
+              }
+            }
+          }
+        } else {
+          console.log(`No other barcodes found in notes for asset ${assetBarcode}`);
+        }
+      } else {
+        console.log(`No asset found with current barcode ${assetBarcode}`);
+      }
     } catch (assetError) {
       console.warn('Error searching assets for barcode in notes:', assetError);
       // Continue with exact matches only
