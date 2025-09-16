@@ -110,7 +110,33 @@ export default function LPHistoryCard({ assetBarcode }: LPHistoryCardProps) {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
-      return new Date(dateString).toLocaleDateString('en-GB');
+      // If it's in ISO format with time, extract just the date part and convert to DD/MM/YYYY
+      if (dateString.includes('T')) {
+        const datePart = dateString.split('T')[0]; // Get YYYY-MM-DD
+        const [year, month, day] = datePart.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      
+      // If it's already in YYYY-MM-DD format, convert to DD/MM/YYYY
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      
+      // If it's already in DD/MM/YYYY format, return as-is
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // For any other format, try to parse and format
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${day}/${month}/${year}`;
     } catch {
       return dateString;
     }

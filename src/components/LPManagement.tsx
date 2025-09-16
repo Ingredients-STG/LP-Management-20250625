@@ -222,6 +222,25 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
     if (!dateString) return "";
     
     try {
+      // If it's in ISO format with time, extract just the date part and convert to DD/MM/YYYY
+      if (dateString.includes('T')) {
+        const datePart = dateString.split('T')[0]; // Get YYYY-MM-DD
+        const [year, month, day] = datePart.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      
+      // If it's already in YYYY-MM-DD format, convert to DD/MM/YYYY
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
+      }
+      
+      // If it's already in DD/MM/YYYY format, return as-is
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // For any other format, try to parse and format
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
       
@@ -230,6 +249,42 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
       const year = date.getFullYear();
       
       return `${day}/${month}/${year}`;
+    } catch (error) {
+      return dateString;
+    }
+  };
+
+  // Helper function to format dates for HTML date input (YYYY-MM-DD) without timezone issues
+  const formatDateForInput = (dateString: string | null | undefined): string => {
+    if (!dateString) return "";
+    
+    try {
+      // If it's already in YYYY-MM-DD format, return as-is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // If it's in ISO format with time, extract just the date part
+      if (dateString.includes('T')) {
+        return dateString.split('T')[0];
+      }
+      
+      // If it's in DD/MM/YYYY format, convert to YYYY-MM-DD
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+        const [day, month, year] = dateString.split('/');
+        return `${year}-${month}-${day}`;
+      }
+      
+      // For any other format, try to parse and format
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString;
+      }
+      
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
     } catch (error) {
       return dateString;
     }
@@ -1007,12 +1062,12 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
         testType: item.testType,
         sampleTemperature: item.sampleTemperature,
         bacteriaVariant: item.bacteriaVariant,
-        sampledOn: item.sampledOn ? item.sampledOn.split('T')[0] : '',
-        nextResampleDate: item.nextResampleDate ? item.nextResampleDate.split('T')[0] : '',
+        sampledOn: item.sampledOn ? formatDateForInput(item.sampledOn) : '',
+        nextResampleDate: item.nextResampleDate ? formatDateForInput(item.nextResampleDate) : '',
         hotTemperature: item.hotTemperature,
         coldTemperature: item.coldTemperature,
         remedialWoNumber: item.remedialWoNumber,
-        remedialCompletedDate: item.remedialCompletedDate ? item.remedialCompletedDate.split('T')[0] : '',
+        remedialCompletedDate: item.remedialCompletedDate ? formatDateForInput(item.remedialCompletedDate) : '',
         status: item.status,
       });
     } else {
@@ -1711,12 +1766,12 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
             <Group justify="space-between">
               <Text fw={600} size="lg">Asset: {selectedItem.assetBarcode}</Text>
               <Group gap="xs">
-                <Badge 
-                  variant="light" 
-                  color={selectedItem.sampleType === 'Original' ? 'blue' : 'orange'}
-                >
-                  {selectedItem.sampleType}
-                </Badge>
+              <Badge 
+                variant="light" 
+                color={selectedItem.sampleType === 'Original' ? 'blue' : 'orange'}
+              >
+                {selectedItem.sampleType}
+              </Badge>
                 <Badge 
                   variant="light" 
                   color={selectedItem.status === 'Completed' ? 'green' : 'orange'}
