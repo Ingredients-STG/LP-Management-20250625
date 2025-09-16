@@ -307,6 +307,8 @@ export default function HomePage() {
   const [expandedAssets, setExpandedAssets] = useState<Set<string>>(new Set());
   // Temperature graph filter - default to All Wings
   const [temperatureGraphWingFilter, setTemperatureGraphWingFilter] = useState<string>('');
+  // Positive detection trends filter - default to All Wings
+  const [positiveDetectionWingFilter, setPositiveDetectionWingFilter] = useState<string>('');
   // Temperature graph period filter
   const [temperatureGraphPeriodFilter, setTemperatureGraphPeriodFilter] = useState<string>('90');
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage({ key: 'sidebarCollapsed', defaultValue: false });
@@ -3394,6 +3396,100 @@ export default function HomePage() {
             ) : (
               <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Text c="dimmed">No temperature data available for {temperatureGraphWingFilter === 'All Wings' ? 'all wings' : temperatureGraphWingFilter || 'selected wing'}</Text>
+              </div>
+            );
+          })()}
+        </Card>
+
+        {/* Positive Detection Trends Card */}
+        <Card shadow="sm" padding="lg" radius="md" withBorder className="chart-card">
+          <Group justify="space-between" mb="md">
+            <div>
+              <Title order={4}>Positive Detection Trends</Title>
+              <Text size="xs" c="dimmed">Trend of positive detections across wings over time</Text>
+            </div>
+            <Select
+              placeholder="Select Wing"
+              value={positiveDetectionWingFilter}
+              onChange={(value) => setPositiveDetectionWingFilter(value || '')}
+              data={[
+                { value: '', label: 'All Wings' },
+                ...Array.from(new Set(assets.map(a => a.wingInShort || a.wing).filter(Boolean))).map(wing => ({
+                  value: wing,
+                  label: wing
+                }))
+              ]}
+              clearable
+              style={{ minWidth: 150 }}
+            />
+          </Group>
+          {(() => {
+            const lpItems: any[] = stats.lpItems || [];
+            const filteredLpItems = positiveDetectionWingFilter && positiveDetectionWingFilter !== 'All Wings'
+              ? lpItems.filter((item: any) => item.wing === positiveDetectionWingFilter)
+              : lpItems;
+            
+            // Group by month and wing, count positive detections
+            const monthlyData = filteredLpItems.reduce((acc: { [key: string]: { [key: string]: number } }, item: any) => {
+              if (!item.sampledOn) return acc;
+              
+              const date = new Date(item.sampledOn);
+              const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+              const wing = item.wing || 'Unknown';
+              
+              if (!acc[monthKey]) {
+                acc[monthKey] = {};
+              }
+              
+              // Count positive detections (pre > 0 or post > 0)
+              const preValue = parseFloat(item.positiveCountPre || '0');
+              const postValue = parseFloat(item.positiveCountPost || '0');
+              const isPositive = preValue > 0 || postValue > 0;
+              
+              if (isPositive) {
+                acc[monthKey][wing] = (acc[monthKey][wing] || 0) + 1;
+              }
+              
+              return acc;
+            }, {});
+            
+            // Convert to chart data format
+            const chartData = Object.entries(monthlyData)
+              .map(([month, wingData]) => {
+                const dataPoint: any = { month };
+                Object.entries(wingData).forEach(([wing, count]) => {
+                  dataPoint[wing] = count;
+                });
+                return dataPoint;
+              })
+              .sort((a: any, b: any) => a.month.localeCompare(b.month));
+            
+            // Get all unique wings for series
+            const allWings = Array.from(new Set(
+              Object.values(monthlyData).flatMap(wingData => Object.keys(wingData))
+            ));
+            
+            const series = allWings.map(wing => ({
+              name: wing,
+              color: `hsl(${Math.random() * 360}, 70%, 50%)`
+            }));
+            
+            return chartData.length > 0 ? (
+              <BarChart
+                h={300}
+                data={chartData}
+                dataKey="month"
+                series={series}
+                withLegend
+                legendProps={{ verticalAlign: 'bottom' }}
+                tooltipProps={{
+                  labelFormatter: (value) => `Month: ${value}`,
+                  formatter: (value, name) => [`${value} detections`, name]
+                }}
+              />
+            ) : (
+              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Text c="dimmed">No positive detection data available for {positiveDetectionWingFilter === 'All Wings' ? 'all wings' : positiveDetectionWingFilter || 'selected wing'}</Text>
               </div>
             );
           })()}
