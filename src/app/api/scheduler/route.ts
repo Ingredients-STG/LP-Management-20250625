@@ -69,7 +69,7 @@ function shouldRunNow(report: ScheduledReport): boolean {
 // POST - Execute scheduled reports (called by cron job or manual trigger)
 export async function POST(request: NextRequest) {
   try {
-    console.log('Starting scheduled reports execution...');
+    console.log('Starting scheduled reports execution... (v1.1)');
     
     // Get all active scheduled reports
     const command = new ScanCommand({
