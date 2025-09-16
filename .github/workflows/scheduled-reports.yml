@@ -1,0 +1,33 @@
+name: Scheduled Email Reports
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  send-reports:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Email Reports
+        run: |
+          curl -X POST "${{ secrets.APP_URL }}/api/scheduler/" \
+            -H "Content-Type: application/json" \
+            -w "HTTP Status: %{http_code}\n" \
+            -s -o response.json
+          
+          echo "Response:"
+          cat response.json
+          
+          # Check if the request was successful
+          if [ $? -eq 0 ]; then
+            echo "✅ Email reports triggered successfully"
+          else
+            echo "❌ Failed to trigger email reports"
+            exit 1
+          fi
+    
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
