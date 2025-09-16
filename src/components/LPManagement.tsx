@@ -721,10 +721,10 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
         },
         body: JSON.stringify({
           ...formData,
-          // Convert date fields to ISO format for proper storage
-          sampledOn: formData.sampledOn ? new Date(formData.sampledOn).toISOString() : '',
-          nextResampleDate: formData.nextResampleDate ? new Date(formData.nextResampleDate).toISOString() : '',
-          remedialCompletedDate: formData.remedialCompletedDate ? new Date(formData.remedialCompletedDate).toISOString() : '',
+          // Store date fields as-is to avoid timezone conversion issues
+          sampledOn: formData.sampledOn || '',
+          nextResampleDate: formData.nextResampleDate || '',
+          remedialCompletedDate: formData.remedialCompletedDate || '',
           // Status will be calculated on the server side based on remedialWoNumber
           modifiedBy: 'current-user', // This should come from auth context
         }),
