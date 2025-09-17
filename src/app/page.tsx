@@ -2203,7 +2203,7 @@ export default function HomePage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              location: `${updateData.wing || ''} ${updateData.room || ''}`.trim(),
+              location: updateData.room || '',
               filterInstalledDate: updateData.filterInstalledOn,
               filterType: updateData.filterType,
               reasonForFilterChange: sanitizedValues.reasonForFilterChange || 'New Installation',

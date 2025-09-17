@@ -520,11 +520,17 @@ export default function LPManagement({ assets, onAssetClick }: LPManagementProps
           for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i] as any[];
             
-            // Skip empty rows
-            if (!row || row.every(cell => !cell)) continue;
+            // Skip completely empty rows or rows where critical fields are missing
+            if (!row || row.length === 0) continue;
+            
+            // Check if this row has essential data (WO Number and Instructions)
+            const woNumber = row[1]; // Column 2 (WO Number)
+            const instructions = row[9]; // Column 10 (Instructions)
+            
+            // Skip row only if both critical fields are empty/missing
+            if (!woNumber && !instructions) continue;
             
             // Extract data based on your Power Automate logic
-            const instructions = row[9] as string || ""; // Column 10 (Instructions)
             const description = row[8] as string || ""; // Column 9 (Description)
             const createdDate = formatDate(row[2] as string); // Column 3 (Created Date)
             // Final correct mapping based on your specification:
