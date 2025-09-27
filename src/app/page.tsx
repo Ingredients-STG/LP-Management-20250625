@@ -311,7 +311,7 @@ export default function HomePage() {
   const [positiveDetectionWingFilter, setPositiveDetectionWingFilter] = useState<string>('');
   const [positiveDetectionTestTypeFilter, setPositiveDetectionTestTypeFilter] = useState<string>('Both');
   const [positiveDetectionSampleTypeFilter, setPositiveDetectionSampleTypeFilter] = useState<string>('All');
-  const [positiveDetectionDateRangeFilter, setPositiveDetectionDateRangeFilter] = useState<string>('90');
+  const [positiveDetectionDateRangeFilter, setPositiveDetectionDateRangeFilter] = useState<string>('365');
   const [customDateRange, setCustomDateRange] = useState<[Date | null, Date | null]>([null, null]);
   // Temperature graph period filter
   const [temperatureGraphPeriodFilter, setTemperatureGraphPeriodFilter] = useState<string>('90');
@@ -2135,6 +2135,21 @@ export default function HomePage() {
         finalNotes = appendNoteToHistory(selectedAssetForView?.notes || '', newNoteInput.trim(), user?.email || user?.username || 'Unknown User');
       }
 
+      // Check if barcode has changed and add automatic note
+      const oldBarcode = selectedAssetForView?.assetBarcode;
+      const newBarcode = sanitizedValues.assetBarcode?.trim().toUpperCase();
+      if (oldBarcode && newBarcode && oldBarcode !== newBarcode) {
+        const currentDate = new Date().toLocaleDateString('en-GB');
+        const currentTime = new Date().toLocaleTimeString('en-GB', { hour12: false });
+        const userEmail = user?.email || user?.username || 'Current User';
+        const barcodeChangeNote = `[${currentDate}, ${currentTime}] ${userEmail}: ${oldBarcode} replaced by ${newBarcode}`;
+        
+        // Add the barcode change note to existing notes
+        finalNotes = finalNotes 
+          ? `${finalNotes}\n${barcodeChangeNote}`
+          : barcodeChangeNote;
+      }
+
       const updateData = {
         ...sanitizedValues,
         notes: finalNotes,
@@ -3453,7 +3468,7 @@ export default function HomePage() {
               <Select
                 placeholder="Date Range"
                 value={positiveDetectionDateRangeFilter}
-                onChange={(value) => setPositiveDetectionDateRangeFilter(value || '90')}
+                onChange={(value) => setPositiveDetectionDateRangeFilter(value || '365')}
                 data={[
                   { value: '30', label: 'Last 30 Days' },
                   { value: '90', label: 'Last 90 Days' },
@@ -4639,13 +4654,14 @@ export default function HomePage() {
       return roomA.localeCompare(roomB);
     });
 
-    // Calculate filter removal assets (same logic as dashboard "Filters to be Removed")
+    // Calculate filter removal assets (ACTIVE assets with Filter Needed: No, Need Flushing: No & Filters On: Yes)
     const filterRemovalAssets = assets.filter(asset => {
-      const isActiveOrMaintenance = asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE';
+      const isActive = asset.status === 'ACTIVE';
       const filterNeeded = typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
+      const needFlushing = typeof asset.needFlushing === 'boolean' ? asset.needFlushing : (asset.needFlushing?.toString().toLowerCase() === 'true' || asset.needFlushing?.toString().toLowerCase() === 'yes');
       const filtersOn = typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes');
       
-      return isActiveOrMaintenance && !filterNeeded && filtersOn;
+      return isActive && !filterNeeded && !needFlushing && filtersOn;
     }).sort((a, b) => {
       // Sort by Wing first, then by Room
       const wingA = (a.wing || '').toString().toLowerCase();
@@ -4884,7 +4900,7 @@ export default function HomePage() {
                       <Title order={4}>Filter Removal List</Title>
                     </Group>
                     <Text c="dimmed" size="sm">
-                      ACTIVE/MAINTENANCE assets with filters to be removed (Filter Needed: No, Filters On: Yes)
+                      ACTIVE assets with filters to be removed (Filter Needed: No, Need Flushing: No, Filters On: Yes)
                     </Text>
                   </div>
                   <Badge 
