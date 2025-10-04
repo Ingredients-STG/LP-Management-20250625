@@ -40,12 +40,22 @@ export async function GET() {
       
       const isExpiringThisWeek = expiryDate >= startOfWeek && expiryDate <= endOfWeek;
       
+      // Use the same boolean handling as filter-removal endpoint
+      const isActive = asset.status === 'ACTIVE';
+      const filterNeeded = typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
+      const filtersOn = typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes');
+      
+      // Debug logging for first few assets
+      if (allAssets.indexOf(asset) < 5) {
+        console.log(`Debug asset ${asset.assetBarcode}: expired=${daysUntilExpiry <= 0}, expiringThisWeek=${isExpiringThisWeek}, filterNeeded=${filterNeeded}, filtersOn=${filtersOn}, isActive=${isActive}, expiryDate=${asset.filterExpiryDate}`);
+      }
+      
       // Filter criteria: (expired OR expiring this week) AND Filter Needed = Yes AND Filters On = Yes AND Status = ACTIVE
       return (
         (daysUntilExpiry <= 0 || isExpiringThisWeek) && // Already expired OR expiring this week
-        (asset.filterNeeded === true || asset.filterNeeded === 'YES' || asset.filterNeeded === 'true') && // Filter Needed = Yes
-        (asset.filtersOn === true || asset.filtersOn === 'YES' || asset.filtersOn === 'true') && // Filters On = Yes
-        asset.status === 'ACTIVE' // Status = ACTIVE only
+        filterNeeded && // Filter Needed = Yes
+        filtersOn && // Filters On = Yes
+        isActive // Status = ACTIVE only
       );
     }).sort((a, b) => {
       // Sort by Room field
