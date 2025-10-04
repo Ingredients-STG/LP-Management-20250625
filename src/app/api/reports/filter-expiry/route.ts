@@ -43,10 +43,10 @@ export async function GET() {
       const isExpiringThisWeek = expiryDate >= startOfWeek && expiryDate <= endOfWeek;
       const isExpired = daysUntilExpiry <= 0;
       
-      // Use the same boolean handling as filter-removal endpoint
+      // Use the exact same logic as the web application
       const isActive = asset.status === 'ACTIVE';
-      const filterNeeded = typeof asset.filterNeeded === 'boolean' ? asset.filterNeeded : (asset.filterNeeded?.toString().toLowerCase() === 'true' || asset.filterNeeded?.toString().toLowerCase() === 'yes');
-      const filtersOn = typeof asset.filtersOn === 'boolean' ? asset.filtersOn : (asset.filtersOn?.toString().toLowerCase() === 'true' || asset.filtersOn?.toString().toLowerCase() === 'yes');
+      const filterNeeded = (asset.filterNeeded === true || asset.filterNeeded === 'YES' || asset.filterNeeded === 'true');
+      const filtersOn = (asset.filtersOn === true || asset.filtersOn === 'YES' || asset.filtersOn === 'true');
       
       // Debug logging for B30674 and first few assets
       if (asset.assetBarcode === 'B30674' || allAssets.indexOf(asset) < 5) {
