@@ -43,7 +43,7 @@ export async function GET() {
       const isExpiringThisWeek = expiryDate >= startOfWeek && expiryDate <= endOfWeek;
       const isExpired = daysUntilExpiry <= 0;
       
-      // Use the exact same logic as the web application
+      // Use the exact same logic as the web application dashboard
       const isActive = asset.status === 'ACTIVE';
       const filterNeeded = (asset.filterNeeded === true || asset.filterNeeded === 'YES' || asset.filterNeeded === 'true');
       const filtersOn = (asset.filtersOn === true || asset.filtersOn === 'YES' || asset.filtersOn === 'true');

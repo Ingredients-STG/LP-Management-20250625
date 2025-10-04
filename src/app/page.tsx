@@ -2964,7 +2964,7 @@ export default function HomePage() {
               const nextMonthEnd = getMonthEnd(nextMonthStart);
               
               // Filter active assets with valid expiry dates and filter needed = yes
-              const activeAssets = assets.filter(asset => asset.status === 'ACTIVE' || asset.status === 'MAINTENANCE');
+              const activeAssets = assets.filter(asset => asset.status === 'ACTIVE');
               const assetsWithExpiry = activeAssets.filter(asset => {
                 const expiryDate = parseDate(asset.filterExpiryDate);
                 if (expiryDate === null) return false;
